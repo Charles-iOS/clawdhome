@@ -3447,10 +3447,11 @@ final class ListenerDelegate: NSObject, NSXPCListenerDelegate {
     private static func isAdminUID(_ uid: uid_t) -> Bool {
         let adminGID: gid_t = 80
         guard let pw = getpwuid(uid) else { return false }
-        var groups = [gid_t](repeating: 0, count: 64)
+        // Darwin SDK here imports getgrouplist() with Int32 group buffer.
+        var groups = [Int32](repeating: 0, count: 64)
         var count = Int32(groups.count)
         getgrouplist(pw.pointee.pw_name, Int32(bitPattern: pw.pointee.pw_gid), &groups, &count)
-        return groups.prefix(Int(count)).contains(adminGID)
+        return groups.prefix(Int(count)).contains(Int32(bitPattern: adminGID))
     }
 }
 

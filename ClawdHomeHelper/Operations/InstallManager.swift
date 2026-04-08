@@ -31,7 +31,8 @@ struct InstallManager {
     static func install(username: String, version: String?, logURL: URL? = nil) throws -> String {
         try ensureNpmBuildToolchainReady()
         try normalizeNpmUserOwnership(username: username)
-        let npmPath = try findNpmBinary(for: username)
+        let nodePath = try findNodeBinary(for: username)
+        let npmCliPath = try findNpmCliJS(for: username)
         let packageArg = version.map { "openclaw@\($0)" } ?? "openclaw@latest"
         let prefix = npmGlobalDir(for: username)
         // 安装前预修正 .openclaw 所有权，避免存量 root-owned 文件阻断新版本启动
@@ -41,7 +42,7 @@ struct InstallManager {
         }
         let args = ["-u", username, "-H",
                     "env", sudoNodePath(for: username),
-                    npmPath, "install", "-g", "--prefix", prefix,
+                    nodePath, npmCliPath, "install", "-g", "--prefix", prefix,
                     "--include=optional",
                     "--loglevel", "verbose",
                     packageArg]
@@ -69,10 +70,11 @@ struct InstallManager {
             throw InstallError.unsupportedNpmRegistry(registry)
         }
         try normalizeNpmUserOwnership(username: username)
-        let npmPath = try findNpmBinary(for: username)
+        let nodePath = try findNodeBinary(for: username)
+        let npmCliPath = try findNpmCliJS(for: username)
         let args = ["-u", username, "-H",
                     "env", sudoNodePath(for: username),
-                    npmPath, "config", "set", "registry", option.rawValue, "--location=user"]
+                    nodePath, npmCliPath, "config", "set", "registry", option.rawValue, "--location=user"]
         do {
             if let logURL {
                 _ = try runLogging("/usr/bin/sudo", args: args, logURL: logURL)
@@ -97,12 +99,13 @@ struct InstallManager {
 
     /// 获取指定用户当前 npm 安装源（优先用户级配置）
     static func getNpmRegistry(username: String) -> String {
-        guard let npmPath = try? findNpmBinary(for: username) else {
+        guard let nodePath = try? findNodeBinary(for: username),
+              let npmCliPath = try? findNpmCliJS(for: username) else {
             return NpmRegistryOption.npmOfficial.rawValue
         }
         let args = ["-u", username, "-H",
                     "env", sudoNodePath(for: username),
-                    npmPath, "config", "get", "registry", "--location=user"]
+                    nodePath, npmCliPath, "config", "get", "registry", "--location=user"]
         let raw = (try? run("/usr/bin/sudo", args: args)) ?? NpmRegistryOption.npmOfficial.rawValue
         if let option = NpmRegistryOption.fromRegistryURL(raw) {
             return option.rawValue
@@ -127,7 +130,11 @@ struct InstallManager {
         //    避免将管理机上的全局安装版本错误地报告为用户已安装版本
         let userBin = "\(npmGlobalBin(for: username))/openclaw"
         if FileManager.default.isExecutableFile(atPath: userBin) {
-            return try? run("/usr/bin/sudo", args: ["-u", username, "-H", "env", sudoNodePath(for: username), userBin, "--version"])
+            return try? run("/usr/bin/sudo", args: [
+                "-u", username, "-H",
+                "env", "HOME=/Users/\(username)", "PATH=\(ConfigWriter.buildNodePath(username: username))",
+                userBin, "--version"
+            ])
         }
         return nil
     }
@@ -158,6 +165,62 @@ struct InstallManager {
             }
         }
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+        throw InstallError.npmNotFound
+    }
+
+    /// 优先返回用户隔离环境中的 node 可执行文件，避免误用系统旧版本 node。
+    static func findNodeBinary(for username: String) throws -> String {
+        let home = "/Users/\(username)"
+        let brewRoot = "\(home)/.brew"
+        var candidates: [String] = []
+
+        let libNodeRoot = "\(brewRoot)/lib/nodejs"
+        if let entries = try? FileManager.default.contentsOfDirectory(atPath: libNodeRoot).sorted(by: >) {
+            for entry in entries where entry.hasPrefix("node-") {
+                candidates.append("\(libNodeRoot)/\(entry)/bin/node")
+            }
+        }
+
+        candidates.append(contentsOf: [
+            "\(brewRoot)/bin/node",
+            "\(brewRoot)/opt/node/bin/node",
+            "\(brewRoot)/opt/node@24/bin/node",
+            "\(brewRoot)/opt/node@22/bin/node",
+            "\(brewRoot)/opt/node@20/bin/node",
+            "\(brewRoot)/opt/node@18/bin/node",
+        ])
+
+        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+        throw InstallError.npmNotFound
+    }
+
+    /// 直接定位 npm-cli.js，并与 node 组合执行，避免依赖 npm shebang 的 PATH 解析。
+    static func findNpmCliJS(for username: String) throws -> String {
+        let home = "/Users/\(username)"
+        let brewRoot = "\(home)/.brew"
+        var candidates: [String] = []
+
+        let libNodeRoot = "\(brewRoot)/lib/nodejs"
+        if let entries = try? FileManager.default.contentsOfDirectory(atPath: libNodeRoot).sorted(by: >) {
+            for entry in entries where entry.hasPrefix("node-") {
+                candidates.append("\(libNodeRoot)/\(entry)/lib/node_modules/npm/bin/npm-cli.js")
+            }
+        }
+
+        candidates.append(contentsOf: [
+            "\(brewRoot)/lib/node_modules/npm/bin/npm-cli.js",
+            "\(brewRoot)/opt/node/lib/node_modules/npm/bin/npm-cli.js",
+            "\(brewRoot)/opt/node@24/lib/node_modules/npm/bin/npm-cli.js",
+            "\(brewRoot)/opt/node@22/lib/node_modules/npm/bin/npm-cli.js",
+            "\(brewRoot)/opt/node@20/lib/node_modules/npm/bin/npm-cli.js",
+            "\(brewRoot)/opt/node@18/lib/node_modules/npm/bin/npm-cli.js",
+        ])
+
+        for path in candidates where FileManager.default.fileExists(atPath: path) {
             return path
         }
         throw InstallError.npmNotFound

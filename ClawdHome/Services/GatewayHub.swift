@@ -288,8 +288,22 @@ final class GatewayHub {
         } else if alive {
             healthzDeadSince.removeValue(forKey: username)
             readinessMap[username] = .starting
+        } else {
+            // 单页探活也要能把 pending starting 收敛为 stopped，避免 UI 永远显示“启动中…”
+            if readinessMap[username] == .starting || readinessMap[username] == .ready {
+                if healthzDeadSince[username] == nil {
+                    healthzDeadSince[username] = Date()
+                    return
+                }
+                if let deadSince = healthzDeadSince[username], Date().timeIntervalSince(deadSince) > 10 {
+                    readinessMap[username] = .stopped
+                    healthzDeadSince.removeValue(forKey: username)
+                }
+            } else {
+                readinessMap[username] = .stopped
+                healthzDeadSince.removeValue(forKey: username)
+            }
         }
-        // 不处理 !alive 情况——留给 DashboardView 的完整 probe 逻辑（含 processRunning tiebreaker）
     }
 
     // MARK: - 即时状态标记（UI 操作时调用，消除等 probe 确认的延迟）

@@ -2651,9 +2651,12 @@ struct UserDetailView: View {
             // 已有未完成会话，但尚未开始（全部 pending）：
             // 仅在"仍符合 onboarding 条件"时保持在初始化向导 pre-start。
             if !state.isCompleted {
+                let readiness = gatewayHub.readinessMap[user.username]
+                let isGatewayOperational = user.isRunning || readiness == .starting || readiness == .ready
                 let shouldKeepOnboarding = shouldForceOnboarding || (!user.isAdmin
                     && user.clawType == .macosUser
-                    && user.openclawVersion == nil)
+                    && user.openclawVersion == nil
+                    && !isGatewayOperational)
                 if shouldKeepOnboarding {
                     user.initStep = nil
                     return true

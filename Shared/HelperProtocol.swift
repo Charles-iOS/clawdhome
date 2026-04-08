@@ -29,6 +29,9 @@ enum ManagedUserFilter {
     /// 获取 Helper 版本号，用于连通性验证
     func getVersion(withReply reply: @escaping (String) -> Void)
 
+    /// 请求 Helper 自行重启（exit(0) 交由 launchd KeepAlive 拉起）
+    func requestRestart(withReply reply: @escaping (Bool) -> Void)
+
     /// 在系统创建新的 macOS 标准用户账户
     func createUser(
         username: String,

@@ -104,6 +104,8 @@ func run(_ executable: String, args: [String] = []) throws -> String {
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: executable)
     proc.arguments = args
+    // 避免以 sudo -u 切换用户时继承到无权限 cwd，触发 Node.js uv_cwd EACCES。
+    proc.currentDirectoryURL = URL(fileURLWithPath: "/")
 
     let stdout = Pipe()
     let stderr = Pipe()
@@ -133,6 +135,8 @@ func runLogging(_ executable: String, args: [String] = [], logURL: URL) throws -
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: executable)
     proc.arguments = args
+    // 统一固定在可访问目录，避免子进程因当前目录权限问题提前崩溃。
+    proc.currentDirectoryURL = URL(fileURLWithPath: "/")
 
     // 先把命令行本身写入日志
     let cmdLine = "$ " + ([executable] + args).joined(separator: " ") + "\n"

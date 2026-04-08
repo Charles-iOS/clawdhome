@@ -191,6 +191,21 @@ final class HelperClient {
         }
     }
 
+    /// 启动超时后的兜底轮询：某些机器上 launchd 启动与 XPC 回调可能晚于请求超时。
+    private func isGatewayRunningEventually(
+        username: String,
+        attempts: Int = 12,
+        intervalNanoseconds: UInt64 = 1_000_000_000
+    ) async -> Bool {
+        for _ in 0..<max(1, attempts) {
+            if await isGatewayRunningQuickly(username: username) {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: intervalNanoseconds)
+        }
+        return false
+    }
+
     // MARK: - 用户管理
 
     func createUser(username: String, fullName: String, password: String) async throws {
@@ -325,7 +340,7 @@ final class HelperClient {
             }
         } catch {
             // 某些场景下（例如 XPC 回调丢失）请求会超时，但 gateway 已经实际拉起。
-            if await isGatewayRunningQuickly(username: username) { return }
+            if await isGatewayRunningEventually(username: username) { return }
             throw error
         }
         if !ok { throw HelperError.operationFailed(msg ?? L10n.k("services.helper_client.unknown", fallback: "未知错误")) }
@@ -422,6 +437,11 @@ final class HelperClient {
     private func shouldSuggestNodeRepair(username: String, startupErrorMessage: String) async -> Bool {
         if Self.isLikelyMissingIsolatedNodeToolchain(message: startupErrorMessage) {
             return true
+        }
+        // 启动超时通常是 launchctl/bootstrap 或进程稳定性问题，不应误导为 Node.js 缺失。
+        let lowered = startupErrorMessage.lowercased()
+        if lowered.contains("启动 gateway 超时") || lowered.contains("gateway start timeout") {
+            return false
         }
         return !(await isNodeInstalled(username: username))
     }
