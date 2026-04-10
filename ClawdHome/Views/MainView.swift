@@ -1,0 +1,41 @@
+// ClawdHome/Views/MainView.swift
+
+import SwiftUI
+
+struct MainView: View {
+    @State private var selection: SidebarDestination? = .dashboard
+
+    var body: some View {
+        NavigationSplitView {
+            SidebarView(selection: $selection)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
+        } detail: {
+            detailView
+        }
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        switch selection {
+        case .dashboard:
+            HomeDashboardView()
+        case .agents:
+            AgentGridView()
+        case .models:
+            ModelConfigView()
+        case .cron:
+            CronTaskView()
+        case .skills:
+            SkillsView()
+        case .channels:
+            ChannelView()
+        case .settings:
+            AppSettingsView()
+        case nil:
+            ContentUnavailableView(
+                L10n.k("main.select_item", fallback: "选择一个菜单项"),
+                systemImage: "sidebar.left"
+            )
+        }
+    }
+}

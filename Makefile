@@ -19,7 +19,7 @@ SIGN_PKG ?= false
 NOTARIZE ?= true
 BUILD_ARCHS ?= arm64
 
-.PHONY: help bump-build build build-helper build-release install-helper uninstall-helper pkg pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
+.PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
 WEBSITE_DIR ?= ../clawdhome_website
 
@@ -28,6 +28,7 @@ help:
 	@echo "  build            Debug 构建（构建时自动递增本地 Build 号）"
 	@echo "  build-helper     Debug 构建 Helper"
 	@echo "  build-release    Release 归档构建（构建时自动递增本地 Build 号）"
+	@echo "  dev-runtime      准备 Debug 运行时到 build/dev-runtime（供 Xcode 直跑）"
 	@echo "  bump-build       预览下一次构建将使用的 Build 号"
 	@echo "  version          显示当前语义化版本、当前 Build 号和当前 tag"
 	@echo "  version-next     预览下一个语义化版本号"
@@ -38,6 +39,7 @@ help:
 	@echo "  pkg              开发用快速打包（默认不签名）"
 	@echo "  pkg-intel        打包 Intel (x86_64) 安装包"
 	@echo "  pkg-universal    打包 Universal (arm64 + x86_64) 安装包"
+	@echo "  pkg-all          连续打包 arm64 + x86_64（分开两个 pkg）"
 	@echo "  pkg-skip-build   跳过构建直接打开发包"
 	@echo "  pkg-signed       生成已签名未公证安装包（发布前本地验收推荐）"
 	@echo "  notarize-pkg     生成已签名且已公证安装包（读取 NOTARY_PROFILE / CLAWDHOME_NOTARY_PROFILE）"
@@ -133,6 +135,10 @@ build-release: bump-build
 		ARCHS="$(BUILD_ARCHS)" \
 		ONLY_ACTIVE_ARCH=NO
 
+dev-runtime:
+	@mkdir -p build/dev-runtime
+	bash scripts/bundle-runtime.sh "$(PWD)/build/dev-runtime" "$$(uname -m)"
+
 # ── 安装 / 卸载 ───────────────────────────────────────────────────────────────
 
 install-helper:
@@ -153,6 +159,11 @@ pkg-intel: bump-build
 
 pkg-universal: bump-build
 	PKG_ARCHS="arm64 x86_64" bash scripts/build-pkg.sh --no-sync-api-version
+	@open dist/
+
+pkg-all: bump-build
+	PKG_ARCHS=arm64 bash scripts/build-pkg.sh --no-sync-api-version
+	PKG_ARCHS=x86_64 bash scripts/build-pkg.sh --no-sync-api-version
 	@open dist/
 
 pkg-skip-build:

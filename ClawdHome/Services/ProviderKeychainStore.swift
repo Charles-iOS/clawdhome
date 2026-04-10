@@ -40,28 +40,29 @@ final class ProviderKeychainStore {
     // invalidate any computed property (providerStatuses) that reads it.
     private var _keychainVersion: Int = 0
 
-    private func account(for provider: KnownProvider) -> String {
-        "provider.\(provider.rawValue)"
+    private func account(for providerId: String) -> String {
+        "provider.\(providerId)"
     }
 
-    func save(apiKey: String, for provider: KnownProvider) {
-        // Delete first to avoid errSecDuplicateItem on subsequent saves.
-        delete(for: provider)
+    // MARK: - 字符串 provider 接口（动态 provider）
+
+    func save(apiKey: String, forProvider id: String) {
+        delete(forProvider: id)
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account(for: provider),
+            kSecAttrAccount as String: account(for: id),
             kSecValueData as String:   Data(apiKey.utf8)
         ]
         SecItemAdd(query as CFDictionary, nil)
         _keychainVersion += 1
     }
 
-    func read(for provider: KnownProvider) -> String? {
+    func read(forProvider id: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account(for: provider),
+            kSecAttrAccount as String: account(for: id),
             kSecReturnData as String:  true,
             kSecMatchLimit as String:  kSecMatchLimitOne
         ]
@@ -74,21 +75,38 @@ final class ProviderKeychainStore {
         return key
     }
 
-    func delete(for provider: KnownProvider) {
+    func delete(forProvider id: String) {
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account(for: provider)
+            kSecAttrAccount as String: account(for: id)
         ]
         SecItemDelete(query as CFDictionary)
         _keychainVersion += 1
     }
 
-    func hasKey(for provider: KnownProvider) -> Bool {
-        read(for: provider) != nil
+    func hasKey(forProvider id: String) -> Bool {
+        read(forProvider: id) != nil
     }
 
-    /// Returns all providers with a flag indicating whether an API key is stored.
+    // MARK: - KnownProvider 便捷接口（桥接到字符串接口）
+
+    func save(apiKey: String, for provider: KnownProvider) {
+        save(apiKey: apiKey, forProvider: provider.rawValue)
+    }
+
+    func read(for provider: KnownProvider) -> String? {
+        read(forProvider: provider.rawValue)
+    }
+
+    func delete(for provider: KnownProvider) {
+        delete(forProvider: provider.rawValue)
+    }
+
+    func hasKey(for provider: KnownProvider) -> Bool {
+        hasKey(forProvider: provider.rawValue)
+    }
+
     /// Reading `_keychainVersion` establishes an @Observable dependency so
     /// SwiftUI views re-evaluate this property after every save/delete.
     var providerStatuses: [(provider: KnownProvider, hasKey: Bool)] {

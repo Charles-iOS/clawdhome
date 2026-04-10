@@ -269,6 +269,23 @@ fi
 PKG_NAME="${APP_NAME}-${PKG_VERSION_LABEL}.pkg"
 PKG_OUTPUT="$DIST_DIR/$PKG_NAME"
 
+# ── Step 1.5：将 Node.js + OpenClaw 嵌入 app bundle ──────────────────────────
+
+BUNDLE_RESOURCES="$APP_BUNDLE/Contents/Resources"
+SKIP_BUNDLE_RUNTIME="${SKIP_BUNDLE_RUNTIME:-false}"
+
+if [ "$SKIP_BUNDLE_RUNTIME" = false ]; then
+  # 取 PKG_ARCHS 的第一个架构用于 Node.js 下载（universal 包用 arm64）
+  BUNDLE_ARCH=$(echo "$PKG_ARCHS" | awk '{print $1}')
+  log "嵌入 Node.js + OpenClaw 运行时 (${BUNDLE_ARCH})..."
+  bash "$SCRIPT_DIR/bundle-runtime.sh" "$BUNDLE_RESOURCES" "$BUNDLE_ARCH"
+else
+  log "跳过运行时嵌入 (SKIP_BUNDLE_RUNTIME=true)"
+  if [ ! -f "$BUNDLE_RESOURCES/node/bin/node" ]; then
+    fail "SKIP_BUNDLE_RUNTIME=true 但 app bundle 中未找到 node"
+  fi
+fi
+
 # ── Step 2：准备 pkg 目录结构 ─────────────────────────────────────────────────
 
 log "准备安装包目录结构..."
@@ -278,21 +295,20 @@ PKG_SCRIPTS="$REPO_ROOT/build/pkg-scripts"
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
 
 mkdir -p "$PKG_ROOT/Applications"
-mkdir -p "$PKG_ROOT/Library/PrivilegedHelperTools"
-mkdir -p "$PKG_ROOT/Library/LaunchDaemons"
 mkdir -p "$PKG_SCRIPTS"
 
-# 拷贝 app（bundle 内的 plist 保留，供 SMAppService 手动安装时使用）
+# 拷贝 app（含嵌入的 Node.js + OpenClaw）
 cp -r "$APP_BUNDLE" "$PKG_ROOT/Applications/"
 
-# 从 bundle 中提取 Helper 二进制到系统路径
+# Helper 仍然按旧方式部署（过渡期保留，后续移除）
 HELPER_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchDaemons/ClawdHomeHelper"
-[ -f "$HELPER_IN_BUNDLE" ] || fail "未在 app bundle 中找到 ClawdHomeHelper"
-cp "$HELPER_IN_BUNDLE" "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
-chmod 555 "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
+if [ -f "$HELPER_IN_BUNDLE" ]; then
+  mkdir -p "$PKG_ROOT/Library/PrivilegedHelperTools"
+  mkdir -p "$PKG_ROOT/Library/LaunchDaemons"
+  cp "$HELPER_IN_BUNDLE" "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
+  chmod 555 "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
 
-# 生成系统级 LaunchDaemon plist（用绝对路径 ProgramArguments，非 BundleProgram）
-cat > "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist" << DAEMON_PLIST
+  cat > "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist" << DAEMON_PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -314,7 +330,11 @@ cat > "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist" << DAEMON_PLIST
 </dict>
 </plist>
 DAEMON_PLIST
-chmod 644 "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist"
+  chmod 644 "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist"
+  log "Helper daemon 已嵌入（过渡期保留）"
+else
+  log "未找到 Helper 二进制，跳过 daemon 部署"
+fi
 
 ok "目录结构准备完成"
 
@@ -338,20 +358,44 @@ cat > "$PKG_SCRIPTS/postinstall" << POSTINSTALL
 #!/usr/bin/env bash
 set -euo pipefail
 
+APP_DIR="/Applications/${APP_NAME}.app"
 HELPER="/Library/PrivilegedHelperTools/${HELPER_LABEL}"
 PLIST="/Library/LaunchDaemons/${HELPER_LABEL}.plist"
 
-# 修正权限
-chmod 555 "\$HELPER"
-chown root:wheel "\$HELPER"
-chown root:wheel "\$PLIST"
-chmod 644 "\$PLIST"
-
 # 解除 app 隔离（允许未签名 app 运行，无弹框）
-xattr -cr "/Applications/${APP_NAME}.app" 2>/dev/null || true
+xattr -cr "\$APP_DIR" 2>/dev/null || true
 
-# 注册并启动 Helper daemon
-launchctl bootstrap system "\$PLIST" 2>/dev/null || true
+# ── Helper daemon（过渡期保留）──
+if [ -f "\$HELPER" ] && [ -f "\$PLIST" ]; then
+  chmod 555 "\$HELPER"
+  chown root:wheel "\$HELPER"
+  chown root:wheel "\$PLIST"
+  chmod 644 "\$PLIST"
+  launchctl bootstrap system "\$PLIST" 2>/dev/null || true
+fi
+
+# ── 为当前登录用户初始化 OpenClaw 环境 ──
+CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
+  USER_HOME=\$(dscl . -read "/Users/\$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print \$2}')
+  if [ -n "\$USER_HOME" ]; then
+    OPENCLAW_DIR="\$USER_HOME/.openclaw"
+    mkdir -p "\$OPENCLAW_DIR/data" "\$OPENCLAW_DIR/logs"
+    chown -R "\$CONSOLE_USER" "\$OPENCLAW_DIR"
+    echo "OpenClaw 配置目录已初始化: \$OPENCLAW_DIR"
+
+    # 验证 bundled 运行时
+    NODE="\$APP_DIR/Contents/Resources/node/bin/node"
+    OPENCLAW_ENTRY="\$APP_DIR/Contents/Resources/openclaw/lib/node_modules/openclaw/openclaw.mjs"
+    if [ -x "\$NODE" ] && [ -f "\$OPENCLAW_ENTRY" ]; then
+      NODE_VER=\$("\$NODE" --version 2>/dev/null || echo "unknown")
+      echo "✅ Node.js \$NODE_VER 就绪"
+      echo "✅ OpenClaw 就绪"
+    else
+      echo "⚠️  bundled 运行时未找到，App 启动时将自动检测"
+    fi
+  fi
+fi
 
 echo "ClawdHome 安装完成"
 exit 0

@@ -15,6 +15,7 @@ struct GatewaySkillStatus: Codable, Identifiable {
     let skillKey: String
     let emoji: String?
     let homepage: String?
+    let category: String?
     let always: Bool
     let disabled: Bool
     let eligible: Bool

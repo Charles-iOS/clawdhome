@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HELPER="/Library/PrivilegedHelperTools/ai.clawdhome.mac.helper"
+PLIST="/Library/LaunchDaemons/ai.clawdhome.mac.helper.plist"
+
+# 修正权限
+chmod 555 "$HELPER"
+chown root:wheel "$HELPER"
+chown root:wheel "$PLIST"
+chmod 644 "$PLIST"
+
+# 解除 app 隔离（允许未签名 app 运行，无弹框）
+xattr -cr "/Applications/ClawdHome.app" 2>/dev/null || true
+
+# 注册并启动 Helper daemon
+launchctl bootstrap system "$PLIST" 2>/dev/null || true
+
+echo "ClawdHome 安装完成"
+exit 0

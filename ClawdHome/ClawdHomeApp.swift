@@ -17,18 +17,26 @@ final class ClawdHomeAppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct ClawdHomeApp: App {
     @NSApplicationDelegateAdaptor(ClawdHomeAppDelegate.self) private var appDelegate
+
+    // 新单实例架构服务
+    @State private var processManager = GatewayProcessManager()
+    @State private var envChecker = EnvironmentChecker()
+    @State private var gatewayService = GatewayService()
+    @State private var agentStore = AgentStore()
+    @State private var keychainStore = ProviderKeychainStore()
+
+    // 旧服务（Phase 5 清理时移除）
     @State private var helperClient: HelperClient
     @State private var shrimpPool: ShrimpPool
     @State private var updater = UpdateChecker()
     @State private var modelStore = GlobalModelStore()
-    @State private var keychainStore = ProviderKeychainStore()
     @State private var gatewayHub = GatewayHub()
     @State private var lockStore = AppLockStore()
     @State private var maintenanceWindowRegistry = MaintenanceWindowRegistry()
+
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.system.rawValue
 
     init() {
-        // 强制忽略上次会话窗口恢复，确保每次启动从全新窗口开始
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
         let client = HelperClient()
         _helperClient = State(initialValue: client)
@@ -38,43 +46,31 @@ struct ClawdHomeApp: App {
     var body: some Scene {
         let appLanguage = AppLanguage(rawValue: appLanguageRaw) ?? .system
         WindowGroup {
-            ContentView()
+            MainView()
+                .environment(processManager)
+                .environment(envChecker)
+                .environment(gatewayService)
+                .environment(agentStore)
+                .environment(keychainStore)
+                .environment(\.locale, appLanguage.locale)
+                // 旧服务注入（Phase 5 移除）
                 .environment(helperClient)
                 .environment(shrimpPool)
                 .environment(updater)
                 .environment(modelStore)
-                .environment(keychainStore)
                 .environment(gatewayHub)
                 .environment(lockStore)
                 .environment(maintenanceWindowRegistry)
-                .environment(\.locale, appLanguage.locale)
-                .task { await maintainConnection() }
-                .task { await updater.checkIfNeeded() }
-                .task { await updater.refreshAppUpdateState(helperClient: helperClient) }
-                .task { await MainActor.run { shrimpPool.start() } }
-                .onAppear { modelStore.load() }
-                .task {
-                    // 主界面稳定后延迟 2s 预热角色中心 WebView，用户无感知
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
-                    await MainActor.run {
-                        RoleMarketWebViewCache.shared.preloadIfNeeded()
-                    }
-                }
+                .task { await bootstrap() }
         }
         .windowStyle(.titleBar)
-        // .contentSize 会随 inspector 列宽变化不断触发窗口 resize，造成约束死循环崩溃
-        // .automatic 让窗口可自由拖动，列宽只约束 minimum，不产生反馈
         .windowResizability(.automatic)
-        .defaultSize(
-            width: UserDetailWindowLayout.mainWindowDefaultWidth,
-            height: UserDetailWindowLayout.detailWindowDefaultHeight
-        )
+        .defaultSize(width: 960, height: 640)
         .commands {
-            // 隐藏主窗口L10n.k("clawd_home_app.text_ededdc48", fallback: "新建窗口")菜单项（单主窗口）
             CommandGroup(replacing: .newItem) { }
         }
 
-        // 龙虾详情独立窗口：每个 username 唯一，重复触发时置前
+        // 旧窗口组（Phase 5 移除）
         WindowGroup(id: "claw-detail", for: String.self) { $username in
             if let name = username {
                 ClawDetailWindow(username: name)
@@ -154,15 +150,73 @@ struct ClawdHomeApp: App {
         .defaultSize(width: 640, height: 560)
     }
 
-    /// 首次连接，断开后每 5 秒自动重试
-    private func maintainConnection() async {
-        helperClient.connect()
-        while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            if !helperClient.isConnected {
-                helperClient.connect()
+    /// 应用启动流程：环境检查 → 启动 Gateway → 连接 WebSocket → 加载智能体
+    private func bootstrap() async {
+        agentStore.load()
+        await envChecker.check()
+
+        if envChecker.isReady {
+            processManager.start()
+
+            // 等待 Gateway 就绪后再连接 WebSocket
+            for _ in 0..<30 {
+                if processManager.isRunning { break }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
+
+        // 无论是 App 自己拉起的还是外部已有的 gateway，都尝试连接
+        let gatewayReady: Bool
+        if processManager.isRunning {
+            appLog("bootstrap: processManager already running")
+            gatewayReady = true
+        } else {
+            appLog("bootstrap: processManager not running, probing port \(processManager.gatewayPort)...")
+            let (alive, ready) = await GatewayClient.httpProbe(port: processManager.gatewayPort)
+            appLog("bootstrap: probe result alive=\(alive) ready=\(ready)")
+            gatewayReady = ready
+        }
+
+        if gatewayReady {
+            await connectGatewayService()
+        } else {
+            appLog("bootstrap: gateway not ready, skipping WebSocket connect", level: .warn)
+        }
+
+        // 旧连接保持（Phase 5 移除）
+        helperClient.connect()
+        await MainActor.run { shrimpPool.start() }
+        modelStore.load()
+    }
+
+    private func readGatewayToken() -> String? {
+        let url = GatewayProcessManager.openClawConfigDir.appendingPathComponent("openclaw.json")
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let gw = json["gateway"] as? [String: Any],
+              let auth = gw["auth"] as? [String: Any],
+              let token = auth["token"] as? String else { return nil }
+        return token
+    }
+
+    /// 读取 token 并连接 WebSocket（带重试，应对 gateway 启动后刷新 token）
+    private func connectGatewayService() async {
+        for attempt in 1...3 {
+            if let token = readGatewayToken() {
+                appLog("bootstrap: token=\(token.prefix(8))... attempt=\(attempt)")
+                gatewayService.updateToken(token)
+            } else {
+                appLog("bootstrap: no token in config", level: .error)
+            }
+            await gatewayService.connect()
+            if gatewayService.isConnected {
+                appLog("bootstrap: connected on attempt \(attempt)")
+                return
+            }
+            appLog("bootstrap: attempt \(attempt) failed", level: .warn)
+            if attempt < 3 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
+        }
+        appLog("bootstrap: connect failed after retries", level: .error)
     }
 }
 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<pkg-info overwrite-permissions="true" relocatable="false" identifier="ai.clawdhome.mac" postinstall-action="none" version="1.4.0" format-version="2" generator-version="InstallCmds-860.14 (24G517)" install-location="/" auth="root">
+    <payload numberOfFiles="63" installKBytes="9148"/>
+    <bundle path="./Applications/ClawdHome.app" id="ai.clawdhome.mac" CFBundleShortVersionString="1.4.0" CFBundleVersion="85"/>
+    <bundle path="./Applications/ClawdHome.app/Contents/Resources/SwiftTerm_SwiftTerm.bundle" id="swiftterm.SwiftTerm.resources" CFBundleShortVersionString="1.4.0" CFBundleVersion="508"/>
+    <bundle-version>
+        <bundle id="ai.clawdhome.mac"/>
+    </bundle-version>
+    <upgrade-bundle>
+        <bundle id="ai.clawdhome.mac"/>
+    </upgrade-bundle>
+    <update-bundle/>
+    <atomic-update-bundle/>
+    <strict-identifier>
+        <bundle id="ai.clawdhome.mac"/>
+    </strict-identifier>
+    <relocate>
+        <bundle id="ai.clawdhome.mac"/>
+    </relocate>
+    <scripts>
+        <preinstall file="./preinstall" timeout="600"/>
+        <postinstall file="./postinstall" timeout="600"/>
+    </scripts>
+</pkg-info>

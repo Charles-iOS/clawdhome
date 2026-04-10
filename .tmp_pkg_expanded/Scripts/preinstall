@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# 关闭 app
+osascript -e 'tell application "ClawdHome" to quit' 2>/dev/null || true
+# 停止旧 Helper daemon（如果在运行）
+if launchctl print "system/ai.clawdhome.mac.helper" &>/dev/null 2>&1; then
+  launchctl bootout "system/ai.clawdhome.mac.helper" 2>/dev/null || true
+fi
+sleep 1
+exit 0
