@@ -106,30 +106,70 @@ struct ConfigWriter {
 
     // MARK: - 内部工具
 
-    /// 查找 openclaw 二进制：仅允许用户私有 npm-global，禁止回退系统全局路径
+    /// 查找 openclaw 二进制：优先用户私有 npm-global，回退到 App bundle 内打包的 openclaw
     static func findOpenclawBinary(for username: String) throws -> String {
-        let candidates = ["\(InstallManager.npmGlobalBin(for: username))/openclaw"]
+        var candidates = ["\(InstallManager.npmGlobalBin(for: username))/openclaw"]
+        // App bundle 内打包的 openclaw（兜底）
+        candidates += bundledOpenclawBinPaths().map { "\($0)/openclaw" }
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
             return path
         }
         throw ConfigError.openclawNotFound
     }
 
+    /// App bundle 内的 Resources 路径候选（Helper 是独立 daemon，需手动定位）
+    static func bundledResourcesPaths() -> [String] {
+        var candidates: [String] = []
+
+        #if DEBUG
+        // Debug 模式：通过源码路径推导仓库根目录 → build/dev-runtime
+        let sourceURL = URL(fileURLWithPath: #filePath)
+        // ConfigWriter.swift → Operations → ClawdHomeHelper → repoRoot
+        let repoRoot = sourceURL
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let devRuntime = repoRoot.appendingPathComponent("build/dev-runtime").path
+        candidates.append(devRuntime)
+        #endif
+
+        candidates.append("/Applications/ClawdHome.app/Contents/Resources")
+
+        var seen = Set<String>()
+        return candidates.filter { seen.insert($0).inserted }
+    }
+
+    /// App bundle 内打包的 node/bin 路径候选
+    static func bundledNodeBinPaths() -> [String] {
+        bundledResourcesPaths().compactMap { res in
+            let nodeBin = "\(res)/node/bin"
+            return FileManager.default.isExecutableFile(atPath: "\(nodeBin)/node") ? nodeBin : nil
+        }
+    }
+
+    /// App bundle 内打包的 openclaw/bin 路径候选
+    static func bundledOpenclawBinPaths() -> [String] {
+        bundledResourcesPaths().compactMap { res in
+            let openclawBin = "\(res)/openclaw/bin"
+            return FileManager.default.isExecutableFile(atPath: "\(openclawBin)/openclaw") ? openclawBin : nil
+        }
+    }
+
     /// 构建包含 node 的 PATH 环境变量（供 GatewayManager 等模块共用）
     static func buildNodePath(username: String) -> String {
-        // 仅包含用户隔离环境（~/.npm-global + ~/.brew）与基础系统命令目录。
-        // 兼容场景：当 ~/.brew/bin/node 符号链接丢失时，回退到 ~/.brew/lib/nodejs/<version>/bin。
+        let home = "/Users/\(username)"
         var paths: [String] = [
             InstallManager.npmGlobalBin(for: username),
-            "/Users/\(username)/.brew/bin",
-            "/Users/\(username)/.brew/opt/node/bin",
-            "/Users/\(username)/.brew/opt/node@24/bin",
-            "/Users/\(username)/.brew/opt/node@22/bin",
-            "/Users/\(username)/.brew/opt/node@20/bin",
-            "/Users/\(username)/.brew/opt/node@18/bin",
+            "\(home)/.brew/bin",
+            "\(home)/.brew/opt/node/bin",
+            "\(home)/.brew/opt/node@24/bin",
+            "\(home)/.brew/opt/node@22/bin",
+            "\(home)/.brew/opt/node@20/bin",
+            "\(home)/.brew/opt/node@18/bin",
         ]
 
-        let libNodeRoot = "/Users/\(username)/.brew/lib/nodejs"
+        // 兼容场景：当 ~/.brew/bin/node 符号链接丢失时，回退到 ~/.brew/lib/nodejs/<version>/bin
+        let libNodeRoot = "\(home)/.brew/lib/nodejs"
         if let entries = try? FileManager.default.contentsOfDirectory(atPath: libNodeRoot).sorted(by: >) {
             for entry in entries where entry.hasPrefix("node-") {
                 let binPath = "\(libNodeRoot)/\(entry)/bin"
@@ -139,7 +179,22 @@ struct ConfigWriter {
             }
         }
 
-        paths.append(contentsOf: ["/usr/bin", "/bin"])
+        // nvm 安装：~/.nvm/versions/node/<version>/bin
+        let nvmRoot = "\(home)/.nvm/versions/node"
+        if let entries = try? FileManager.default.contentsOfDirectory(atPath: nvmRoot).sorted(by: >) {
+            for entry in entries where entry.hasPrefix("v") {
+                let binPath = "\(nvmRoot)/\(entry)/bin"
+                if FileManager.default.isExecutableFile(atPath: "\(binPath)/node") {
+                    paths.append(binPath)
+                }
+            }
+        }
+
+        // App bundle 内打包的 node 和 openclaw（兜底）
+        paths.append(contentsOf: bundledNodeBinPaths())
+        paths.append(contentsOf: bundledOpenclawBinPaths())
+
+        paths.append(contentsOf: ["/usr/local/bin", "/usr/bin", "/bin"])
 
         var seen = Set<String>()
         let deduped = paths.filter { seen.insert($0).inserted }
@@ -161,8 +216,8 @@ enum ConfigError: LocalizedError {
 }
 
 extension ConfigWriter {
-    /// 查找隔离用户环境 npx：
-    /// 仅允许 ~/.brew 下的 npx，避免回退到宿主机 /usr/local/bin/npx 造成版本串用。
+    /// 查找可用的 npx 二进制：
+    /// 优先用户隔离环境（~/.brew），然后 nvm，最后 App bundle 内打包的 npx
     static func findIsolatedNpxBinary(for username: String) throws -> String {
         let home = "/Users/\(username)"
         let brewRoot = "\(home)/.brew"
@@ -176,6 +231,7 @@ extension ConfigWriter {
             "\(brewRoot)/opt/node@18/bin/npx",
         ]
 
+        // ~/.brew/Cellar
         let cellar = "\(brewRoot)/Cellar"
         if let entries = try? FileManager.default.contentsOfDirectory(atPath: cellar) {
             let nodeFormulae = entries.filter { $0 == "node" || $0.hasPrefix("node@") }.sorted()
@@ -187,6 +243,19 @@ extension ConfigWriter {
                     }
                 }
             }
+        }
+
+        // nvm 安装
+        let nvmRoot = "\(home)/.nvm/versions/node"
+        if let entries = try? FileManager.default.contentsOfDirectory(atPath: nvmRoot).sorted(by: >) {
+            for entry in entries where entry.hasPrefix("v") {
+                candidates.append("\(nvmRoot)/\(entry)/bin/npx")
+            }
+        }
+
+        // App bundle 内打包的 npx（兜底）
+        for binPath in bundledNodeBinPaths() {
+            candidates.append("\(binPath)/npx")
         }
 
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {

@@ -442,11 +442,17 @@ private final class MaintenanceTerminalSession {
         let lcCType = inheritedEnv["LC_CTYPE"] ?? lang
         let argv0 = command.first ?? ""
         let argvRest = Array(command.dropFirst())
-        let effectivePath = nodePath
+        var effectivePath = nodePath
         let resolvedExecutable: String
         switch argv0 {
         case "openclaw":
             resolvedExecutable = "\(home)/.npm-global/bin/openclaw"
+        case "npx":
+            // npx 需要通过 shim 解析到隔离环境的真实路径
+            if let shimDir = try? Self.ensureNpxShimDirectory(username: username) {
+                effectivePath = "\(shimDir):\(effectivePath)"
+            }
+            resolvedExecutable = "npx"
         case "zsh":
             resolvedExecutable = "/bin/zsh"
         case "bash":
@@ -457,7 +463,9 @@ private final class MaintenanceTerminalSession {
             resolvedExecutable = argv0
         }
 
-        let bootstrapScript = "stty cols 120 rows 40 >/dev/null 2>&1 || true; exec \"$0\" \"$@\""
+        // login shell（-l）会通过 /etc/profile → path_helper 重置 PATH，
+        // 因此先用 __CLAWDHOME_PATH 保存原始 PATH，profile 加载后恢复
+        let bootstrapScript = "stty cols 120 rows 40 >/dev/null 2>&1 || true; export PATH=\"$__CLAWDHOME_PATH\"; exec \"$0\" \"$@\""
 
         let commandArgs = [
             "-q", "/dev/null",
@@ -465,6 +473,7 @@ private final class MaintenanceTerminalSession {
             "/usr/bin/env",
             "HOME=\(home)",
             "PATH=\(effectivePath)",
+            "__CLAWDHOME_PATH=\(effectivePath)",
             "NPM_CONFIG_PREFIX=\(npmGlobalDir)",
             "npm_config_prefix=\(npmGlobalDir)",
             "LANG=\(lang)",
@@ -2543,6 +2552,10 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
             _ = try? run("/usr/sbin/chown", args: ["-R", username, openclawDir])
         }
         let nodePath = ConfigWriter.buildNodePath(username: username)
+        helperLog("[maintenance] PATH=\(nodePath)")
+        helperLog("[maintenance] bundledResources=\(ConfigWriter.bundledResourcesPaths())")
+        helperLog("[maintenance] bundledNodeBin=\(ConfigWriter.bundledNodeBinPaths())")
+        helperLog("[maintenance] bundledOpenclawBin=\(ConfigWriter.bundledOpenclawBinPaths())")
 
         do {
             let session = try MaintenanceTerminalSession(username: username, nodePath: nodePath, command: command)

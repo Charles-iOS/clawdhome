@@ -93,6 +93,7 @@
 		84F5E7792AD26095746BA431 /* CronJobDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3B59F2E144B3C63DA276806 /* CronJobDetailView.swift */; };
 		864BEE41DD89F2AB8B0C0B43 /* ChannelBindSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29698F149D09CD452FCFFF5A /* ChannelBindSheet.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ChannelBotConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6D7E8F9A0B1C2 /* ChannelBotConfigSheet.swift */; };
+		C4D5E6F7A8B9C0D1E2F3A4B5 /* ChannelPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6A7B8C9D0E1F2A3B4C5D6E7 /* ChannelPairingSheet.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* ChannelType.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F3A4B5C6D7E8F9A0B1C2D3 /* ChannelType.swift */; };
 		87442F9B989A859F1BCF6FC2 /* GatewayLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81B47FD58BA6519F937D3A52 /* GatewayLog.swift */; };
 		8782D0C95C1470BAA40F3CB3 /* AppLockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DFA0D3288E6276A9630CE4B /* AppLockScreen.swift */; };
@@ -205,6 +206,7 @@
 		24615C52F3A1E7567FD09730 /* AgentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCardView.swift; sourceTree = "<group>"; };
 		29698F149D09CD452FCFFF5A /* ChannelBindSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelBindSheet.swift; sourceTree = "<group>"; };
 		D1E2F3A4B5C6D7E8F9A0B1C2 /* ChannelBotConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelBotConfigSheet.swift; sourceTree = "<group>"; };
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* ChannelPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPairingSheet.swift; sourceTree = "<group>"; };
 		E2F3A4B5C6D7E8F9A0B1C2D3 /* ChannelType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelType.swift; sourceTree = "<group>"; };
 		2BD15AFBF24DE05D57194904 /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		2F837F1CD97FBADD4A87A567 /* ClawdHomeHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClawdHomeHelper.entitlements; sourceTree = "<group>"; };
@@ -507,6 +509,7 @@
 			children = (
 				29698F149D09CD452FCFFF5A /* ChannelBindSheet.swift */,
 				D1E2F3A4B5C6D7E8F9A0B1C2 /* ChannelBotConfigSheet.swift */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* ChannelPairingSheet.swift */,
 				C98981F58B78359BB7A2503D /* ChannelView.swift */,
 				4802CF918041FF79978E4DA4 /* CronAddSheet.swift */,
 				A3B59F2E144B3C63DA276806 /* CronJobDetailView.swift */,
@@ -880,6 +883,7 @@
 				7C6F9710AD100210ABE9D075 /* CLIConfigStep.swift in Sources */,
 				864BEE41DD89F2AB8B0C0B43 /* ChannelBindSheet.swift in Sources */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* ChannelBotConfigSheet.swift in Sources */,
+				C4D5E6F7A8B9C0D1E2F3A4B5 /* ChannelPairingSheet.swift in Sources */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* ChannelType.swift in Sources */,
 				2371095B34D07442965A5E43 /* ChannelView.swift in Sources */,
 				1D4EDB9DB0495FE0EFA54FE4 /* ClawPoolView.swift in Sources */,

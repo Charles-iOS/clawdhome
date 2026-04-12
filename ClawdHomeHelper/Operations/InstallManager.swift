@@ -171,6 +171,7 @@ struct InstallManager {
     }
 
     /// 优先返回用户隔离环境中的 node 可执行文件，避免误用系统旧版本 node。
+    /// 查找顺序：~/.brew → nvm → App bundle 打包 → 抛错
     static func findNodeBinary(for username: String) throws -> String {
         let home = "/Users/\(username)"
         let brewRoot = "\(home)/.brew"
@@ -191,6 +192,19 @@ struct InstallManager {
             "\(brewRoot)/opt/node@20/bin/node",
             "\(brewRoot)/opt/node@18/bin/node",
         ])
+
+        // nvm 安装
+        let nvmRoot = "\(home)/.nvm/versions/node"
+        if let entries = try? FileManager.default.contentsOfDirectory(atPath: nvmRoot).sorted(by: >) {
+            for entry in entries where entry.hasPrefix("v") {
+                candidates.append("\(nvmRoot)/\(entry)/bin/node")
+            }
+        }
+
+        // App bundle 内打包的 node（兜底）
+        for binPath in ConfigWriter.bundledNodeBinPaths() {
+            candidates.append("\(binPath)/node")
+        }
 
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
             return path

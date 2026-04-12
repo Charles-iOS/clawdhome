@@ -20,11 +20,20 @@ struct AgentBinding: Codable, Identifiable, Equatable {
         "\(agentId):\(channel):\(accountId ?? "*"):\(peerId ?? "*")"
     }
 
+    // MARK: - ChannelType 桥接
+
+    /// 匹配 ChannelType 枚举（weixin/feishu/telegram/discord）；其它 channel 字符串仍为合法绑定
+    var channelType: ChannelType? {
+        ChannelType(rawValue: channel)
+    }
+
     // MARK: - 显示辅助
 
-    /// 渠道图标
+    /// 渠道图标（优先使用 ChannelType 元数据）
     var channelIcon: String {
+        if let ct = channelType { return ct.iconName }
         switch channel.lowercased() {
+        case "dingtalk":  return "bolt.circle.fill"
         case "whatsapp":  return "message.fill"
         case "telegram":  return "paperplane.fill"
         case "discord":   return "bubble.left.and.bubble.right.fill"

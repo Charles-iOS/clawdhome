@@ -210,6 +210,46 @@ final class GatewayProcessManager {
         return Bundle.main.resourceURL!
     }
 
+    // MARK: - 本地命令执行
+
+    /// 在 app 进程内直接执行 openclaw 子命令（如 pairing approve），
+    /// 避免走 helper daemon 的 sudo -u 导致 TCC EPERM。
+    /// 返回 (success, output)
+    static func runOpenclawLocally(args: [String]) async -> (Bool, String) {
+        let nodeURL = bundledNodeURL
+        let entry = bundledOpenClawEntry
+
+        guard FileManager.default.fileExists(atPath: nodeURL.path),
+              FileManager.default.fileExists(atPath: entry.path) else {
+            return (false, "Bundled Node.js 或 OpenClaw 不存在")
+        }
+
+        let proc = Process()
+        proc.executableURL = nodeURL
+        proc.arguments = [entry.path] + args
+        proc.environment = buildEnvironment()
+        proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = pipe
+
+        do {
+            try proc.run()
+        } catch {
+            return (false, error.localizedDescription)
+        }
+
+        return await withCheckedContinuation { continuation in
+            proc.terminationHandler = { p in
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                continuation.resume(returning: (p.terminationStatus == 0, output))
+            }
+        }
+    }
+
     #if DEBUG
     /// 通过源码绝对路径推导仓库根目录（.../clawdhome）
     private static var debugRepoRootURL: URL? {

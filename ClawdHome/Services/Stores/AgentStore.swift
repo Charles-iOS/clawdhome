@@ -23,7 +23,7 @@ final class AgentStore {
 
     private var gateway: GatewayService?
     private var workspaceManager: AgentWorkspaceManager?
-    private var username: String = ""
+    private(set) var username: String = ""
 
     // MARK: - 加载
 

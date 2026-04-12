@@ -1,5 +1,5 @@
 // ClawdHome/Views/Capabilities/ChannelBotConfigSheet.swift
-// 渠道机器人凭据配置表单（钉钉 / 飞书 / Telegram / Discord）
+// 渠道机器人凭据配置表单（飞书 / Telegram / Discord 等）
 
 import SwiftUI
 
