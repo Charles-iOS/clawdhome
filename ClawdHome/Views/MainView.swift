@@ -20,7 +20,12 @@ struct MainView: View {
         case .dashboard:
             HomeDashboardView()
         case .agents:
-            AgentGridView()
+            NavigationStack {
+                AgentGridView()
+                    .navigationDestination(for: String.self) { agentId in
+                        AgentWorkspaceView(agentId: agentId)
+                    }
+            }
         case .models:
             ModelConfigView()
         case .cron:

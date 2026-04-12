@@ -48,8 +48,16 @@ enum PersonaFile: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 相对于 Shrimp home 的文件路径
-    var relPath: String { ".openclaw/workspace/\(rawValue)" }
+    /// 相对于 Shrimp home 的文件路径（默认 main 智能体）
+    var relPath: String { relPath(agentId: nil) }
+
+    /// 按智能体 ID 计算相对路径
+    func relPath(agentId: String?) -> String {
+        let dir = (agentId == nil || agentId == "main")
+            ? ".openclaw/workspace"
+            : ".openclaw/workspace-\(agentId!)"
+        return "\(dir)/\(rawValue)"
+    }
 }
 
 // MARK: - 选中项模型（静态角色文件 or 记忆日志）
@@ -70,10 +78,16 @@ enum PersonaSelection: Hashable {
         }
     }
 
-    var relPath: String {
+    var relPath: String { relPath(agentId: nil) }
+
+    func relPath(agentId: String?) -> String {
         switch self {
-        case .file(let f): return f.relPath
-        case .memoryLog(let name): return ".openclaw/workspace/memory/\(name)"
+        case .file(let f): return f.relPath(agentId: agentId)
+        case .memoryLog(let name):
+            let dir = (agentId == nil || agentId == "main")
+                ? ".openclaw/workspace"
+                : ".openclaw/workspace-\(agentId!)"
+            return "\(dir)/memory/\(name)"
         }
     }
 }

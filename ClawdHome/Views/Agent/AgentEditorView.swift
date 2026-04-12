@@ -1,10 +1,11 @@
 // ClawdHome/Views/Agent/AgentEditorView.swift
+// 智能体元数据编辑（名称、emoji、分类、描述、首选模型、技能）
+// persona 文件（SOUL.md/IDENTITY.md 等）在 AgentWorkspaceView 中编辑
 
 import SwiftUI
 
 struct AgentEditorView: View {
     @Environment(AgentStore.self) private var store
-    @Environment(GatewayService.self) private var gateway
     @Environment(\.dismiss) private var dismiss
 
     let agent: Agent
@@ -12,29 +13,27 @@ struct AgentEditorView: View {
     @State private var name: String
     @State private var emoji: String
     @State private var description: String
-    @State private var systemPrompt: String
-    @State private var identity: String
     @State private var category: AgentCategory
-    @State private var isSaving = false
-    @State private var isActivating = false
+    @State private var preferredModel: String
+    @State private var skillsText: String
 
     init(agent: Agent) {
         self.agent = agent
         _name = State(initialValue: agent.name)
         _emoji = State(initialValue: agent.emoji)
         _description = State(initialValue: agent.description)
-        _systemPrompt = State(initialValue: agent.systemPrompt)
-        _identity = State(initialValue: agent.identity)
         _category = State(initialValue: agent.category)
+        _preferredModel = State(initialValue: agent.preferredModel ?? "")
+        _skillsText = State(initialValue: agent.skills.joined(separator: ", "))
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 basicInfoSection
-                promptSection
-                identitySection
-                actionSection
+                modelSection
+                skillsSection
+                dangerSection
             }
             .formStyle(.grouped)
             .navigationTitle(agent.name)
@@ -44,11 +43,11 @@ struct AgentEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.k("common.save", fallback: "保存")) { save() }
-                        .disabled(isSaving || name.isEmpty)
+                        .disabled(name.isEmpty)
                 }
             }
         }
-        .frame(minWidth: 520, minHeight: 480)
+        .frame(minWidth: 480, minHeight: 360)
     }
 
     @ViewBuilder
@@ -70,44 +69,36 @@ struct AgentEditorView: View {
     }
 
     @ViewBuilder
-    private var promptSection: some View {
-        Section(L10n.k("agent.editor.soul", fallback: "灵魂（System Prompt）")) {
-            TextEditor(text: $systemPrompt)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 120)
+    private var modelSection: some View {
+        Section(L10n.k("agent.editor.model", fallback: "首选模型")) {
+            TextField(
+                L10n.k("agent.editor.model_placeholder", fallback: "如 claude-opus-4, gpt-4o（留空使用默认）"),
+                text: $preferredModel
+            )
         }
     }
 
     @ViewBuilder
-    private var identitySection: some View {
-        Section(L10n.k("agent.editor.identity", fallback: "身份定义")) {
-            TextEditor(text: $identity)
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 100)
+    private var skillsSection: some View {
+        Section(L10n.k("agent.editor.skills", fallback: "技能标签")) {
+            TextField(
+                L10n.k("agent.editor.skills_placeholder", fallback: "逗号分隔，如：战略规划, 需求拆解"),
+                text: $skillsText,
+                axis: .vertical
+            )
+            .lineLimit(2...3)
         }
     }
 
     @ViewBuilder
-    private var actionSection: some View {
-        Section {
-            Button {
-                Task { await activateAgent() }
-            } label: {
-                HStack {
-                    if isActivating {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text(agent.isActive
-                         ? L10n.k("agent.editor.activated", fallback: "当前已激活")
-                         : L10n.k("agent.editor.activate", fallback: "激活此角色"))
-                }
-            }
-            .disabled(agent.isActive || isActivating)
-
-            if !agent.isPreset {
+    private var dangerSection: some View {
+        if !agent.isPreset && agent.id != "main" {
+            Section {
                 Button(role: .destructive) {
-                    store.delete(id: agent.id)
-                    dismiss()
+                    Task {
+                        try? await store.removeAgent(id: agent.id)
+                        dismiss()
+                    }
                 } label: {
                     Text(L10n.k("agent.editor.delete", fallback: "删除此智能体"))
                 }
@@ -116,35 +107,17 @@ struct AgentEditorView: View {
     }
 
     private func save() {
-        isSaving = true
         var updated = agent
         updated.name = name
         updated.emoji = emoji
         updated.description = description
-        updated.systemPrompt = systemPrompt
-        updated.identity = identity
         updated.category = category
-        store.update(updated)
-        isSaving = false
+        updated.preferredModel = preferredModel.isEmpty ? nil : preferredModel
+        updated.skills = skillsText
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        store.updateAgent(updated)
         dismiss()
-    }
-
-    private func activateAgent() async {
-        isActivating = true
-        defer { isActivating = false }
-
-        store.activate(id: agent.id)
-
-        do {
-            let (_, baseHash) = try await gateway.configGetFull()
-            let patch: [String: Any] = [
-                "soul": ["content": agent.systemPrompt],
-                "identity": ["content": agent.identity],
-            ]
-            try await gateway.configPatch(patch: patch, baseHash: baseHash, note: "Activate agent: \(agent.name)")
-            appLog("Activated agent: \(agent.name)")
-        } catch {
-            appLog("Failed to activate agent \(agent.name): \(error)", level: .error)
-        }
     }
 }

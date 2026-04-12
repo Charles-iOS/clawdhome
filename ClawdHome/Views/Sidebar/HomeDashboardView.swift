@@ -129,21 +129,35 @@ struct HomeDashboardView: View {
 
     @ViewBuilder
     private var activeAgentCard: some View {
-        if let agent = agentStore.activeAgent {
+        let activeAgents = agentStore.agents.filter { $0.status == .active }
+        if !activeAgents.isEmpty {
             GroupBox {
-                HStack(spacing: 12) {
-                    Text(agent.emoji).font(.title)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(agent.name).fontWeight(.medium)
-                        Text(agent.description)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                VStack(spacing: 8) {
+                    ForEach(activeAgents) { agent in
+                        HStack(spacing: 12) {
+                            Text(agent.emoji).font(.title)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(agent.name).fontWeight(.medium)
+                                Text(agent.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            if !agent.boundBindings.isEmpty {
+                                HStack(spacing: 2) {
+                                    ForEach(agent.boundBindings.prefix(3)) { binding in
+                                        Image(systemName: binding.channelIcon)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
                     }
-                    Spacer()
                 }
             } label: {
-                Text(L10n.k("dashboard.active_agent", fallback: "当前激活角色"))
+                Text(L10n.k("dashboard.active_agents", fallback: "活跃智能体"))
             }
         }
     }

@@ -156,6 +156,12 @@
 		E433976BEA8531BF2C2B9D14 /* PresetAgents.json in Resources */ = {isa = PBXBuildFile; fileRef = D584DFAFCB96ECF4584A0AFB /* PresetAgents.json */; };
 		E77BC44DFA9B1F067EA967A0 /* Agent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F184C2986A6A0F32E163D6 /* Agent.swift */; };
 		ED22529988CD2CEA680AB860 /* AgentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24615C52F3A1E7567FD09730 /* AgentCardView.swift */; };
+		26E4D72A38CE1404150B3126 /* AgentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3434BC501BFE431AE7D0C828 /* AgentStatus.swift */; };
+		333D84F47D2089938D1DCF6F /* AgentBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDAB3E3D35337FDC387CC531 /* AgentBinding.swift */; };
+		DBD0FBB83AC050D1676ECD3D /* AgentWorkspaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1ADB4E355194B48092FDDE1 /* AgentWorkspaceManager.swift */; };
+		83F4F8A40A9A979E8AE64CF4 /* AgentWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FAAE2F63A1431B657770EE9 /* AgentWorkspaceView.swift */; };
+		73AE634E40E6CBB5391EEBB8 /* AgentBindingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E1967F7145E5EA18BF748AF /* AgentBindingsView.swift */; };
+		C2340FE2307440A855824AF1 /* AgentSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC58116061502E5F27BC355 /* AgentSessionsView.swift */; };
 		ED40DBD9596B50649987B59A /* FallbackManagerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21D5AE60DA0449BC16B42DAA /* FallbackManagerSheet.swift */; };
 		EFB354F72C60BB435A62D4B4 /* NetworkPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54673332FA3CBD020381CD20 /* NetworkPolicyView.swift */; };
 		F02888A8B0361779328686A4 /* SkillListItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8033992A557E5424F1A22DB3 /* SkillListItemRow.swift */; };
@@ -270,6 +276,12 @@
 		9CD828477AAA73135DC7D84D /* ProviderKeyRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeyRow.swift; sourceTree = "<group>"; };
 		9EFDF0452F0C6492C04DDB63 /* GlobalSecretsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSecretsStore.swift; sourceTree = "<group>"; };
 		9FC048E33BB4D0CAF60A90E2 /* AgentCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCategory.swift; sourceTree = "<group>"; };
+		3434BC501BFE431AE7D0C828 /* AgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatus.swift; sourceTree = "<group>"; };
+		DDAB3E3D35337FDC387CC531 /* AgentBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBinding.swift; sourceTree = "<group>"; };
+		D1ADB4E355194B48092FDDE1 /* AgentWorkspaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentWorkspaceManager.swift; sourceTree = "<group>"; };
+		9FAAE2F63A1431B657770EE9 /* AgentWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentWorkspaceView.swift; sourceTree = "<group>"; };
+		2E1967F7145E5EA18BF748AF /* AgentBindingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBindingsView.swift; sourceTree = "<group>"; };
+		EEC58116061502E5F27BC355 /* AgentSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionsView.swift; sourceTree = "<group>"; };
 		A2AF7BE5DA61BB38781D130C /* AccountKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountKeychain.swift; sourceTree = "<group>"; };
 		A2F39F27916E7B56B4688842 /* HelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperClient.swift; sourceTree = "<group>"; };
 		A3B59F2E144B3C63DA276806 /* CronJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronJobDetailView.swift; sourceTree = "<group>"; };
@@ -373,6 +385,9 @@
 				545E866B7856426726C512F4 /* AgentEditorView.swift */,
 				EE862BB4ED5FA4D521EB1A3E /* AgentGridView.swift */,
 				9B1FA442457E06273604562E /* CreateAgentSheet.swift */,
+				9FAAE2F63A1431B657770EE9 /* AgentWorkspaceView.swift */,
+				2E1967F7145E5EA18BF748AF /* AgentBindingsView.swift */,
+				EEC58116061502E5F27BC355 /* AgentSessionsView.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -388,6 +403,7 @@
 		3D8863F2146A4E82963EC03B /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D1ADB4E355194B48092FDDE1 /* AgentWorkspaceManager.swift */,
 				4B639FCB2D3020F3E95F7EFC /* AppLockStore.swift */,
 				81E5226083EF9356F8C51363 /* AppLogger.swift */,
 				304E3BEE50A0653474FF27FC /* DaemonInstaller.swift */,
@@ -509,6 +525,8 @@
 				A2AF7BE5DA61BB38781D130C /* AccountKeychain.swift */,
 				C4F184C2986A6A0F32E163D6 /* Agent.swift */,
 				9FC048E33BB4D0CAF60A90E2 /* AgentCategory.swift */,
+				3434BC501BFE431AE7D0C828 /* AgentStatus.swift */,
+				DDAB3E3D35337FDC387CC531 /* AgentBinding.swift */,
 				E2F3A4B5C6D7E8F9A0B1C2D3 /* ChannelType.swift */,
 				BC6AA535876BDE2A4F506473 /* GatewayCronModels.swift */,
 				510B37F51235580E44933A19 /* GatewaySkillModels.swift */,
@@ -842,6 +860,12 @@
 				2D38DE3D740162CA50BE27C1 /* AgentEditorView.swift in Sources */,
 				ADF637E73F223E34E2176F85 /* AgentGridView.swift in Sources */,
 				552147D4604D950BB657D259 /* AgentStore.swift in Sources */,
+				26E4D72A38CE1404150B3126 /* AgentStatus.swift in Sources */,
+				333D84F47D2089938D1DCF6F /* AgentBinding.swift in Sources */,
+				DBD0FBB83AC050D1676ECD3D /* AgentWorkspaceManager.swift in Sources */,
+				83F4F8A40A9A979E8AE64CF4 /* AgentWorkspaceView.swift in Sources */,
+				73AE634E40E6CBB5391EEBB8 /* AgentBindingsView.swift in Sources */,
+				C2340FE2307440A855824AF1 /* AgentSessionsView.swift in Sources */,
 				E2AF48EFF2D8470BF06BF3CA /* AppLanguage.swift in Sources */,
 				8782D0C95C1470BAA40F3CB3 /* AppLockScreen.swift in Sources */,
 				DA1F41ECCF5EF07721BC8FCF /* AppLockStore.swift in Sources */,

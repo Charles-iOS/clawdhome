@@ -23,6 +23,7 @@ struct ClawdHomeApp: App {
     @State private var envChecker = EnvironmentChecker()
     @State private var gatewayService = GatewayService()
     @State private var agentStore = AgentStore()
+    @State private var workspaceManager = AgentWorkspaceManager()
     @State private var keychainStore = ProviderKeychainStore()
 
     // 旧服务（Phase 5 清理时移除）
@@ -51,6 +52,7 @@ struct ClawdHomeApp: App {
                 .environment(envChecker)
                 .environment(gatewayService)
                 .environment(agentStore)
+                .environment(workspaceManager)
                 .environment(keychainStore)
                 .environment(\.locale, appLanguage.locale)
                 // 旧服务注入（Phase 5 移除）
@@ -152,7 +154,10 @@ struct ClawdHomeApp: App {
 
     /// 应用启动流程：环境检查 → 启动 Gateway → 连接 WebSocket → 加载智能体
     private func bootstrap() async {
-        agentStore.load()
+        // 配置 workspace manager（使用当前用户名）
+        let currentUsername = NSUserName()
+        workspaceManager.configure(helperClient: helperClient, username: currentUsername)
+
         await envChecker.check()
 
         if envChecker.isReady {
@@ -183,8 +188,18 @@ struct ClawdHomeApp: App {
             appLog("bootstrap: gateway not ready, skipping WebSocket connect", level: .warn)
         }
 
-        // 旧连接保持（Phase 5 移除）
+        // 先建立 XPC 连接，agentStore/workspaceManager 依赖 helperClient 读写文件
         helperClient.connect()
+
+        // 加载智能体（从 gateway 配置 + workspace 扫描）
+        await agentStore.load(
+            gateway: gatewayService,
+            workspaceManager: workspaceManager,
+            username: currentUsername
+        )
+        // 执行一次性迁移（旧 agents.json → 新架构）
+        await agentStore.migrateIfNeeded()
+
         await MainActor.run { shrimpPool.start() }
         modelStore.load()
     }
