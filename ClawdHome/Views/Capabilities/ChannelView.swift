@@ -117,57 +117,44 @@ struct ChannelView: View {
         }
     }
 
-    /// 为已关联的渠道加载配对统计（并发请求）
+    /// 直接读取本地 JSON 文件加载配对统计（无需启动 Node 进程）
     private func loadPairingStats() async {
-        await withTaskGroup(of: (ChannelType, ChannelPairingStats?).self) { group in
-            for channel in ChannelType.allCases where isChannelConnected(channel) {
-                group.addTask {
-                    let (ok, output) = await GatewayProcessManager.runOpenclawLocally(
-                        args: ["pairing", "list", channel.rawValue, "--json"]
-                    )
-                    guard ok else { return (channel, nil) }
-                    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard let data = trimmed.data(using: .utf8) else { return (channel, nil) }
+        let credDir = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("credentials")
+        let fm = FileManager.default
 
-                    var directCount = 0
-                    var groupCount = 0
-                    var pendingCount = 0
+        for channel in ChannelType.allCases where isChannelConnected(channel) {
+            let ch = channel.rawValue
+            var pendingCount = 0
+            var approvedCount = 0
 
-                    // 优先尝试结构化格式 { pending: [...], approved/paired/peers: [...] }
-                    if let wrapper = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        if let pending = wrapper["pending"] as? [[String: Any]] {
-                            pendingCount = pending.count
-                        }
-                        let approvedArr = wrapper["approved"] as? [[String: Any]]
-                            ?? wrapper["paired"] as? [[String: Any]]
-                            ?? wrapper["peers"] as? [[String: Any]]
-                            ?? wrapper["list"] as? [[String: Any]]
-                        if let arr = approvedArr,
-                           let arrData = try? JSONSerialization.data(withJSONObject: arr),
-                           let peers = try? JSONDecoder().decode([PairingPeer].self, from: arrData) {
-                            directCount = peers.filter { !$0.isGroup }.count
-                            groupCount = peers.filter { $0.isGroup }.count
-                        }
-                    } else if let peers = try? JSONDecoder().decode([PairingPeer].self, from: data) {
-                        // 回退：纯数组
-                        directCount = peers.filter { !$0.isGroup }.count
-                        groupCount = peers.filter { $0.isGroup }.count
-                    } else {
-                        return (channel, nil)
+            // 待审批：<channel>-pairing.json → { requests: [...] }
+            let pairingFile = credDir.appendingPathComponent("\(ch)-pairing.json")
+            if let data = fm.contents(atPath: pairingFile.path),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let requests = json["requests"] as? [Any] {
+                pendingCount = requests.count
+            }
+
+            // 已配对：<channel>-*-allowFrom.json → { allowFrom: [...] }
+            let prefix = "\(ch)-"
+            let suffix = "-allowFrom.json"
+            if let entries = try? fm.contentsOfDirectory(atPath: credDir.path) {
+                for entry in entries where entry.hasPrefix(prefix) && entry.hasSuffix(suffix) {
+                    let filePath = credDir.appendingPathComponent(entry)
+                    if let data = fm.contents(atPath: filePath.path),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let allowFrom = json["allowFrom"] as? [Any] {
+                        approvedCount += allowFrom.count
                     }
+                }
+            }
 
-                    return (channel, ChannelPairingStats(
-                        directCount: directCount,
-                        groupCount: groupCount,
-                        pendingCount: pendingCount
-                    ))
-                }
-            }
-            for await (channel, stats) in group {
-                if let stats {
-                    pairingStats[channel] = stats
-                }
-            }
+            pairingStats[channel] = ChannelPairingStats(
+                directCount: approvedCount,
+                groupCount: 0,
+                pendingCount: pendingCount
+            )
         }
     }
 }

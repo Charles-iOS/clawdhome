@@ -398,7 +398,9 @@ struct ChannelPairingSheet: View {
 
     // MARK: - 数据操作
 
-    /// 加载待审批请求和已配对列表
+    /// 直接读取本地 JSON 文件加载配对数据（无需启动 Node 进程）
+    /// - 待审批：~/.openclaw/credentials/<channel>-pairing.json → { requests: [...] }
+    /// - 已配对：~/.openclaw/credentials/<channel>-*-allowFrom.json → { allowFrom: ["id", ...] }
     private func loadAll() async {
         isLoading = true
         defer {
@@ -406,51 +408,40 @@ struct ChannelPairingSheet: View {
             hasLoadedOnce = true
         }
 
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["pairing"] + ["list", channelType.rawValue, "--json"]
-        )
+        let credDir = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("credentials")
+        let fm = FileManager.default
+        let channel = channelType.rawValue
 
-        guard ok else {
-            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty || trimmed.contains("no pairing") || trimmed == "[]" {
-                pendingRequests = []
-                approvedPeers = []
-            } else if pendingRequests.isEmpty && approvedPeers.isEmpty {
-                errorMessage = trimmed
-            }
-            return
-        }
-
-        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = trimmed.data(using: .utf8) else { return }
-
-        // 尝试解析为结构化对象 { pending: [...], approved/paired: [...] }
-        if let wrapper = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            // 解析待审批
-            if let pendingArr = wrapper["pending"] as? [[String: Any]],
-               let pendingData = try? JSONSerialization.data(withJSONObject: pendingArr) {
-                pendingRequests = (try? JSONDecoder().decode([PairingRequest].self, from: pendingData)) ?? []
-            } else {
-                pendingRequests = []
-            }
-
-            // 解析已配对（可能叫 approved / paired / peers）
-            let approvedArr = wrapper["approved"] as? [[String: Any]]
-                ?? wrapper["paired"] as? [[String: Any]]
-                ?? wrapper["peers"] as? [[String: Any]]
-                ?? wrapper["list"] as? [[String: Any]]
-            if let arr = approvedArr, let arrData = try? JSONSerialization.data(withJSONObject: arr) {
-                approvedPeers = (try? JSONDecoder().decode([PairingPeer].self, from: arrData)) ?? []
-            } else {
-                approvedPeers = []
-            }
-            return
-        }
-
-        // 回退：尝试解析为纯数组（全部视为已配对）
-        if let arr = try? JSONDecoder().decode([PairingPeer].self, from: data) {
-            approvedPeers = arr
+        // 1. 读取待审批请求
+        let pairingFile = credDir.appendingPathComponent("\(channel)-pairing.json")
+        if let data = fm.contents(atPath: pairingFile.path),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let requests = json["requests"] as? [[String: Any]],
+           let reqData = try? JSONSerialization.data(withJSONObject: requests) {
+            pendingRequests = (try? JSONDecoder().decode([PairingRequest].self, from: reqData)) ?? []
+        } else {
             pendingRequests = []
         }
+
+        // 2. 扫描 allowFrom 文件获取已配对用户
+        var allPeers: [PairingPeer] = []
+        let prefix = "\(channel)-"
+        let suffix = "-allowFrom.json"
+        if let entries = try? fm.contentsOfDirectory(atPath: credDir.path) {
+            for entry in entries where entry.hasPrefix(prefix) && entry.hasSuffix(suffix) {
+                let filePath = credDir.appendingPathComponent(entry)
+                guard let data = fm.contents(atPath: filePath.path),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let allowFrom = json["allowFrom"] as? [String] else { continue }
+                for peerId in allowFrom {
+                    if !allPeers.contains(where: { $0.id == peerId }) {
+                        allPeers.append(PairingPeer(id: peerId))
+                    }
+                }
+            }
+        }
+        approvedPeers = allPeers
     }
 
     /// 审批通过配对码
