@@ -7,13 +7,24 @@ struct AppSettingsView: View {
     @Environment(EnvironmentChecker.self) private var envChecker
 
     var body: some View {
-        Form {
-            gatewaySection
-            environmentSection
-            aboutSection
+        VStack(spacing: 0) {
+            PageHeroHeader(
+                title: L10n.k("settings.title", fallback: "设置"),
+                subtitle: L10n.k("settings.hero.subtitle", fallback: "Gateway、运行环境与版本信息。")
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+
+            Form {
+                gatewaySection
+                environmentSection
+                aboutSection
+            }
+            .formStyle(.grouped)
         }
-        .formStyle(.grouped)
-        .navigationTitle(L10n.k("settings.title", fallback: "设置"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

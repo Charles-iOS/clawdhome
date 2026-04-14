@@ -19,15 +19,15 @@ struct ChannelView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // 页面描述
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L10n.k("channel.page.desc", fallback: "配置 AI 智能体与用户交互的消息平台。所有连接数据存储在本地——无需云端。"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Text(L10n.f("channel.page.count", fallback: "%d 个渠道", ChannelType.allCases.count))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                PageHeroHeader(
+                    title: L10n.k("channel.title", fallback: "消息渠道"),
+                    subtitle: L10n.k("channel.page.desc", fallback: "配置 AI 智能体与用户交互的消息平台。所有连接数据存储在本地——无需云端。"),
+                    subtitleLineLimit: 4
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(L10n.f("channel.page.count", fallback: "%d 个渠道", ChannelType.allCases.count))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                 // 渠道卡片网格
                 LazyVGrid(columns: columns, spacing: 16) {
@@ -48,7 +48,6 @@ struct ChannelView: View {
             }
             .padding(20)
         }
-        .navigationTitle(L10n.k("channel.title", fallback: "消息渠道"))
         .toolbar {
             ToolbarItem {
                 Button {

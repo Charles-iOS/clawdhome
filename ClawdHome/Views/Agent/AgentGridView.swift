@@ -53,14 +53,10 @@ struct AgentGridView: View {
     @ViewBuilder
     private var heroHeader: some View {
         HStack(alignment: .top, spacing: 20) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(L10n.k("agent.grid.title", fallback: "智能体"))
-                    .font(.system(size: 36, weight: .bold))
-                Text(L10n.k("agent.grid.subtitle", fallback: "管理你的个性化助手，创建新角色并开始对话。"))
-                    .font(.system(size: 22))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            PageHeroHeader(
+                title: L10n.k("agent.grid.title", fallback: "智能体"),
+                subtitle: L10n.k("agent.grid.subtitle", fallback: "管理你的个性化助手，创建新角色并开始对话。")
+            )
             Spacer()
 
             VStack(alignment: .trailing, spacing: 12) {

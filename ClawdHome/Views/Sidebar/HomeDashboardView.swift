@@ -12,13 +12,17 @@ struct HomeDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                PageHeroHeader(
+                    title: L10n.k("dashboard.title", fallback: "仪表盘"),
+                    subtitle: L10n.k("dashboard.hero.subtitle", fallback: "查看 Gateway 状态与快捷入口。")
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
                 gatewayStatusCard
                 quickStatsGrid
                 activeAgentCard
             }
             .padding(20)
         }
-        .navigationTitle(L10n.k("dashboard.title", fallback: "仪表盘"))
     }
 
     @ViewBuilder

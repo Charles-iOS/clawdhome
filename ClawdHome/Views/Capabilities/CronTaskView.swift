@@ -10,13 +10,25 @@ struct CronTaskView: View {
     @State private var showAddSheet = false
 
     var body: some View {
-        HSplitView {
-            jobList
-                .frame(minWidth: 240, idealWidth: 280)
-            jobDetail
-                .frame(minWidth: 300)
+        VStack(spacing: 0) {
+            PageHeroHeader(
+                title: L10n.k("cron.title", fallback: "定时任务"),
+                subtitle: L10n.k("cron.hero.subtitle", fallback: "管理 Gateway 定时任务与执行计划。")
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+
+            HSplitView {
+                jobList
+                    .frame(minWidth: 240, idealWidth: 280)
+                jobDetail
+                    .frame(minWidth: 300)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationTitle(L10n.k("cron.title", fallback: "定时任务"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {

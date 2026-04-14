@@ -16,12 +16,23 @@ struct ModelConfigView: View {
     }
 
     var body: some View {
-        List {
-            providerKeysSection
-            availableModelsSection
+        VStack(spacing: 0) {
+            PageHeroHeader(
+                title: L10n.k("models.title", fallback: "模型配置"),
+                subtitle: L10n.k("models.hero.subtitle", fallback: "管理 API 密钥与 Gateway 返回的可用模型列表。")
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
+
+            List {
+                providerKeysSection
+                availableModelsSection
+            }
+            .listStyle(.inset(alternatesRowBackgrounds: true))
         }
-        .listStyle(.inset(alternatesRowBackgrounds: true))
-        .navigationTitle(L10n.k("models.title", fallback: "模型配置"))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .toolbar {
             ToolbarItem {
                 Button {
