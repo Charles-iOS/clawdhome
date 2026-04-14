@@ -7,10 +7,18 @@ struct AgentGridView: View {
     @State private var searchText = ""
     @State private var selectedCategory: AgentCategory?
     @State private var showCreateSheet = false
-    @State private var showTemplates = false
+    @State private var segment: AgentGridSegment = .myAgents
 
     private var filteredAgents: [Agent] {
-        var results = store.agents
+        var results: [Agent]
+        switch segment {
+        case .myAgents:
+            results = store.agents
+        case .taskDerived:
+            results = store.presetTemplates.filter { preset in
+                !store.agents.contains(where: { $0.id == preset.id })
+            }
+        }
         if let cat = selectedCategory {
             results = results.filter { $0.category == cat }
         }
@@ -26,50 +34,74 @@ struct AgentGridView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
-            categoryTags
-            agentGrid
-
-            if !store.presetTemplates.isEmpty {
-                templateSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                heroHeader
+                categoryTags
+                agentGrid
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
+            .padding(.bottom, 28)
         }
-        .navigationTitle(L10n.k("agent.grid.title", fallback: "智能体"))
+        .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showCreateSheet) {
             CreateAgentSheet()
         }
     }
 
     @ViewBuilder
-    private var headerBar: some View {
-        HStack {
-            TextField(L10n.k("agent.grid.search", fallback: "搜索智能体…"), text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 300)
+    private var heroHeader: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L10n.k("agent.grid.title", fallback: "智能体"))
+                    .font(.system(size: 36, weight: .bold))
+                Text(L10n.k("agent.grid.subtitle", fallback: "管理你的个性化助手，创建新角色并开始对话。"))
+                    .font(.system(size: 22))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
             Spacer()
-            Button {
-                showCreateSheet = true
-            } label: {
-                Label(L10n.k("agent.grid.create", fallback: "新建智能体"), systemImage: "plus")
+
+            VStack(alignment: .trailing, spacing: 12) {
+                Picker("Agent", selection: $segment) {
+                    ForEach(AgentGridSegment.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 340)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField(L10n.k("agent.grid.search", fallback: "搜索智能体…"), text: $searchText)
+                        .textFieldStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .frame(width: 340, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.secondary.opacity(0.15), lineWidth: 1)
+                        )
+                )
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     @ViewBuilder
     private var categoryTags: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 categoryTag(nil, label: L10n.k("agent.grid.all", fallback: "全部"))
                 ForEach(AgentCategory.allCases) { cat in
                     categoryTag(cat, label: cat.displayName)
                 }
             }
-            .padding(.horizontal, 16)
         }
-        .padding(.bottom, 8)
     }
 
     @ViewBuilder
@@ -79,62 +111,70 @@ struct AgentGridView: View {
             selectedCategory = category
         }
         .buttonStyle(.plain)
-        .font(.caption)
+        .font(.system(size: 13, weight: .medium))
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.08))
-        .foregroundStyle(isSelected ? Color.accentColor : .primary)
+        .padding(.vertical, 7)
+        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.08))
+        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
         .clipShape(Capsule())
     }
 
     @ViewBuilder
     private var agentGrid: some View {
-        let columns = [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: 12)]
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(filteredAgents) { agent in
+        let columns = [GridItem(.adaptive(minimum: 300, maximum: 360), spacing: 20)]
+        LazyVGrid(columns: columns, spacing: 20) {
+            if segment == .myAgents {
+                createAgentCard
+            }
+            ForEach(filteredAgents) { agent in
+                if segment == .myAgents {
                     NavigationLink(value: agent.id) {
-                        AgentCardView(agent: agent)
+                        AgentVisualCard(agent: agent)
                     }
                     .buttonStyle(.plain)
-                    .contextMenu {
-                        agentContextMenu(agent)
-                    }
+                    .contextMenu { agentContextMenu(agent) }
+                } else {
+                    presetCard(agent)
                 }
             }
-            .padding(16)
         }
     }
 
-    // MARK: - 预置模板区域
-
     @ViewBuilder
-    private var templateSection: some View {
-        Divider()
-        DisclosureGroup(isExpanded: $showTemplates) {
-            let columns = [GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 8)]
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(store.presetTemplates.filter { preset in
-                    !store.agents.contains(where: { $0.id == preset.id })
-                }) { preset in
-                    presetTemplateCard(preset)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-        } label: {
-            Text(L10n.k("agent.grid.templates", fallback: "预置模板"))
-                .font(.subheadline)
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-    }
-
-    @ViewBuilder
-    private func presetTemplateCard(_ preset: Agent) -> some View {
+    private var createAgentCard: some View {
         Button {
-            // 从预置模板创建新智能体
+            showCreateSheet = true
+        } label: {
+            VStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .light))
+                        .foregroundStyle(.secondary)
+                }
+                Text(L10n.k("agent.grid.create", fallback: "新建智能体"))
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                            .foregroundStyle(Color.secondary.opacity(0.35))
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func presetCard(_ preset: Agent) -> some View {
+        Button {
             Task {
                 do {
                     try await store.addAgent(
@@ -150,20 +190,44 @@ struct AgentGridView: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
-                Text(preset.emoji).font(.title3)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(preset.name).font(.caption).fontWeight(.medium).lineLimit(1)
-                    Text(preset.description).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(preset.emoji)
+                        .font(.system(size: 44))
+                    Spacer()
+                    Text(L10n.k("agent.grid.templates", fallback: "预置模板"))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.12), in: Capsule())
                 }
-                Spacer()
-                Image(systemName: "plus.circle")
+                Text(preset.name)
+                    .font(.system(size: 30, weight: .bold))
+                    .lineLimit(1)
+                Text(preset.description)
+                    .font(.system(size: 22))
                     .foregroundStyle(.secondary)
-                    .font(.caption)
+                    .lineLimit(2)
+                Spacer()
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                    Text(L10n.k("agent.grid.from_template", fallback: "从模板创建"))
+                }
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
             }
-            .padding(8)
-            .background(Color.secondary.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(20)
+            .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -188,6 +252,125 @@ struct AgentGridView: View {
             } label: {
                 Label(L10n.k("agent.menu.delete", fallback: "删除智能体"), systemImage: "trash")
             }
+        }
+    }
+}
+
+private enum AgentGridSegment: String, CaseIterable, Identifiable {
+    case myAgents
+    case taskDerived
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .myAgents:
+            return L10n.k("agent.grid.segment.my_agents", fallback: "我的智能体")
+        case .taskDerived:
+            return L10n.k("agent.grid.segment.task_derived", fallback: "预置模板")
+        }
+    }
+}
+
+private struct AgentVisualCard: View {
+    let agent: Agent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(agent.emoji)
+                    .font(.system(size: 46))
+                Spacer()
+                statusTag
+            }
+
+            Text(agent.name)
+                .font(.system(size: 32, weight: .bold))
+                .lineLimit(1)
+            Text(agent.description)
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 8) {
+                capabilityRow(
+                    icon: "bubble.left.and.bubble.right",
+                    text: L10n.k("agent.card.sessions", fallback: "\(agent.sessionCount) 个会话")
+                )
+                capabilityRow(icon: "link", text: channelSummary)
+                capabilityRow(icon: "bolt", text: runtimeSummary)
+            }
+            .font(.system(size: 14))
+            .foregroundStyle(.secondary)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, minHeight: 330, maxHeight: 330, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.05), radius: 10, y: 2)
+    }
+
+    @ViewBuilder
+    private var statusTag: some View {
+        let cfg = statusConfig
+        HStack(spacing: 6) {
+            Circle()
+                .fill(cfg.color)
+                .frame(width: 7, height: 7)
+            Text(cfg.title)
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .foregroundStyle(cfg.color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(cfg.color.opacity(0.14), in: Capsule())
+    }
+
+    @ViewBuilder
+    private func capabilityRow(icon: String, text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .frame(width: 16)
+            Text(text)
+                .lineLimit(1)
+        }
+    }
+
+    private var channelSummary: String {
+        let channels = Array(Set(agent.boundBindings.map(\.channel)))
+        if channels.isEmpty {
+            return L10n.k("agent.card.channels.none", fallback: "未绑定渠道")
+        }
+        return L10n.k("agent.card.channels.count", fallback: "已绑定 \(channels.count) 个渠道")
+    }
+
+    private var runtimeSummary: String {
+        switch agent.status {
+        case .active:
+            return L10n.k("agent.status.active", fallback: "运行中")
+        case .idle:
+            return L10n.k("agent.status.idle", fallback: "空闲")
+        case .uninitialized:
+            return L10n.k("agent.status.uninitialized", fallback: "未初始化")
+        }
+    }
+
+    private var statusConfig: (title: String, color: Color) {
+        switch agent.status {
+        case .active:
+            return (L10n.k("agent.status.active", fallback: "运行中"), .green)
+        case .idle:
+            return (L10n.k("agent.status.idle", fallback: "空闲"), .secondary)
+        case .uninitialized:
+            return (L10n.k("agent.status.uninitialized", fallback: "未初始化"), .orange)
         }
     }
 }

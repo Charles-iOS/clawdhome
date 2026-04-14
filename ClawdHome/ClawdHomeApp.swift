@@ -76,9 +76,9 @@ struct ClawdHomeApp: App {
                     await bootstrap()
                 }
         }
-        .windowStyle(.titleBar)
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.automatic)
-        .defaultSize(width: 960, height: 640)
+        .defaultSize(width: 1280, height: 960)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
