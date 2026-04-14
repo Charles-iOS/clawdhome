@@ -18,6 +18,7 @@ struct AgentEditorView: View {
     @State private var category: AgentCategory
     @State private var preferredModel: String
     @State private var skillsText: String
+    @State private var isDeleting = false
 
     init(agent: Agent) {
         self.agent = agent
@@ -45,7 +46,7 @@ struct AgentEditorView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(L10n.k("common.save", fallback: "保存")) { save() }
-                        .disabled(name.isEmpty)
+                        .disabled(name.isEmpty || isDeleting)
                 }
             }
         }
@@ -110,12 +111,29 @@ struct AgentEditorView: View {
             Section {
                 Button(role: .destructive) {
                     Task {
-                        try? await store.removeAgent(id: agent.id)
-                        dismiss()
+                        isDeleting = true
+                        defer { isDeleting = false }
+                        do {
+                            try await store.removeAgent(id: agent.id)
+                            dismiss()
+                        } catch {
+                            appLog("删除智能体失败: \(error)", level: .error)
+                        }
                     }
                 } label: {
-                    Text(L10n.k("agent.editor.delete", fallback: "删除此智能体"))
+                    HStack(spacing: 8) {
+                        if isDeleting {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(
+                            isDeleting
+                                ? L10n.k("agent.delete.loading", fallback: "删除中…")
+                                : L10n.k("agent.editor.delete", fallback: "删除此智能体")
+                        )
+                    }
                 }
+                .disabled(isDeleting)
             }
         }
     }

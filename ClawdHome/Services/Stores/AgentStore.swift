@@ -131,13 +131,28 @@ final class AgentStore {
         description: String = "",
         category: AgentCategory = .strategy,
         workspace: String? = nil,
-        fromPresetId: String? = nil
+        fromPresetId: String? = nil,
+        seedContent overrideSeedContent: [PersonaFile: String]? = nil,
+        preferredModel: String? = nil,
+        skills: [String]? = nil
     ) async throws {
         guard let gateway, let workspaceManager else { return }
+        let resolvedId = try Self.validateAgentId(id)
 
-        // 从预置模板获取种子内容
+        // 从预置模板获取种子内容，或使用调用方传入的 seed
         var seedContent: [PersonaFile: String] = [:]
-        if let presetId = fromPresetId,
+        if let overrideSeedContent {
+            // 向导模式：调用方已组装好 seed content
+            seedContent = overrideSeedContent
+            // 如果同时指定了模板，将模板中的 SOUL 合并进去（若调用方未提供 soul）
+            if let presetId = fromPresetId,
+               presetTemplates.contains(where: { $0.id == presetId }) {
+                let presetSeed = Self.extractPresetSeedContent(presetId: presetId)
+                for (file, content) in presetSeed where seedContent[file] == nil {
+                    seedContent[file] = content
+                }
+            }
+        } else if let presetId = fromPresetId,
            presetTemplates.contains(where: { $0.id == presetId }) {
             // 预置模板中 systemPrompt/identity 字段在旧模型中已移除，
             // 但 PresetAgents.json 仍保留这些字段，通过 raw JSON 提取
@@ -145,16 +160,19 @@ final class AgentStore {
         }
 
         do {
-            try await tryAddAgentViaCLI(id: id)
-            appLog("AgentStore: CLI 添加智能体成功 id=\(id)")
+            try await tryAddAgentViaCLI(id: resolvedId)
+            appLog("AgentStore: CLI 添加智能体成功 id=\(resolvedId)")
         } catch {
+            if await didCLIAddActuallySucceed(gateway: gateway, agentId: resolvedId) {
+                appLog("AgentStore: CLI 添加智能体虽超时/报错，但配置已生效 id=\(resolvedId)", level: .warn)
+            } else {
             let cliErr = error
-            appLog("AgentStore: CLI 添加智能体失败，回退 patch 方案 id=\(id): \(cliErr)", level: .warn)
+            appLog("AgentStore: CLI 添加智能体失败，回退 patch 方案 id=\(resolvedId): \(cliErr)", level: .warn)
             do {
                 try await addAgentViaPatchFallback(
                     gateway: gateway,
                     workspaceManager: workspaceManager,
-                    id: id,
+                    id: resolvedId,
                     name: name,
                     workspace: workspace,
                     seedContent: seedContent
@@ -166,15 +184,26 @@ final class AgentStore {
                     fallbackReason: (fallbackErr as? LocalizedError)?.errorDescription ?? fallbackErr.localizedDescription
                 )
             }
+            }
+        }
+
+        do {
+            try await persistAgentDisplayName(
+                gateway: gateway,
+                agentId: resolvedId,
+                name: name
+            )
+        } catch {
+            appLog("AgentStore: 持久化智能体名称失败 id=\(resolvedId): \(error)", level: .warn)
         }
 
         // 刷新本地列表，避免与 gateway 真实状态漂移
         await refreshFromGateway()
 
         // 兜底：若刷新后仍未出现（极端时序），补写本地展示项
-        guard !agents.contains(where: { $0.id == id }) else { return }
+        guard !agents.contains(where: { $0.id == resolvedId }) else { return }
         let agent = Agent(
-            id: id,
+            id: resolvedId,
             name: name,
             emoji: emoji,
             description: description,
@@ -191,7 +220,7 @@ final class AgentStore {
                 await GatewayProcessManager.addAgentLocally(agentId: id)
             }
             group.addTask {
-                try await Task.sleep(nanoseconds: 15_000_000_000)
+                try await Task.sleep(nanoseconds: 30_000_000_000)
                 throw GatewayClientError.requestFailed(
                     code: "agents_add_cli_timeout",
                     message: "openclaw agents add 执行超时，已自动回退"
@@ -227,6 +256,9 @@ final class AgentStore {
         let (config, baseHash) = try await gateway.configGetFull()
         var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
         var newEntry: [String: Any] = ["id": id]
+        if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            newEntry["name"] = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if let ws = workspace {
             newEntry["workspace"] = ws
         }
@@ -238,29 +270,134 @@ final class AgentStore {
     /// 删除智能体
     func removeAgent(id: String) async throws {
         guard id != "main" else { return } // 不允许删除默认智能体
-        guard let gateway, let workspaceManager else { return }
+        guard let gateway, let workspaceManager else {
+            appLog("AgentStore: removeAgent(\(id)) 失败 — gateway 或 workspaceManager 未就绪", level: .error)
+            return
+        }
 
-        // 1. 从 gateway 配置移除
+        func finalizeLocalRemoval() async {
+            agents.removeAll { $0.id == id }
+            bindings.removeAll { $0.agentId == id }
+            do {
+                try await workspaceManager.deleteWorkspace(agentId: id)
+            } catch {
+                appLog("AgentStore: 清理 workspace 失败（不影响删除）: \(error)", level: .warn)
+            }
+        }
+
+        do {
+            try await tryDeleteAgentViaCLI(id: id)
+            appLog("AgentStore: CLI 删除智能体成功 id=\(id)")
+            await refreshFromGateway()
+            await finalizeLocalRemoval()
+            return
+        } catch {
+            do {
+                let (config, _) = try await gateway.configGetFull()
+                let cliDidActuallyDelete = !((config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? [])
+                    .contains { ($0["id"] as? String) == id }
+                if cliDidActuallyDelete {
+                    appLog("AgentStore: CLI 删除智能体虽超时/报错，但配置已生效 id=\(id)", level: .warn)
+                    await refreshFromGateway()
+                    await finalizeLocalRemoval()
+                    return
+                }
+            } catch {
+                appLog("AgentStore: 校验 CLI 删除结果失败 id=\(id): \(error)", level: .warn)
+            }
+
+            appLog("AgentStore: CLI 删除智能体失败，回退 patch 方案 id=\(id): \(error)", level: .warn)
+        }
+
+        func removeAgentFromSnapshot(_ config: [String: Any]) -> (agentsList: [[String: Any]], bindingsList: [[String: Any]], didContainAgent: Bool) {
+            var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+            let beforeCount = agentsList.count
+            agentsList.removeAll { ($0["id"] as? String) == id }
+
+            var bindingsList = config["bindings"] as? [[String: Any]] ?? []
+            bindingsList.removeAll { ($0["agentId"] as? String) == id }
+            return (agentsList, bindingsList, agentsList.count < beforeCount)
+        }
+
+        func configStillContainsAgent(_ config: [String: Any]) -> Bool {
+            let agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+            return agentsList.contains { ($0["id"] as? String) == id }
+        }
+
+        // 1. 从 gateway 配置移除（核心步骤，必须成功）
         let (config, baseHash) = try await gateway.configGetFull()
-        var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
-        agentsList.removeAll { ($0["id"] as? String) == id }
+        let removal = removeAgentFromSnapshot(config)
 
-        // 同时移除关联的 bindings
-        var bindingsList = config["bindings"] as? [[String: Any]] ?? []
-        bindingsList.removeAll { ($0["agentId"] as? String) == id }
+        if removal.didContainAgent {
+            let patch: [String: Any] = [
+                "agents": ["list": removal.agentsList],
+                "bindings": removal.bindingsList
+            ]
+            let (noop, patchedConfig) = try await gateway.configPatch(
+                patch: patch,
+                baseHash: baseHash,
+                note: "删除智能体: \(id)"
+            )
 
-        let patch: [String: Any] = [
-            "agents": ["list": agentsList],
-            "bindings": bindingsList
-        ]
-        try await gateway.configPatch(patch: patch, baseHash: baseHash, note: "删除智能体: \(id)")
+            let deletedAfterFirstPatch = !configStillContainsAgent(patchedConfig)
+            if noop || !deletedAfterFirstPatch {
+                appLog("AgentStore: 删除智能体首次 patch 未确认生效，准备重试 id=\(id) noop=\(noop)", level: .warn)
 
-        // 2. 删除 workspace
-        try await workspaceManager.deleteWorkspace(agentId: id)
+                let (freshConfig, freshHash) = try await gateway.configGetFull()
+                let freshRemoval = removeAgentFromSnapshot(freshConfig)
+                let retryPatch: [String: Any] = [
+                    "agents": ["list": freshRemoval.agentsList],
+                    "bindings": freshRemoval.bindingsList
+                ]
+                let (retryNoop, retryConfig) = try await gateway.configPatch(
+                    patch: retryPatch,
+                    baseHash: freshHash,
+                    note: "删除智能体(重试): \(id)"
+                )
 
-        // 3. 从本地列表移除
-        agents.removeAll { $0.id == id }
-        bindings.removeAll { $0.agentId == id }
+                if retryNoop || configStillContainsAgent(retryConfig) {
+                    let (verifiedConfig, _) = try await gateway.configGetFull()
+                    if configStillContainsAgent(verifiedConfig) {
+                        appLog("AgentStore: 删除智能体未持久化，终止本地移除 id=\(id)", level: .error)
+                        throw GatewayClientError.requestFailed(
+                            code: "agent_delete_not_persisted",
+                            message: "删除未写入配置，请重试"
+                        )
+                    }
+                }
+            }
+
+            appLog("AgentStore: 已从 gateway 配置移除智能体 id=\(id)")
+        } else {
+            appLog("AgentStore: 智能体 id=\(id) 不在 gateway agents.list 中，仅做本地清理", level: .warn)
+        }
+
+        // 2. 从本地列表和文件系统移除
+        await finalizeLocalRemoval()
+    }
+
+    private func tryDeleteAgentViaCLI(id: String) async throws {
+        let (ok, output) = try await withThrowingTaskGroup(of: (Bool, String).self) { group in
+            group.addTask {
+                await GatewayProcessManager.deleteAgentLocally(agentId: id)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+                throw GatewayClientError.requestFailed(
+                    code: "agents_delete_cli_timeout",
+                    message: "openclaw agents delete 执行超时，已自动回退"
+                )
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+        guard ok else {
+            throw GatewayClientError.requestFailed(
+                code: "agents_delete_cli_failed",
+                message: output.isEmpty ? "openclaw agents delete 执行失败" : output
+            )
+        }
     }
 
     /// 更新智能体元数据（仅影响本地显示，OpenClaw 配置中只存 id 和 workspace）
@@ -410,10 +547,17 @@ final class AgentStore {
     private func parseConfig(_ config: [String: Any]) {
         // 解析 agents.list
         var parsedAgents: [Agent] = []
+        var seenNormalizedIds = Set<String>()
         if let agentsConfig = config["agents"] as? [String: Any],
            let list = agentsConfig["list"] as? [[String: Any]] {
             for entry in list {
                 guard let id = entry["id"] as? String else { continue }
+                let normalizedId = Self.normalizedAgentIdKey(id)
+                if seenNormalizedIds.contains(normalizedId) {
+                    appLog("AgentStore: 检测到重复/脏 agent 配置，已忽略后续条目 rawId=\(id) normalizedId=\(normalizedId)", level: .warn)
+                    continue
+                }
+                seenNormalizedIds.insert(normalizedId)
                 let ws = entry["workspace"] as? String
                 let dir = entry["agentDir"] as? String
                 let isDefault = entry["default"] as? Bool ?? false
@@ -421,12 +565,14 @@ final class AgentStore {
                 // 读取 per-agent 模型配置
                 let modelConfig = entry["model"] as? [String: Any]
                 let agentModel = modelConfig?["primary"] as? String
+                let configuredName = (entry["name"] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
 
                 // 尝试从预置模板匹配显示信息
                 let preset = presetTemplates.first(where: { $0.id == id })
                 let agent = Agent(
                     id: id,
-                    name: preset?.name ?? id,
+                    name: (configuredName?.isEmpty == false ? configuredName! : (preset?.name ?? id)),
                     emoji: preset?.emoji ?? "🤖",
                     description: preset?.description ?? "",
                     category: preset?.category ?? .strategy,
@@ -570,5 +716,66 @@ private struct AgentCreationError: LocalizedError {
         CLI 错误：\(cliReason)
         回退错误：\(fallbackReason)
         """
+    }
+}
+
+private extension AgentStore {
+    func didCLIAddActuallySucceed(gateway: GatewayService, agentId: String) async -> Bool {
+        do {
+            let (config, _) = try await gateway.configGetFull()
+            let agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+            return agentsList.contains { Self.normalizedAgentIdKey($0["id"] as? String ?? "") == agentId }
+        } catch {
+            appLog("AgentStore: 校验 CLI 添加结果失败 id=\(agentId): \(error)", level: .warn)
+            return false
+        }
+    }
+
+    func persistAgentDisplayName(
+        gateway: GatewayService,
+        agentId: String,
+        name: String
+    ) async throws {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        let (config, baseHash) = try await gateway.configGetFull()
+        var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+        guard let idx = agentsList.firstIndex(where: {
+            Self.normalizedAgentIdKey($0["id"] as? String ?? "") == agentId
+        }) else { return }
+
+        let currentName = (agentsList[idx]["name"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if currentName == trimmedName { return }
+
+        agentsList[idx]["name"] = trimmedName
+        let patch: [String: Any] = ["agents": ["list": agentsList]]
+        _ = try await gateway.configPatch(
+            patch: patch,
+            baseHash: baseHash,
+            note: "设置智能体名称: \(trimmedName)"
+        )
+    }
+
+    static func normalizedAgentIdKey(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed
+            .lowercased()
+            .filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return normalized.isEmpty ? trimmed.lowercased() : normalized
+    }
+
+    static func validateAgentId(_ raw: String) throws -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = normalizedAgentIdKey(trimmed)
+        guard !trimmed.isEmpty, trimmed == normalized else {
+            throw GatewayClientError.requestFailed(
+                code: "invalid_agent_id",
+                message: "智能体 ID 仅支持英文小写字母、数字和连字符"
+            )
+        }
+        return normalized
     }
 }

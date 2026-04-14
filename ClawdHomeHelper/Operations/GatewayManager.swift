@@ -45,14 +45,17 @@ struct GatewayManager {
             throw error
         }
 
-        // 2. 清理 OpenClaw 原生 LaunchAgent（避免双重注册抢端口）
-        let agentPlist = "/Users/\(username)/Library/LaunchAgents/ai.openclaw.gateway.plist"
-        if FileManager.default.fileExists(atPath: agentPlist) {
+        // 2. 清理历史遗留的用户侧 LaunchAgent（避免旧版本残留持续抢占/误导端口与状态）
+        let legacyAgents: [(label: String, plist: String)] = [
+            ("ai.openclaw.gateway", "/Users/\(username)/Library/LaunchAgents/ai.openclaw.gateway.plist"),
+            ("ai.clawdsetup.gateway", "/Users/\(username)/Library/LaunchAgents/ai.clawdsetup.gateway.plist"),
+        ]
+        for legacyAgent in legacyAgents where FileManager.default.fileExists(atPath: legacyAgent.plist) {
             GatewayLog.log("START_STEP", username: username,
-                detail: "清理冲突 LaunchAgent: \(agentPlist)")
-            _ = try? run("/bin/launchctl", args: ["bootout", "gui/\(uid)/ai.openclaw.gateway"])
-            _ = try? run("/bin/launchctl", args: ["unload", agentPlist])
-            try? FileManager.default.removeItem(atPath: agentPlist)
+                detail: "清理冲突 LaunchAgent: \(legacyAgent.plist)")
+            _ = try? run("/bin/launchctl", args: ["bootout", "gui/\(uid)/\(legacyAgent.label)"])
+            _ = try? run("/bin/launchctl", args: ["unload", legacyAgent.plist])
+            try? FileManager.default.removeItem(atPath: legacyAgent.plist)
         }
 
         // 3. 修复可能损坏的配置文件（智能引号等非法字符）

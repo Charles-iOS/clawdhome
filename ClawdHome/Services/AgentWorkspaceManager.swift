@@ -141,6 +141,11 @@ final class AgentWorkspaceManager {
             relativePath: sessionsDirPath(for: agentId),
             showHidden: false
         )
+        .filter { entry in
+            guard !entry.isDirectory else { return false }
+            if entry.name == "sessions.json" { return false }
+            return entry.name.hasSuffix(".jsonl")
+        }
     }
 
     // MARK: - Workspace 检测
@@ -164,16 +169,76 @@ final class AgentWorkspaceManager {
 
     func deleteWorkspace(agentId: String) async throws {
         guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
-        // 删除 workspace 目录
-        try await helper.deleteItem(
-            username: username,
-            relativePath: workspacePath(for: agentId)
+        let normalizedId = Self.normalizedAgentKey(agentId)
+
+        // 删除 workspace 目录（不存在时忽略）
+        let workspaceCandidates = try await deletionCandidates(
+            parentRelativePath: ".openclaw",
+            exactName: workspacePath(for: agentId).split(separator: "/").last.map(String.init) ?? "",
+            normalizedMatch: { entryName in
+                guard entryName.hasPrefix("workspace-") else { return false }
+                return Self.normalizedAgentKey(String(entryName.dropFirst("workspace-".count))) == normalizedId
+            }
         )
-        // 删除 agent 目录（含 sessions）
-        try await helper.deleteItem(
-            username: username,
-            relativePath: ".openclaw/agents/\(agentId)"
+        for relativePath in workspaceCandidates {
+            do {
+                try await helper.deleteItem(username: username, relativePath: relativePath)
+            } catch {
+                appLog("AgentWorkspace: 删除 workspace 目录失败（可忽略）: \(error)", level: .warn)
+            }
+        }
+
+        // 删除 agent 目录（含 sessions，不存在时忽略）
+        let agentCandidates = try await deletionCandidates(
+            parentRelativePath: ".openclaw/agents",
+            exactName: agentId,
+            normalizedMatch: { entryName in
+                Self.normalizedAgentKey(entryName) == normalizedId
+            }
         )
+        for relativePath in agentCandidates {
+            do {
+                try await helper.deleteItem(username: username, relativePath: relativePath)
+            } catch {
+                appLog("AgentWorkspace: 删除 agent 目录失败（可忽略）: \(error)", level: .warn)
+            }
+        }
+    }
+
+    private func deletionCandidates(
+        parentRelativePath: String,
+        exactName: String,
+        normalizedMatch: (String) -> Bool
+    ) async throws -> [String] {
+        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
+
+        var candidates = Set<String>()
+        if !exactName.isEmpty {
+            candidates.insert("\(parentRelativePath)/\(exactName)")
+        }
+
+        let entries = (try? await helper.listDirectory(
+            username: username,
+            relativePath: parentRelativePath,
+            showHidden: false
+        )) ?? []
+
+        for entry in entries where entry.isDirectory && normalizedMatch(entry.name) {
+            candidates.insert("\(parentRelativePath)/\(entry.name)")
+        }
+
+        return Array(candidates).sorted()
+    }
+}
+
+private extension AgentWorkspaceManager {
+    static func normalizedAgentKey(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = trimmed
+            .lowercased()
+            .filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return normalized.isEmpty ? trimmed.lowercased() : normalized
     }
 }
 

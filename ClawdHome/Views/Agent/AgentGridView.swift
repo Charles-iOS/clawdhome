@@ -8,6 +8,9 @@ struct AgentGridView: View {
     @State private var selectedCategory: AgentCategory?
     @State private var showCreateSheet = false
     @State private var segment: AgentGridSegment = .myAgents
+    @State private var agentToDelete: Agent?
+    @State private var deletingAgentId: String?
+    @State private var deleteError: String?
 
     private var filteredAgents: [Agent] {
         var results: [Agent]
@@ -47,6 +50,49 @@ struct AgentGridView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showCreateSheet) {
             CreateAgentSheet()
+        }
+        .alert(
+            L10n.k("agent.delete.confirm_title", fallback: "确认删除"),
+            isPresented: Binding(
+                get: { agentToDelete != nil },
+                set: { if !$0 { agentToDelete = nil } }
+            )
+        ) {
+            Button(L10n.k("common.cancel", fallback: "取消"), role: .cancel) {
+                agentToDelete = nil
+            }
+            .disabled(deletingAgentId != nil)
+            Button(L10n.k("agent.delete.confirm", fallback: "删除"), role: .destructive) {
+                guard let agent = agentToDelete else { return }
+                agentToDelete = nil
+                Task {
+                    deletingAgentId = agent.id
+                    defer { deletingAgentId = nil }
+                    do {
+                        try await store.removeAgent(id: agent.id)
+                    } catch {
+                        deleteError = error.localizedDescription
+                        appLog("删除智能体失败: \(error)", level: .error)
+                    }
+                }
+            }
+        } message: {
+            if let agent = agentToDelete {
+                Text(L10n.k("agent.delete.confirm_msg", fallback: "确定要删除智能体「\(agent.name)」吗？此操作不可撤销。"))
+            }
+        }
+        .alert(
+            L10n.k("agent.delete.failed_title", fallback: "删除失败"),
+            isPresented: Binding(
+                get: { deleteError != nil },
+                set: { if !$0 { deleteError = nil } }
+            )
+        ) {
+            Button("OK") { deleteError = nil }
+        } message: {
+            if let err = deleteError {
+                Text(err)
+            }
         }
     }
 
@@ -125,9 +171,13 @@ struct AgentGridView: View {
             ForEach(filteredAgents) { agent in
                 if segment == .myAgents {
                     NavigationLink(value: agent.id) {
-                        AgentVisualCard(agent: agent)
+                        AgentVisualCard(
+                            agent: agent,
+                            isDeleting: deletingAgentId == agent.id
+                        )
                     }
                     .buttonStyle(.plain)
+                    .disabled(deletingAgentId == agent.id)
                     .contextMenu { agentContextMenu(agent) }
                 } else {
                     presetCard(agent)
@@ -242,12 +292,11 @@ struct AgentGridView: View {
 
         if agent.id != "main" {
             Button(role: .destructive) {
-                Task {
-                    try? await store.removeAgent(id: agent.id)
-                }
+                agentToDelete = agent
             } label: {
                 Label(L10n.k("agent.menu.delete", fallback: "删除智能体"), systemImage: "trash")
             }
+            .disabled(deletingAgentId != nil)
         }
     }
 }
@@ -270,6 +319,7 @@ private enum AgentGridSegment: String, CaseIterable, Identifiable {
 
 private struct AgentVisualCard: View {
     let agent: Agent
+    let isDeleting: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -312,6 +362,21 @@ private struct AgentVisualCard: View {
                 )
         )
         .shadow(color: .black.opacity(0.05), radius: 10, y: 2)
+        .overlay {
+            if isDeleting {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .controlSize(.large)
+                            Text(L10n.k("agent.delete.loading", fallback: "删除中…"))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
+                    }
+            }
+        }
     }
 
     @ViewBuilder

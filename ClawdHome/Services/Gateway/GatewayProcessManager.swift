@@ -442,6 +442,20 @@ final class GatewayProcessManager {
         ])
     }
 
+    /// 删除智能体（CLI 主路径）：`openclaw agents delete <id>`
+    /// - Returns: (success, output)
+    static func deleteAgentLocally(agentId: String) async -> (Bool, String) {
+        let trimmedId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedId.isEmpty else {
+            return (false, "agentId 不能为空")
+        }
+        return await runOpenclawLocally(args: [
+            "agents", "delete", trimmedId,
+            "--force",
+            "--json"
+        ])
+    }
+
     #if DEBUG
     /// 通过源码绝对路径推导仓库根目录（.../clawdhome）
     private static var debugRepoRootURL: URL? {
