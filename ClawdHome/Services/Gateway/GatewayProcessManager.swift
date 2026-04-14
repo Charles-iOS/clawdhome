@@ -208,10 +208,22 @@ final class GatewayProcessManager {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 15_000_000_000)
                 guard !Task.isCancelled else { return }
-                let (alive, _) = await GatewayClient.httpProbe(port: port)
-                if !alive {
-                    await MainActor.run {
-                        if self?.state == .running { self?.state = .starting }
+                let (alive, ready) = await GatewayClient.httpProbe(port: port)
+                await MainActor.run {
+                    guard let self else { return }
+                    if ready {
+                        if self.state != .running {
+                            appLog("GatewayProcessManager: health probe recovered on port \(port)")
+                            self.state = .running
+                        }
+                    } else if !alive {
+                        if self.state == .running {
+                            appLog("GatewayProcessManager: health probe lost on port \(port), marking starting", level: .warn)
+                            self.state = .starting
+                        }
+                    } else if self.state == .running {
+                        // 服务仍在监听，但 readyz 尚未恢复，通常是重启中的短暂过渡态。
+                        self.state = .starting
                     }
                 }
             }
