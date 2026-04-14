@@ -361,6 +361,14 @@ final class AgentStore {
         bindings.filter { $0.agentId == agentId }
     }
 
+    /// Gateway 断开或停止后，清理基于旧连接残留的运行态展示。
+    func markGatewayDisconnected() {
+        for index in agents.indices where agents[index].status == .active {
+            agents[index].status = .idle
+            agents[index].sessionCount = 0
+        }
+    }
+
     // MARK: - 预置模板
 
     private static func loadPresets() -> [Agent] {

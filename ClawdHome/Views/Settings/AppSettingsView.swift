@@ -78,6 +78,7 @@ struct AppSettingsView: View {
     private var stateLabel: String {
         switch processManager.state {
         case .running: return L10n.k("dashboard.running", fallback: "运行中")
+        case .stopping: return L10n.k("dashboard.stopping", fallback: "正在停止…")
         case .starting: return L10n.k("dashboard.starting", fallback: "正在启动…")
         case .stopped: return L10n.k("dashboard.stopped", fallback: "已停止")
         case .failed(let msg): return msg

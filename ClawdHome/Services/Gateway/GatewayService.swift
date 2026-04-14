@@ -55,6 +55,20 @@ final class GatewayService {
         skillsStore.stop()
     }
 
+    func prepareForAppTermination() {
+        let existingClient = client
+        client = nil
+        isConnected = false
+        cronStore.stop()
+        skillsStore.stop()
+
+        if let existingClient {
+            Task {
+                await existingClient.disconnect()
+            }
+        }
+    }
+
     func updateToken(_ newToken: String) {
         token = newToken
     }

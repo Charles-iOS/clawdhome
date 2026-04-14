@@ -70,13 +70,20 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(SidebarSection.allCases, id: \.self) { section in
+            ForEach(Array(SidebarSection.allCases.enumerated()), id: \.element) { index, section in
                 let items = SidebarDestination.allCases.filter { $0.section == section }
-                Section(section.label) {
+                Section {
                     ForEach(items) { dest in
                         Label(dest.label, systemImage: dest.systemImage)
+                            .font(.system(size: 18))
+                            .labelStyle(SidebarItemLabelStyle())
                             .tag(dest)
                     }
+                } header: {
+                    Text(section.label)
+                        .font(.system(size: 18))
+                        .padding(.top, index == 0 ? 0 : 10)
+                        .padding(.bottom, 10)
                 }
             }
         }
@@ -95,7 +102,7 @@ struct SidebarView: View {
                 .fill(statusColor)
                 .frame(width: 8, height: 8)
             Text(statusText)
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,6 +111,7 @@ struct SidebarView: View {
     private var statusColor: Color {
         switch processManager.state {
         case .running: return gatewayService.isConnected ? .green : .orange
+        case .stopping: return .orange
         case .starting: return .orange
         case .stopped: return .secondary
         case .failed: return .red
@@ -116,9 +124,19 @@ struct SidebarView: View {
             return gatewayService.isConnected
                 ? L10n.k("sidebar.status.running", fallback: "Gateway 运行中")
                 : L10n.k("models.not_connected", fallback: "Gateway 未连接")
+        case .stopping: return L10n.k("sidebar.status.stopping", fallback: "Gateway 停止中…")
         case .starting: return L10n.k("sidebar.status.starting", fallback: "Gateway 启动中…")
         case .stopped: return L10n.k("sidebar.status.stopped", fallback: "Gateway 已停止")
         case .failed(let msg): return msg
+        }
+    }
+}
+
+private struct SidebarItemLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 15) {
+            configuration.icon
+            configuration.title
         }
     }
 }

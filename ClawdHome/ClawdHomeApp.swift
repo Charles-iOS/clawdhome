@@ -5,12 +5,18 @@ import Observation
 import SwiftUI
 
 final class ClawdHomeAppDelegate: NSObject, NSApplicationDelegate {
+    var onWillTerminate: (() -> Void)?
+
     func application(_ app: NSApplication, shouldSaveApplicationState coder: NSCoder) -> Bool {
         false
     }
 
     func application(_ app: NSApplication, shouldRestoreApplicationState coder: NSCoder) -> Bool {
         false
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        onWillTerminate?()
     }
 }
 
@@ -35,6 +41,7 @@ struct ClawdHomeApp: App {
     @State private var lockStore = AppLockStore()
     @State private var maintenanceWindowRegistry = MaintenanceWindowRegistry()
     @State private var gatewayReconnectTask: Task<Void, Never>?
+    @State private var didPrepareForTermination = false
 
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.system.rawValue
 
@@ -64,7 +71,10 @@ struct ClawdHomeApp: App {
                 .environment(gatewayHub)
                 .environment(lockStore)
                 .environment(maintenanceWindowRegistry)
-                .task { await bootstrap() }
+                .task {
+                    appDelegate.onWillTerminate = handleAppTermination
+                    await bootstrap()
+                }
         }
         .windowStyle(.titleBar)
         .windowResizability(.automatic)
@@ -218,6 +228,17 @@ struct ClawdHomeApp: App {
                 }
             }
         }
+    }
+
+    private func handleAppTermination() {
+        guard !didPrepareForTermination else { return }
+        didPrepareForTermination = true
+
+        gatewayReconnectTask?.cancel()
+        gatewayReconnectTask = nil
+        processManager.prepareForAppTermination()
+        helperClient.disconnect()
+        gatewayService.prepareForAppTermination()
     }
 
     private func readGatewayToken() -> String? {

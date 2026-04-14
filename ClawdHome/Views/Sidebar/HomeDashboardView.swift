@@ -50,6 +50,9 @@ struct HomeDashboardView: View {
         case .running:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
+        case .stopping:
+            ProgressView()
+                .controlSize(.large)
         case .starting:
             ProgressView()
                 .controlSize(.large)
@@ -65,6 +68,7 @@ struct HomeDashboardView: View {
     private var stateTitle: String {
         switch processManager.state {
         case .running:    return L10n.k("dashboard.running", fallback: "运行中")
+        case .stopping:   return L10n.k("dashboard.stopping", fallback: "正在停止…")
         case .starting:   return L10n.k("dashboard.starting", fallback: "正在启动…")
         case .stopped:    return L10n.k("dashboard.stopped", fallback: "已停止")
         case .failed(let msg): return msg
@@ -81,18 +85,37 @@ struct HomeDashboardView: View {
     @ViewBuilder
     private var gatewayControls: some View {
         HStack(spacing: 8) {
-            if processManager.isRunning {
+            switch processManager.state {
+            case .running:
                 Button(L10n.k("dashboard.restart", fallback: "重启")) {
                     processManager.restart()
                 }
                 Button(L10n.k("dashboard.stop", fallback: "停止")) {
-                    processManager.stop()
+                    Task {
+                        await gateway.disconnect()
+                        agentStore.markGatewayDisconnected()
+                        processManager.stop()
+                    }
                 }
-            } else {
+            case .stopped, .failed:
                 Button(L10n.k("dashboard.start", fallback: "启动")) {
-                    processManager.start()
+                    Task {
+                        processManager.start()
+                        for _ in 0..<30 {
+                            if processManager.state == .running || gateway.isConnected { break }
+                            if case .failed = processManager.state { break }
+                            try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        }
+                        guard processManager.state == .running else { return }
+                        await gateway.connect()
+                        if gateway.isConnected {
+                            await agentStore.refreshFromGateway()
+                        }
+                    }
                 }
                 .disabled(!envChecker.isReady)
+            case .starting, .stopping:
+                EmptyView()
             }
         }
     }
