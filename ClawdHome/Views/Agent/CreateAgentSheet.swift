@@ -140,7 +140,11 @@ struct CreateAgentSheet: View {
                 )
                 dismiss()
             } catch {
-                errorMessage = error.localizedDescription
+                let detail = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                errorMessage = """
+                \(L10n.k("agent.create.failed", fallback: "创建失败"))
+                \(detail)
+                """
                 isCreating = false
             }
         }

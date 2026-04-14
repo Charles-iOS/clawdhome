@@ -1025,6 +1025,8 @@ struct ModelAddSheet: View {
                 fields[fieldName] = val
             case .bool(let b):
                 fields[fieldName] = b
+            case .jsonArray(let rows):
+                fields[fieldName] = rows
             }
         }
 

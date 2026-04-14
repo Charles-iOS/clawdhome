@@ -6,6 +6,8 @@ import SwiftUI
 
 struct AgentEditorView: View {
     @Environment(AgentStore.self) private var store
+    @Environment(GlobalModelStore.self) private var modelStore
+    @Environment(GatewayService.self) private var gateway
     @Environment(\.dismiss) private var dismiss
 
     let agent: Agent
@@ -71,10 +73,22 @@ struct AgentEditorView: View {
     @ViewBuilder
     private var modelSection: some View {
         Section(L10n.k("agent.editor.model", fallback: "首选模型")) {
-            TextField(
-                L10n.k("agent.editor.model_placeholder", fallback: "如 claude-opus-4, gpt-4o（留空使用默认）"),
-                text: $preferredModel
-            )
+            Picker(
+                L10n.k("agent.editor.model_picker", fallback: "模型"),
+                selection: $preferredModel
+            ) {
+                Text(L10n.k("agent.editor.model_default", fallback: "使用全局默认"))
+                    .tag("")
+                Divider()
+                ForEach(modelStore.allTemplateModels) { model in
+                    Text(model.label).tag(model.id)
+                }
+            }
+            if !gateway.isConnected {
+                Text(L10n.k("agent.editor.model_gateway_hint", fallback: "Gateway 未连接，模型变更将在保存时写入"))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 
@@ -118,6 +132,18 @@ struct AgentEditorView: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         store.updateAgent(updated)
+
+        // 模型变更写入 gateway 配置
+        let newModel = preferredModel.isEmpty ? nil : preferredModel
+        if newModel != agent.preferredModel {
+            Task {
+                try? await store.setAgentModel(
+                    agentId: agent.id,
+                    modelId: newModel
+                )
+            }
+        }
+
         dismiss()
     }
 }

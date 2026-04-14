@@ -6816,6 +6816,96 @@
         }
       }
     },
+    "models.gateway_key_sync.clear_failed": {
+      "comment": "配置-模型：清除 Gateway 失败",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to clear Gateway config: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除 Gateway 配置失败：%@"
+          }
+        }
+      }
+    },
+    "models.gateway_key_sync.failed": {
+      "comment": "配置-模型：config.set 失败",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved locally, but writing to Gateway failed: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存到本机，但写入 Gateway 失败：%@"
+          }
+        }
+      }
+    },
+    "models.gateway_key_sync.local_only": {
+      "comment": "配置-模型：仅钥匙串",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gateway is not connected. The API key was saved to the local keychain only and was not written to OpenClaw. Connect Gateway and save again to sync."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gateway 未连接，API 密钥已写入本机钥匙串，尚未写入 OpenClaw。连接 Gateway 后可再次打开此处保存以同步。"
+          }
+        }
+      }
+    },
+    "models.gateway_key_sync.local_only_title": {
+      "comment": "配置-模型：仅钥匙串弹窗标题",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved locally"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已保存到本机"
+          }
+        }
+      }
+    },
+    "models.gateway_key_sync.path_hint": {
+      "comment": "配置-模型：OpenClaw dot-path",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Config path: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置路径：%@"
+          }
+        }
+      }
+    },
     "models.global_secrets_store.text_1ff177a5": {
       "extractionState": "manual",
       "localizations": {

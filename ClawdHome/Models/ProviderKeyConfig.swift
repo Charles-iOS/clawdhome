@@ -6,6 +6,8 @@ import Foundation
 enum ProviderConfigValue {
     case string(String)
     case bool(Bool)
+    /// OpenClaw `models.providers.*.models` 数组（与 UserInitWizard MinimaxModel 结构一致）
+    case jsonArray([[String: Any]])
 }
 
 struct ProviderKeyConfig: Identifiable {
@@ -32,6 +34,73 @@ struct ProviderKeyConfig: Identifiable {
 
     var inputLabel: String { isUrlConfig ? L10n.k("models.provider_key_config.service_url", fallback: "服务地址") : "API Key" }
 }
+
+/// MiniMax 系列在 OpenClaw 中要求的 `models` 清单（与 UserInitWizard MinimaxModel.providerModelConfig 对齐）
+private let minimaxOpenClawModelCatalog: [[String: Any]] = [
+    [
+        "id": "MiniMax-M2.7",
+        "name": "MiniMax M2.7",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-M2.7-highspeed",
+        "name": "MiniMax M2.7 Highspeed",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-M2.5",
+        "name": "MiniMax M2.5",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-M2.5-highspeed",
+        "name": "MiniMax M2.5 Highspeed",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-VL-01",
+        "name": "MiniMax VL 01",
+        "reasoning": false,
+        "input": ["text", "image"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-M2",
+        "name": "MiniMax M2",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+    [
+        "id": "MiniMax-M2.1",
+        "name": "MiniMax M2.1",
+        "reasoning": true,
+        "input": ["text"],
+        "cost": ["input": 0.3, "output": 1.2, "cacheRead": 0.03, "cacheWrite": 0.12],
+        "contextWindow": 200_000,
+        "maxTokens": 8192,
+    ],
+]
 
 /// 所有支持的 Provider（顺序即界面显示顺序）
 /// 与 openclaw src/agents/models-config.providers.ts 同步
@@ -85,6 +154,18 @@ let supportedProviderKeys: [ProviderKeyConfig] = [
             ("models.providers.minimax.api", .string("anthropic-messages")),
             ("models.providers.minimax.baseUrl", .string("https://api.minimaxi.com/anthropic")),
             ("models.providers.minimax.authHeader", .bool(true)),
+        ]),
+    ProviderKeyConfig(
+        id: "minimax-cn",
+        displayName: "MiniMax（国内）",
+        configPath: "models.providers.minimax-cn.apiKey",
+        placeholder: "eyJ...",
+        isUrlConfig: false, supportsOAuth: false,
+        sideConfigs: [
+            ("models.providers.minimax-cn.api", .string("anthropic-messages")),
+            ("models.providers.minimax-cn.baseUrl", .string("https://api.minimaxi.com/anthropic")),
+            ("models.providers.minimax-cn.authHeader", .bool(true)),
+            ("models.providers.minimax-cn.models", .jsonArray(minimaxOpenClawModelCatalog)),
         ]),
     ProviderKeyConfig(
         id: "zai",

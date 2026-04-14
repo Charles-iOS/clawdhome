@@ -34,6 +34,7 @@ struct ClawdHomeApp: App {
     @State private var gatewayHub = GatewayHub()
     @State private var lockStore = AppLockStore()
     @State private var maintenanceWindowRegistry = MaintenanceWindowRegistry()
+    @State private var gatewayReconnectTask: Task<Void, Never>?
 
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.system.rawValue
 
@@ -187,6 +188,7 @@ struct ClawdHomeApp: App {
         } else {
             appLog("bootstrap: gateway not ready, skipping WebSocket connect", level: .warn)
         }
+        startGatewayReconnectLoop()
 
         // 先建立 XPC 连接，agentStore/workspaceManager 依赖 helperClient 读写文件
         helperClient.connect()
@@ -202,6 +204,20 @@ struct ClawdHomeApp: App {
 
         await MainActor.run { shrimpPool.start() }
         modelStore.load()
+    }
+
+    private func startGatewayReconnectLoop() {
+        gatewayReconnectTask?.cancel()
+        gatewayReconnectTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                if processManager.isRunning, !gatewayService.isConnected {
+                    appLog("bootstrap: reconnect loop detected disconnected gateway, retrying...")
+                    await connectGatewayService()
+                }
+            }
+        }
     }
 
     private func readGatewayToken() -> String? {

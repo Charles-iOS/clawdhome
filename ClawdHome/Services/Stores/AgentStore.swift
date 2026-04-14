@@ -53,6 +53,8 @@ final class AgentStore {
             parseConfig(config)
         } catch {
             appLog("AgentStore: 无法从 gateway 读取配置: \(error)", level: .error)
+            // 网关暂不可用时也要保底生成 main，避免 UI 出现空列表
+            parseConfig([:])
         }
 
         // 扫描 workspace 状态
@@ -136,30 +138,41 @@ final class AgentStore {
         // 从预置模板获取种子内容
         var seedContent: [PersonaFile: String] = [:]
         if let presetId = fromPresetId,
-           let preset = presetTemplates.first(where: { $0.id == presetId }) {
+           presetTemplates.contains(where: { $0.id == presetId }) {
             // 预置模板中 systemPrompt/identity 字段在旧模型中已移除，
             // 但 PresetAgents.json 仍保留这些字段，通过 raw JSON 提取
             seedContent = Self.extractPresetSeedContent(presetId: presetId)
         }
 
-        // 1. 创建 workspace 目录和文件
-        try await workspaceManager.initializeWorkspace(
-            agentId: id,
-            seedContent: seedContent
-        )
-
-        // 2. 更新 gateway 配置：追加到 agents.list
-        let (config, baseHash) = try await gateway.configGetFull()
-        var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
-        var newEntry: [String: Any] = ["id": id]
-        if let ws = workspace {
-            newEntry["workspace"] = ws
+        do {
+            try await tryAddAgentViaCLI(id: id)
+            appLog("AgentStore: CLI 添加智能体成功 id=\(id)")
+        } catch {
+            let cliErr = error
+            appLog("AgentStore: CLI 添加智能体失败，回退 patch 方案 id=\(id): \(cliErr)", level: .warn)
+            do {
+                try await addAgentViaPatchFallback(
+                    gateway: gateway,
+                    workspaceManager: workspaceManager,
+                    id: id,
+                    name: name,
+                    workspace: workspace,
+                    seedContent: seedContent
+                )
+            } catch {
+                let fallbackErr = error
+                throw AgentCreationError(
+                    cliReason: (cliErr as? LocalizedError)?.errorDescription ?? cliErr.localizedDescription,
+                    fallbackReason: (fallbackErr as? LocalizedError)?.errorDescription ?? fallbackErr.localizedDescription
+                )
+            }
         }
-        agentsList.append(newEntry)
-        let patch: [String: Any] = ["agents": ["list": agentsList]]
-        try await gateway.configPatch(patch: patch, baseHash: baseHash, note: "添加智能体: \(name)")
 
-        // 3. 添加到本地列表
+        // 刷新本地列表，避免与 gateway 真实状态漂移
+        await refreshFromGateway()
+
+        // 兜底：若刷新后仍未出现（极端时序），补写本地展示项
+        guard !agents.contains(where: { $0.id == id }) else { return }
         let agent = Agent(
             id: id,
             name: name,
@@ -170,6 +183,56 @@ final class AgentStore {
             isDefault: agents.isEmpty
         )
         agents.append(agent)
+    }
+
+    private func tryAddAgentViaCLI(id: String) async throws {
+        let (ok, output) = try await withThrowingTaskGroup(of: (Bool, String).self) { group in
+            group.addTask {
+                await GatewayProcessManager.addAgentLocally(agentId: id)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: 15_000_000_000)
+                throw GatewayClientError.requestFailed(
+                    code: "agents_add_cli_timeout",
+                    message: "openclaw agents add 执行超时，已自动回退"
+                )
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+        guard ok else {
+            throw GatewayClientError.requestFailed(
+                code: "agents_add_cli_failed",
+                message: output.isEmpty ? "openclaw agents add 执行失败" : output
+            )
+        }
+    }
+
+    private func addAgentViaPatchFallback(
+        gateway: GatewayService,
+        workspaceManager: AgentWorkspaceManager,
+        id: String,
+        name: String,
+        workspace: String?,
+        seedContent: [PersonaFile: String]
+    ) async throws {
+        // 1. 创建 workspace 目录和文件（旧实现）
+        try await workspaceManager.initializeWorkspace(
+            agentId: id,
+            seedContent: seedContent
+        )
+
+        // 2. 更新 gateway 配置：追加到 agents.list（旧实现）
+        let (config, baseHash) = try await gateway.configGetFull()
+        var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+        var newEntry: [String: Any] = ["id": id]
+        if let ws = workspace {
+            newEntry["workspace"] = ws
+        }
+        agentsList.append(newEntry)
+        let patch: [String: Any] = ["agents": ["list": agentsList]]
+        try await gateway.configPatch(patch: patch, baseHash: baseHash, note: "添加智能体: \(name)")
     }
 
     /// 删除智能体
@@ -204,6 +267,37 @@ final class AgentStore {
     func updateAgent(_ agent: Agent) {
         guard let idx = agents.firstIndex(where: { $0.id == agent.id }) else { return }
         agents[idx] = agent
+    }
+
+    /// 设置智能体的首选模型（写入 agents.list[].model.primary）
+    /// - Parameters:
+    ///   - agentId: 智能体 ID
+    ///   - modelId: 模型 ID（nil 或空字符串表示清除，使用全局默认）
+    func setAgentModel(agentId: String, modelId: String?) async throws {
+        guard let gateway else { return }
+
+        let (config, baseHash) = try await gateway.configGetFull()
+        var agentsList = (config["agents"] as? [String: Any])?["list"] as? [[String: Any]] ?? []
+
+        guard let idx = agentsList.firstIndex(where: { ($0["id"] as? String) == agentId }) else { return }
+
+        if let modelId, !modelId.isEmpty {
+            agentsList[idx]["model"] = ["primary": modelId]
+        } else {
+            agentsList[idx].removeValue(forKey: "model")
+        }
+
+        let patch: [String: Any] = ["agents": ["list": agentsList]]
+        try await gateway.configPatch(
+            patch: patch,
+            baseHash: baseHash,
+            note: "设置智能体 \(agentId) 模型: \(modelId ?? "全局默认")"
+        )
+
+        // 更新本地状态
+        if let localIdx = agents.firstIndex(where: { $0.id == agentId }) {
+            agents[localIdx].preferredModel = (modelId?.isEmpty == false) ? modelId : nil
+        }
     }
 
     // MARK: - Bindings 管理
@@ -316,6 +410,10 @@ final class AgentStore {
                 let dir = entry["agentDir"] as? String
                 let isDefault = entry["default"] as? Bool ?? false
 
+                // 读取 per-agent 模型配置
+                let modelConfig = entry["model"] as? [String: Any]
+                let agentModel = modelConfig?["primary"] as? String
+
                 // 尝试从预置模板匹配显示信息
                 let preset = presetTemplates.first(where: { $0.id == id })
                 let agent = Agent(
@@ -324,7 +422,7 @@ final class AgentStore {
                     emoji: preset?.emoji ?? "🤖",
                     description: preset?.description ?? "",
                     category: preset?.category ?? .strategy,
-                    preferredModel: preset?.preferredModel,
+                    preferredModel: agentModel ?? preset?.preferredModel,
                     skills: preset?.skills ?? [],
                     isPreset: preset != nil,
                     workspace: ws,
@@ -451,5 +549,18 @@ final class AgentStore {
         let backupPath = home.appendingPathComponent(".openclaw/agents.json.migrated")
         try? FileManager.default.moveItem(at: oldPath, to: backupPath)
         appLog("AgentStore: 迁移完成，旧文件已备份")
+    }
+}
+
+private struct AgentCreationError: LocalizedError {
+    let cliReason: String
+    let fallbackReason: String
+
+    var errorDescription: String? {
+        """
+        创建智能体失败：CLI 与回退方案均未成功。
+        CLI 错误：\(cliReason)
+        回退错误：\(fallbackReason)
+        """
     }
 }

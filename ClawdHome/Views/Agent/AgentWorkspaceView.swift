@@ -338,9 +338,12 @@ private struct AgentSettingsView: View {
 
     @Environment(AgentStore.self) private var store
     @Environment(GatewayService.self) private var gateway
+    @Environment(GlobalModelStore.self) private var modelStore
 
     @State private var preferredModel = ""
     @State private var skillsAllowList = ""
+    @State private var isSavingModel = false
+    @State private var modelSaveError: String?
 
     private var agent: Agent? {
         store.agents.first(where: { $0.id == agentId })
@@ -349,13 +352,32 @@ private struct AgentSettingsView: View {
     var body: some View {
         Form {
             Section(L10n.k("agent.settings.model", fallback: "模型配置")) {
-                TextField(
-                    L10n.k("agent.settings.model_placeholder", fallback: "首选模型（留空使用全局默认）"),
-                    text: $preferredModel
-                )
-                Text(L10n.k("agent.settings.model_hint", fallback: "对应 agents.list[].model.primary 配置"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Picker(
+                    L10n.k("agent.settings.model_picker", fallback: "首选模型"),
+                    selection: $preferredModel
+                ) {
+                    Text(L10n.k("agent.settings.model_default", fallback: "使用全局默认"))
+                        .tag("")
+                    Divider()
+                    ForEach(modelStore.allTemplateModels) { model in
+                        Text(model.label).tag(model.id)
+                    }
+                }
+                .disabled(!gateway.isConnected || isSavingModel)
+                .onChange(of: preferredModel) { _, newValue in
+                    guard !isSavingModel else { return }
+                    Task { await saveModel(newValue) }
+                }
+
+                if !gateway.isConnected {
+                    Text(L10n.k("agent.settings.model_gateway_disconnected", fallback: "Gateway 未连接，无法修改模型"))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if let error = modelSaveError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
             }
 
             Section(L10n.k("agent.settings.skills", fallback: "Skills 允许列表")) {
@@ -386,5 +408,21 @@ private struct AgentSettingsView: View {
         .onAppear {
             preferredModel = agent?.preferredModel ?? ""
         }
+    }
+
+    private func saveModel(_ modelId: String) async {
+        isSavingModel = true
+        modelSaveError = nil
+        do {
+            try await store.setAgentModel(
+                agentId: agentId,
+                modelId: modelId.isEmpty ? nil : modelId
+            )
+        } catch {
+            modelSaveError = error.localizedDescription
+            // 回滚选择
+            preferredModel = agent?.preferredModel ?? ""
+        }
+        isSavingModel = false
     }
 }

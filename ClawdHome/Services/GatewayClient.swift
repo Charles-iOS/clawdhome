@@ -214,9 +214,63 @@ actor GatewayClient {
         return current
     }
 
-    /// 写入配置项（调用 config.set，path + value）
+    /// 写入配置项（通过 config.patch 合并，因 Gateway 的 config.set 仅接受 `raw` 与 path/value 不兼容）
     func configSet(path: String, value: Any) async throws {
-        _ = try await request(method: "config.set", params: ["path": path, "value": value])
+        try await applyConfigLeafPatches([(path, value)])
+    }
+
+    /// 多条 dot-path 合并为单次 patch，避免分步校验失败（如 provider 需同时含 baseUrl、models、apiKey）
+    func applyConfigLeafPatches(_ pairs: [(String, Any)]) async throws {
+        guard !pairs.isEmpty else { return }
+        let (_, baseHash) = try await configGetFull()
+        var combined: [String: Any] = [:]
+        for (path, val) in pairs {
+            let piece = try Self.mergePatchDict(dotPath: path, leafValue: val)
+            combined = Self.mergePatchTrees(combined, piece)
+        }
+        _ = try await configPatch(
+            patch: combined,
+            baseHash: baseHash,
+            note: "ClawdHome: applyConfigLeafPatches"
+        )
+    }
+
+    /// 深度合并两棵「仅含嵌套字典」的 patch 树（叶子可为任意 JSON 值）
+    private static func mergePatchTrees(_ a: [String: Any], _ b: [String: Any]) -> [String: Any] {
+        var out = a
+        for (k, v) in b {
+            if let existing = out[k] as? [String: Any], let vDict = v as? [String: Any] {
+                out[k] = mergePatchTrees(existing, vDict)
+            } else {
+                out[k] = v
+            }
+        }
+        return out
+    }
+
+    /// 将 `a.b.c` 转为 JSON Merge Patch 嵌套字典；空字符串表示删除该键（RFC 7396 `null`）
+    private static func mergePatchDict(dotPath: String, leafValue: Any) throws -> [String: Any] {
+        let parts = dotPath.split(separator: ".").map(String.init).filter { !$0.isEmpty }
+        guard let last = parts.last else {
+            throw GatewayClientError.requestFailed(code: nil, message: "empty config path")
+        }
+        let leaf: Any
+        if let s = leafValue as? String, s.isEmpty {
+            leaf = NSNull()
+        } else {
+            leaf = leafValue
+        }
+        if parts.count == 1 {
+            return [last: leaf]
+        }
+        var current: Any = [last: leaf]
+        for key in parts.dropLast().reversed() {
+            current = [key: current]
+        }
+        guard let root = current as? [String: Any] else {
+            throw GatewayClientError.requestFailed(code: nil, message: "invalid config path nesting")
+        }
+        return root
     }
 
     /// 读取完整配置快照 + hash（用于 config.patch 的乐观锁）

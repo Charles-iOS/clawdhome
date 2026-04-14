@@ -250,6 +250,24 @@ final class GatewayProcessManager {
         }
     }
 
+    /// 创建智能体（CLI 主路径）：`openclaw agents add <id>`
+    /// - Returns: (success, output)
+    static func addAgentLocally(agentId: String) async -> (Bool, String) {
+        let trimmedId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedId.isEmpty else {
+            return (false, "agentId 不能为空")
+        }
+        let workspace = ".openclaw/workspace-\(trimmedId)"
+        let agentDir = ".openclaw/agents/\(trimmedId)/agent"
+        return await runOpenclawLocally(args: [
+            "agents", "add", trimmedId,
+            "--non-interactive",
+            "--workspace", workspace,
+            "--agent-dir", agentDir,
+            "--json"
+        ])
+    }
+
     #if DEBUG
     /// 通过源码绝对路径推导仓库根目录（.../clawdhome）
     private static var debugRepoRootURL: URL? {

@@ -76,6 +76,12 @@ final class GatewayService {
         try await c.configSet(path: path, value: value)
     }
 
+    /// 将多条 dot-path 合并为一次 config.patch（同一 baseHash），满足 OpenClaw 对整块 provider 的校验
+    func applyConfigLeafPatches(_ pathValuePairs: [(String, Any)]) async throws {
+        guard let c = client else { throw GatewayClientError.notConnected }
+        try await c.applyConfigLeafPatches(pathValuePairs)
+    }
+
     func configGetFull() async throws -> (config: [String: Any], baseHash: String) {
         guard let c = client else { throw GatewayClientError.notConnected }
         return try await c.configGetFull()

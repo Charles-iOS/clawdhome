@@ -41,6 +41,8 @@ final class EnvironmentChecker {
         }
 
         ensureOpenClawDir()
+        let setupReady = await ensureOpenClawSetupIfNeeded()
+        guard setupReady else { return }
         status = .ready
         appLog("EnvironmentChecker: environment ready")
     }
@@ -56,5 +58,32 @@ final class EnvironmentChecker {
             }
         }
         appLog("EnvironmentChecker: ensured ~/.openclaw/ structure")
+    }
+
+    /// 在首次安装后补齐 openclaw 初始化，确保 openclaw.json 已生成
+    private func ensureOpenClawSetupIfNeeded() async -> Bool {
+        let configFile = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("openclaw.json")
+        if FileManager.default.fileExists(atPath: configFile.path) {
+            return true
+        }
+
+        appLog("EnvironmentChecker: openclaw.json missing, running `openclaw setup`")
+        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["setup"])
+        guard ok else {
+            let reason = output.isEmpty ? "openclaw setup 执行失败" : output
+            status = .missing("OpenClaw 初始化失败：\(reason)")
+            appLog("EnvironmentChecker: openclaw setup failed: \(reason)", level: .error)
+            return false
+        }
+
+        guard FileManager.default.fileExists(atPath: configFile.path) else {
+            status = .missing("OpenClaw 初始化后未生成配置文件: \(configFile.path)")
+            appLog("EnvironmentChecker: setup finished but openclaw.json not found", level: .error)
+            return false
+        }
+
+        appLog("EnvironmentChecker: openclaw setup complete")
+        return true
     }
 }

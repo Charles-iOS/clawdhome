@@ -66,6 +66,7 @@ enum SidebarSection: String, CaseIterable {
 struct SidebarView: View {
     @Binding var selection: SidebarDestination?
     @Environment(GatewayProcessManager.self) private var processManager
+    @Environment(GatewayService.self) private var gatewayService
 
     var body: some View {
         List(selection: $selection) {
@@ -102,7 +103,7 @@ struct SidebarView: View {
 
     private var statusColor: Color {
         switch processManager.state {
-        case .running: return .green
+        case .running: return gatewayService.isConnected ? .green : .orange
         case .starting: return .orange
         case .stopped: return .secondary
         case .failed: return .red
@@ -111,7 +112,10 @@ struct SidebarView: View {
 
     private var statusText: String {
         switch processManager.state {
-        case .running: return L10n.k("sidebar.status.running", fallback: "Gateway 运行中")
+        case .running:
+            return gatewayService.isConnected
+                ? L10n.k("sidebar.status.running", fallback: "Gateway 运行中")
+                : L10n.k("models.not_connected", fallback: "Gateway 未连接")
         case .starting: return L10n.k("sidebar.status.starting", fallback: "Gateway 启动中…")
         case .stopped: return L10n.k("sidebar.status.stopped", fallback: "Gateway 已停止")
         case .failed(let msg): return msg
