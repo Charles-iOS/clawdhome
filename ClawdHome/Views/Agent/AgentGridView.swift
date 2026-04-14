@@ -321,10 +321,15 @@ private struct AgentVisualCard: View {
     let agent: Agent
     let isDeleting: Bool
 
+    private var displayEmoji: String {
+        let trimmed = agent.emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "🤖" : trimmed
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(agent.emoji)
+                Text(displayEmoji)
                     .font(.system(size: 46))
                 Spacer()
                 statusTag

@@ -76,3 +76,22 @@ struct Agent: Codable, Identifiable, Equatable {
         isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
     }
 }
+
+struct AgentPersistedMetadata: Codable {
+    var emoji: String
+    var description: String
+    var category: AgentCategory
+    var skills: [String]
+
+    init(
+        emoji: String,
+        description: String,
+        category: AgentCategory,
+        skills: [String]
+    ) {
+        self.emoji = emoji
+        self.description = description
+        self.category = category
+        self.skills = skills
+    }
+}

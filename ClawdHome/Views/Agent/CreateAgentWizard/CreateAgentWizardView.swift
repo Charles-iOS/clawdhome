@@ -250,34 +250,68 @@ struct CreateAgentWizardView: View {
 
     private func composeSeedContent() -> [PersonaFile: String] {
         var seed: [PersonaFile: String] = [:]
-
-        // IDENTITY.md
-        var identityParts: [String] = []
-        identityParts.append("角色名：\(wizardState.name)")
-        if !wizardState.description.isEmpty {
-            identityParts.append("\n\(wizardState.description)")
+        let presetSeed = wizardState.selectedTemplateId.map(AgentStore.extractPresetSeedContent) ?? [:]
+        let presetTemplate = wizardState.selectedTemplateId.flatMap { id in
+            store.presetTemplates.first(where: { $0.id == id })
         }
+
+        seed.merge(presetSeed) { _, new in new }
+
+        // IDENTITY.md：保留模板原文，并把向导里的补充信息追加进去
+        var identityExtras: [String] = []
+        if let presetTemplate {
+            if !wizardState.name.isEmpty && wizardState.name != presetTemplate.name {
+                identityExtras.append("当前角色名：\(wizardState.name)")
+            }
+            if !wizardState.description.isEmpty && wizardState.description != presetTemplate.description {
+                identityExtras.append("补充描述：\(wizardState.description)")
+            }
+        } else {
+            identityExtras.append("角色名：\(wizardState.name)")
+            if !wizardState.description.isEmpty {
+                identityExtras.append(wizardState.description)
+            }
+        }
+
         if !wizardState.selectedStyles.isEmpty {
             let styleNames = wizardState.selectedStyles
                 .compactMap { raw in AgentStyle(rawValue: raw)?.displayName }
                 .joined(separator: "、")
-            identityParts.append("\n风格：\(styleNames)")
+            identityExtras.append("风格：\(styleNames)")
         }
-        seed[.identity] = identityParts.joined()
 
-        // USER.md
-        var userParts: [String] = ["# 关于你\n"]
+        let presetIdentity = presetSeed[.identity]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let extraIdentity = identityExtras.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !presetIdentity.isEmpty && !extraIdentity.isEmpty {
+            seed[.identity] = "\(presetIdentity)\n\n## 当前配置补充\n\(extraIdentity)"
+        } else if !extraIdentity.isEmpty {
+            seed[.identity] = extraIdentity
+        } else if !presetIdentity.isEmpty {
+            seed[.identity] = presetIdentity
+        }
+
+        // USER.md：保留模板填写框架，并把用户在向导中输入的信息追加进去
+        var userParts: [String] = []
         if !wizardState.userDisplayName.isEmpty {
             userParts.append("称呼：\(wizardState.userDisplayName)")
         }
         userParts.append("偏好语言：\(wizardState.preferredLanguage)")
         if !wizardState.userNotes.isEmpty {
-            userParts.append("\n备注：\(wizardState.userNotes)")
+            userParts.append("备注：\(wizardState.userNotes)")
         }
         if !wizardState.userBackground.isEmpty {
-            userParts.append("\n## 补充背景\n\(wizardState.userBackground)")
+            userParts.append("## 补充背景\n\(wizardState.userBackground)")
         }
-        seed[.user] = userParts.joined(separator: "\n")
+
+        let presetUser = presetSeed[.user]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let extraUser = userParts.joined(separator: "\n\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !presetUser.isEmpty && !extraUser.isEmpty {
+            seed[.user] = "\(presetUser)\n\n## 当前配置\n\(extraUser)"
+        } else if !extraUser.isEmpty {
+            seed[.user] = "# 关于你\n\n\(extraUser)"
+        } else if !presetUser.isEmpty {
+            seed[.user] = presetUser
+        }
 
         return seed
     }

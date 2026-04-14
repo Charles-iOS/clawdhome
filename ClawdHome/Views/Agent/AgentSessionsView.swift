@@ -24,6 +24,7 @@ struct AgentSessionsView: View {
             // 右侧会话内容
             sessionDetail
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
             await loadSessions()
         }

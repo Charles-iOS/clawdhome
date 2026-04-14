@@ -49,18 +49,9 @@ struct WizardStep1IdentityView: View {
 
             // 头像选择
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(L10n.k("wizard.step1.avatar", fallback: "智能体头像"))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Button(L10n.k("wizard.step1.upload_avatar", fallback: "上传自定义头像")) {}
-                        .font(.system(size: 11))
-                        .buttonStyle(.plain)
-                        .foregroundColor(.accentColor)
-                }
+                Text(L10n.k("wizard.step1.avatar", fallback: "智能体头像"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {

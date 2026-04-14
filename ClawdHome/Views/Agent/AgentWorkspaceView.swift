@@ -25,6 +25,7 @@ struct AgentWorkspaceView: View {
             tabPicker
             tabContent
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .navigationTitle(agent?.name ?? agentId)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -128,16 +129,19 @@ struct AgentWorkspaceView: View {
 
     @ViewBuilder
     private var tabContent: some View {
-        switch selectedTab {
-        case .persona:
-            AgentPersonaEditorView(agentId: agentId)
-        case .bindings:
-            AgentBindingsView(agentId: agentId)
-        case .sessions:
-            AgentSessionsView(agentId: agentId)
-        case .settings:
-            AgentSettingsView(agentId: agentId)
+        Group {
+            switch selectedTab {
+            case .persona:
+                AgentPersonaEditorView(agentId: agentId)
+            case .bindings:
+                AgentBindingsView(agentId: agentId)
+            case .sessions:
+                AgentSessionsView(agentId: agentId)
+            case .settings:
+                AgentSettingsView(agentId: agentId)
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 

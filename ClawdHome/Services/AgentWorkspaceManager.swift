@@ -42,6 +42,11 @@ final class AgentWorkspaceManager {
         ".openclaw/agents/\(agentId)/agent"
     }
 
+    /// 智能体元数据文件相对路径
+    func metadataPath(for agentId: String) -> String {
+        ".openclaw/agents/\(agentId)/metadata.json"
+    }
+
     /// sessions 目录相对路径
     func sessionsDirPath(for agentId: String) -> String {
         ".openclaw/agents/\(agentId)/sessions"
@@ -97,6 +102,29 @@ final class AgentWorkspaceManager {
             username: username,
             relativePath: personaFilePath(agentId: agentId, file: file),
             data: Data(content.utf8)
+        )
+    }
+
+    // MARK: - 智能体元数据读写
+
+    func readAgentMetadata(agentId: String) async throws -> AgentPersistedMetadata {
+        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
+        let data = try await helper.readFile(
+            username: username,
+            relativePath: metadataPath(for: agentId)
+        )
+        return try JSONDecoder().decode(AgentPersistedMetadata.self, from: data)
+    }
+
+    func writeAgentMetadata(agentId: String, metadata: AgentPersistedMetadata) async throws {
+        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
+        let parent = ".openclaw/agents/\(agentId)"
+        try await helper.createDirectory(username: username, relativePath: parent)
+        let data = try JSONEncoder().encode(metadata)
+        try await helper.writeFile(
+            username: username,
+            relativePath: metadataPath(for: agentId),
+            data: data
         )
     }
 

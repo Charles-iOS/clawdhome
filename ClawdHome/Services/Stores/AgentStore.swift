@@ -57,6 +57,8 @@ final class AgentStore {
             parseConfig([:])
         }
 
+        await applyPersistedMetadata()
+
         // 扫描 workspace 状态
         await refreshWorkspaceStatus()
 
@@ -188,6 +190,15 @@ final class AgentStore {
         }
 
         do {
+            try await ensureAgentWorkspaceSeeded(
+                agentId: resolvedId,
+                seedContent: seedContent
+            )
+        } catch {
+            appLog("AgentStore: 初始化智能体 workspace 失败 id=\(resolvedId): \(error)", level: .warn)
+        }
+
+        do {
             try await persistAgentDisplayName(
                 gateway: gateway,
                 agentId: resolvedId,
@@ -195,6 +206,18 @@ final class AgentStore {
             )
         } catch {
             appLog("AgentStore: 持久化智能体名称失败 id=\(resolvedId): \(error)", level: .warn)
+        }
+
+        do {
+            try await persistAgentMetadata(
+                agentId: resolvedId,
+                emoji: emoji,
+                description: description,
+                category: category,
+                skills: skills ?? []
+            )
+        } catch {
+            appLog("AgentStore: 持久化智能体元数据失败 id=\(resolvedId): \(error)", level: .warn)
         }
 
         // 刷新本地列表，避免与 gateway 真实状态漂移
@@ -400,10 +423,22 @@ final class AgentStore {
         }
     }
 
-    /// 更新智能体元数据（仅影响本地显示，OpenClaw 配置中只存 id 和 workspace）
-    func updateAgent(_ agent: Agent) {
+    /// 更新智能体元数据（显示信息持久化到本地 metadata.json）
+    func updateAgent(_ agent: Agent) async {
         guard let idx = agents.firstIndex(where: { $0.id == agent.id }) else { return }
         agents[idx] = agent
+
+        do {
+            try await persistAgentMetadata(
+                agentId: agent.id,
+                emoji: agent.emoji,
+                description: agent.description,
+                category: agent.category,
+                skills: agent.skills
+            )
+        } catch {
+            appLog("AgentStore: 更新智能体元数据失败 id=\(agent.id): \(error)", level: .warn)
+        }
     }
 
     /// 设置智能体的首选模型（写入 agents.list[].model.primary）
@@ -661,6 +696,46 @@ final class AgentStore {
         }
     }
 
+    private func ensureAgentWorkspaceSeeded(
+        agentId: String,
+        seedContent: [PersonaFile: String]
+    ) async throws {
+        guard let workspaceManager else { return }
+
+        let workspaceExists = await workspaceManager.workspaceExists(agentId: agentId)
+        if !workspaceExists {
+            try await workspaceManager.initializeWorkspace(
+                agentId: agentId,
+                seedContent: seedContent
+            )
+            return
+        }
+
+        for (file, content) in seedContent where !content.isEmpty {
+            try await workspaceManager.writePersonaFile(
+                agentId: agentId,
+                file: file,
+                content: content
+            )
+        }
+    }
+
+    private func applyPersistedMetadata() async {
+        guard let workspaceManager else { return }
+
+        for i in agents.indices {
+            do {
+                let metadata = try await workspaceManager.readAgentMetadata(agentId: agents[i].id)
+                agents[i].emoji = metadata.emoji
+                agents[i].description = metadata.description
+                agents[i].category = metadata.category
+                agents[i].skills = metadata.skills
+            } catch {
+                // metadata 文件不存在或不可读时，继续使用配置/模板默认值
+            }
+        }
+    }
+
     // MARK: - 数据迁移（旧 agents.json → 新架构）
 
     /// 检查并执行一次性迁移
@@ -756,6 +831,23 @@ private extension AgentStore {
             baseHash: baseHash,
             note: "设置智能体名称: \(trimmedName)"
         )
+    }
+
+    func persistAgentMetadata(
+        agentId: String,
+        emoji: String,
+        description: String,
+        category: AgentCategory,
+        skills: [String]
+    ) async throws {
+        guard let workspaceManager else { return }
+        let metadata = AgentPersistedMetadata(
+            emoji: emoji,
+            description: description,
+            category: category,
+            skills: skills
+        )
+        try await workspaceManager.writeAgentMetadata(agentId: agentId, metadata: metadata)
     }
 
     static func normalizedAgentIdKey(_ raw: String) -> String {

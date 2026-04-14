@@ -149,19 +149,20 @@ struct AgentEditorView: View {
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        store.updateAgent(updated)
 
-        // 模型变更写入 gateway 配置
-        let newModel = preferredModel.isEmpty ? nil : preferredModel
-        if newModel != agent.preferredModel {
-            Task {
+        Task {
+            await store.updateAgent(updated)
+
+            // 模型变更写入 gateway 配置
+            let newModel = preferredModel.isEmpty ? nil : preferredModel
+            if newModel != agent.preferredModel {
                 try? await store.setAgentModel(
                     agentId: agent.id,
                     modelId: newModel
                 )
             }
-        }
 
-        dismiss()
+            dismiss()
+        }
     }
 }
