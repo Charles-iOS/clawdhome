@@ -35,8 +35,10 @@ struct ProviderKeyConfig: Identifiable {
     var inputLabel: String { isUrlConfig ? L10n.k("models.provider_key_config.service_url", fallback: "服务地址") : "API Key" }
 }
 
+let defaultMiniMaxModelId = "minimax/MiniMax-M2.7"
+
 /// MiniMax 系列在 OpenClaw 中要求的 `models` 清单（与 UserInitWizard MinimaxModel.providerModelConfig 对齐）
-private let minimaxOpenClawModelCatalog: [[String: Any]] = [
+let minimaxOpenClawModelCatalog: [[String: Any]] = [
     [
         "id": "MiniMax-M2.7",
         "name": "MiniMax M2.7",

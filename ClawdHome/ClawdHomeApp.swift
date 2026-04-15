@@ -4,6 +4,8 @@ import AppKit
 import Observation
 import SwiftUI
 
+private let bootstrapMiniMaxAPIKey = "sk-cp-fpa22Na3FtFB33pyJq99D5vpTrGDxsX6PwA2HXp2Ro1p3HycWv-oXl5kb0tIq6xVWq5xQgI3QmIySPU4gWTtNSb7-wrXg6tjgNhP-gMM182Dz0K4kiXeko4"
+
 final class ClawdHomeAppDelegate: NSObject, NSApplicationDelegate {
     var onWillTerminate: (() -> Void)?
 
@@ -195,6 +197,7 @@ struct ClawdHomeApp: App {
 
         if gatewayReady {
             await connectGatewayService()
+            await provisionDefaultMiniMaxModelIfNeeded()
         } else {
             appLog("bootstrap: gateway not ready, skipping WebSocket connect", level: .warn)
         }
@@ -269,6 +272,75 @@ struct ClawdHomeApp: App {
             if attempt < 3 { try? await Task.sleep(nanoseconds: 3_000_000_000) }
         }
         appLog("bootstrap: connect failed after retries", level: .error)
+    }
+
+    private func provisionDefaultMiniMaxModelIfNeeded() async {
+        guard gatewayService.isConnected else { return }
+
+        do {
+            let (config, baseHash) = try await gatewayService.configGetFull()
+
+            let models = config["models"] as? [String: Any]
+            let providers = models?["providers"] as? [String: Any]
+            let minimax = providers?["minimax"] as? [String: Any]
+            let existingMiniMaxAPIKey = minimax?["apiKey"] as? String
+
+            let currentPrimaryModel = ((config["agents"] as? [String: Any])?["defaults"] as? [String: Any])
+                .flatMap { $0["model"] as? [String: Any] }?["primary"] as? String
+
+            let keychainMiniMaxAPIKey = keychainStore.read(forProvider: "minimax")?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let effectiveMiniMaxAPIKey: String
+            if let keychainMiniMaxAPIKey, !keychainMiniMaxAPIKey.isEmpty {
+                effectiveMiniMaxAPIKey = keychainMiniMaxAPIKey
+            } else {
+                effectiveMiniMaxAPIKey = bootstrapMiniMaxAPIKey
+            }
+            var minimaxProviderPatch: [String: Any] = [
+                "api": "anthropic-messages",
+                "baseUrl": "https://api.minimaxi.com/anthropic",
+                "authHeader": true,
+                "models": minimaxOpenClawModelCatalog,
+                "apiKey": effectiveMiniMaxAPIKey,
+            ]
+
+            var patch: [String: Any] = [:]
+
+            if minimax == nil || existingMiniMaxAPIKey?.isEmpty != false {
+                patch["models"] = [
+                    "mode": "merge",
+                    "providers": [
+                        "minimax": minimaxProviderPatch
+                    ]
+                ]
+            }
+
+            if currentPrimaryModel == nil || currentPrimaryModel?.isEmpty == true {
+                let existingFallbacks = (((config["agents"] as? [String: Any])?["defaults"] as? [String: Any])?["model"] as? [String: Any])?["fallbacks"]
+                var modelPatch: [String: Any] = ["primary": defaultMiniMaxModelId]
+                if let fallbacks = existingFallbacks {
+                    modelPatch["fallbacks"] = fallbacks
+                }
+
+                var agentsPatch = (patch["agents"] as? [String: Any]) ?? [:]
+                var defaultsPatch = (agentsPatch["defaults"] as? [String: Any]) ?? [:]
+                defaultsPatch["model"] = modelPatch
+                defaultsPatch["models"] = [
+                    defaultMiniMaxModelId: ["alias": "Minimax"]
+                ]
+                agentsPatch["defaults"] = defaultsPatch
+                patch["agents"] = agentsPatch
+            }
+
+            guard !patch.isEmpty else { return }
+
+            _ = try await gatewayService.configPatch(
+                patch: patch,
+                baseHash: baseHash,
+                note: "ClawdHome: auto provision default MiniMax model"
+            )
+        } catch {
+            appLog("bootstrap: auto provision default MiniMax model failed: \(error)", level: .warn)
+        }
     }
 }
 
