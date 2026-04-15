@@ -1,5 +1,5 @@
 // ClawdHome/Models/ChannelType.swift
-// 消息渠道类型定义：微信、飞书、Telegram、Discord
+// 消息渠道类型定义与当前可用渠道白名单
 
 import Foundation
 import SwiftUI
@@ -22,6 +22,12 @@ enum ChannelType: String, CaseIterable, Identifiable {
     case discord
 
     var id: String { rawValue }
+
+    /// 当前版本在 UI 中开放的渠道
+    static let enabledCases: [ChannelType] = [
+        .feishu,
+        .telegram,
+    ]
 
     /// 渠道显示名称
     var displayName: String {

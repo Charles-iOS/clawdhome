@@ -25,13 +25,13 @@ struct ChannelView: View {
                     subtitleLineLimit: 4
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
-                Text(L10n.f("channel.page.count", fallback: "%d 个渠道", ChannelType.allCases.count))
+                Text(L10n.f("channel.page.count", fallback: "%d 个渠道", ChannelType.enabledCases.count))
                     .font(.system(size: 16))
                     .foregroundStyle(.secondary)
 
                 // 渠道卡片网格
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(ChannelType.allCases) { channel in
+                    ForEach(ChannelType.enabledCases) { channel in
                         ChannelCardView(
                             channel: channel,
                             isConnected: isChannelConnected(channel),
@@ -98,7 +98,7 @@ struct ChannelView: View {
             let channelsDict = config["channels"] as? [String: Any] ?? [:]
 
             var result: [ChannelType: [String: String]] = [:]
-            for channel in ChannelType.allCases {
+            for channel in ChannelType.enabledCases {
                 guard let chConfig = channelsDict[channel.rawValue] as? [String: Any] else { continue }
                 var fields: [String: String] = [:]
                 for field in channel.configFields {
@@ -122,7 +122,7 @@ struct ChannelView: View {
             .appendingPathComponent("credentials")
         let fm = FileManager.default
 
-        for channel in ChannelType.allCases where isChannelConnected(channel) {
+        for channel in ChannelType.enabledCases where isChannelConnected(channel) {
             let ch = channel.rawValue
             var pendingCount = 0
             var approvedCount = 0
@@ -344,9 +344,9 @@ private struct ChannelCardView: View {
                         .font(.system(size: FontSize.smallControl, weight: .medium))
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(L10n.k("channel.agent.placeholder.title", fallback: "请配置智能体"))
+                        Text(L10n.k("channel.agent.placeholder.title", fallback: "请配置数字员工"))
                             .font(.system(size: FontSize.placeholderTitle, weight: .semibold))
-                        Text(L10n.k("channel.agent.placeholder.desc", fallback: "选择一个智能体来处理此渠道的消息"))
+                        Text(L10n.k("channel.agent.placeholder.desc", fallback: "选择一个数字员工来处理此渠道的消息"))
                             .font(.system(size: FontSize.placeholderDesc))
                             .foregroundStyle(.secondary)
                     }
@@ -362,9 +362,13 @@ private struct ChannelCardView: View {
                         .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 3]))
                         .foregroundStyle(Color(nsColor: .separatorColor))
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 8))
             }
-            .buttonStyle(.plain)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .buttonStyle(.plain)
+        } else if bindings.count == 1, let binding = bindings.first {
+            singleBoundAgentCard(binding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else {
             // 已绑定：展示智能体列表（固定高度内滚动）
             ScrollView {
@@ -372,23 +376,72 @@ private struct ChannelCardView: View {
                     ForEach(bindings) { binding in
                         boundAgentRow(binding)
                     }
-                    Button { showAgentPicker = true } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "plus.circle")
-                                .font(.system(size: FontSize.smallControl))
-                            Text(L10n.k("channel.agent.add_more", fallback: "添加更多智能体"))
-                                .font(.system(size: FontSize.placeholderDesc))
-                        }
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.plain)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    @ViewBuilder
+    private func singleBoundAgentCard(_ binding: AgentBinding) -> some View {
+        let agent = agents.first(where: { $0.id == binding.agentId })
+        VStack(alignment: .leading, spacing: 12) {
+            Text("当前绑定数字员工")
+                .font(.system(size: FontSize.agentMeta, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                Text(agent?.emoji ?? "🤖")
+                    .font(.system(size: 34))
+                    .frame(width: 48, height: 48)
+                    .background(Color.white.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(agent?.name ?? binding.agentId)
+                        .font(.system(size: 22, weight: .semibold))
+                    if let peer = binding.peerId {
+                        Text("\(binding.peerKind ?? "peer") · \(peer)")
+                            .font(.system(size: FontSize.agentMeta))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text("处理此渠道的默认消息")
+                            .font(.system(size: FontSize.agentMeta))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Button {
+                    onRemoveBinding(binding)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: FontSize.smallControl + 3))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [
+                    channel.swiftUIColor.opacity(0.10),
+                    Color(nsColor: .windowBackgroundColor).opacity(0.75),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(channel.swiftUIColor.opacity(0.14), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     @ViewBuilder
@@ -472,11 +525,17 @@ private struct ChannelCardView: View {
 
 struct ChannelAgentPickerSheet: View {
     private enum PickerFont {
+        static let headerIcon: CGFloat = 24
+        static let headerTitle: CGFloat = 20
+        static let headerSubtitle: CGFloat = 15
+        static let sectionTitle: CGFloat = 15
         static let emoji: CGFloat = 22
         static let name: CGFloat = 15
         static let desc: CGFloat = 13
         static let badge: CGFloat = 12
         static let checkmark: CGFloat = 18
+        static let fieldLabel: CGFloat = 13
+        static let footerButton: CGFloat = 16
     }
 
     let channelType: ChannelType
@@ -487,10 +546,6 @@ struct ChannelAgentPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedAgentId: String?
-    @State private var accountId = ""
-    @State private var peerId = ""
-    @State private var peerKind = ""
-    @State private var guildId = ""
     @State private var searchText = ""
     @State private var isAdding = false
 
@@ -508,84 +563,141 @@ struct ChannelAgentPickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                // 智能体选择
-                Section(L10n.k("channel.picker.agent", fallback: "选择智能体")) {
-                    TextField(L10n.k("channel.picker.search", fallback: "搜索智能体…"), text: $searchText)
-
-                    ForEach(filteredAgents) { agent in
-                        let isBound = boundAgentIds.contains(agent.id)
-                        Button {
-                            selectedAgentId = agent.id
-                        } label: {
-                            HStack(spacing: 10) {
-                                Text(agent.emoji)
-                                    .font(.system(size: PickerFont.emoji))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(agent.name)
-                                        .font(.system(size: PickerFont.name, weight: .medium))
-                                    if !agent.description.isEmpty {
-                                        Text(agent.description)
-                                            .font(.system(size: PickerFont.desc))
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                Spacer()
-                                if isBound {
-                                    Text(L10n.k("channel.picker.already_bound", fallback: "已绑定"))
-                                        .font(.system(size: PickerFont.badge))
-                                        .foregroundStyle(.secondary)
-                                }
-                                if selectedAgentId == agent.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: PickerFont.checkmark))
-                                        .foregroundStyle(.blue)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            pickerHeader
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    pickerAgentSection
                 }
-
-                // 可选匹配条件
-                Section(L10n.k("channel.picker.match", fallback: "匹配条件（可选）")) {
-                    TextField(
-                        L10n.k("agent.binding.account_placeholder", fallback: "账号 ID（留空使用默认账号）"),
-                        text: $accountId
-                    )
-                    TextField(
-                        L10n.k("agent.binding.peer_id", fallback: "Peer ID（如电话号码、群组 ID）"),
-                        text: $peerId
-                    )
-                    Picker(L10n.k("agent.binding.peer_kind", fallback: "Peer 类型"), selection: $peerKind) {
-                        Text(L10n.k("agent.binding.peer_any", fallback: "不限")).tag("")
-                        Text(L10n.k("agent.binding.peer_direct", fallback: "私信")).tag("direct")
-                        if channelType.supportsGroupChat {
-                            Text(L10n.k("agent.binding.peer_group", fallback: "群组")).tag("group")
-                        }
-                    }
-                    if channelType == .discord {
-                        TextField("Guild ID", text: $guildId)
-                    }
-                }
+                .padding(20)
             }
-            .formStyle(.grouped)
-            .navigationTitle(L10n.f("channel.picker.title", fallback: "%@ · 绑定智能体", channelType.displayName))
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.k("common.cancel", fallback: "取消")) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.k("agent.binding.add_confirm", fallback: "添加绑定")) {
-                        addBinding()
-                    }
-                    .disabled(selectedAgentId == nil || isAdding)
+            Divider()
+            pickerBottomBar
+        }
+        .frame(minWidth: 520, minHeight: 520)
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var pickerHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: channelType.iconName)
+                .font(.system(size: PickerFont.headerIcon, weight: .medium))
+                .foregroundStyle(channelType.swiftUIColor)
+                .frame(width: 42, height: 42)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(L10n.f("channel.picker.title", fallback: "%@ · 绑定数字员工", channelType.displayName))
+                    .font(.system(size: PickerFont.headerTitle, weight: .semibold))
+                Text("选择一个数字员工处理此渠道消息。")
+                    .font(.system(size: PickerFont.headerSubtitle))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(L10n.k("common.cancel", fallback: "取消")) { dismiss() }
+                .buttonStyle(.bordered)
+        }
+        .padding(20)
+    }
+
+    @ViewBuilder
+    private var pickerAgentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.k("channel.picker.agent", fallback: "选择数字员工"))
+                .font(.system(size: PickerFont.sectionTitle, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TextField(L10n.k("channel.picker.search", fallback: "搜索数字员工…"), text: $searchText)
+                .textFieldStyle(.roundedBorder)
+
+            VStack(spacing: 8) {
+                ForEach(filteredAgents) { agent in
+                    let isBound = boundAgentIds.contains(agent.id)
+                    let isSelected = selectedAgentId == agent.id
+                    agentOptionRow(agent: agent, isBound: isBound, isSelected: isSelected)
                 }
             }
         }
-        .frame(minWidth: 460, minHeight: 400)
+    }
+
+    @ViewBuilder
+    private func agentOptionRow(agent: Agent, isBound: Bool, isSelected: Bool) -> some View {
+        let backgroundColor = isSelected
+            ? channelType.swiftUIColor.opacity(0.10)
+            : Color(nsColor: .windowBackgroundColor).opacity(0.6)
+        let borderColor = isSelected
+            ? channelType.swiftUIColor.opacity(0.30)
+            : Color(nsColor: .separatorColor)
+        let borderWidth: CGFloat = isSelected ? 1 : 0.5
+
+        Button {
+            selectedAgentId = agent.id
+        } label: {
+            HStack(spacing: 12) {
+                Text(agent.emoji)
+                    .font(.system(size: PickerFont.emoji))
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(agent.name)
+                        .font(.system(size: PickerFont.name, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    if !agent.description.isEmpty {
+                        Text(agent.description)
+                            .font(.system(size: PickerFont.desc))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                if isBound {
+                    Text(L10n.k("channel.picker.already_bound", fallback: "已绑定"))
+                        .font(.system(size: PickerFont.badge, weight: .medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.secondary.opacity(0.10))
+                        .foregroundStyle(.secondary)
+                        .clipShape(Capsule())
+                }
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: PickerFont.checkmark))
+                    .foregroundStyle(isSelected ? channelType.swiftUIColor : Color.secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(backgroundColor)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(borderColor, lineWidth: borderWidth)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var pickerBottomBar: some View {
+        HStack {
+            Spacer()
+            Button(L10n.k("common.cancel", fallback: "取消")) { dismiss() }
+                .font(.system(size: PickerFont.footerButton, weight: .semibold))
+                .buttonStyle(.bordered)
+            Button(L10n.k("agent.binding.add_confirm", fallback: "添加绑定")) {
+                addBinding()
+            }
+            .font(.system(size: PickerFont.footerButton, weight: .semibold))
+            .buttonStyle(.borderedProminent)
+            .tint(channelType.swiftUIColor)
+            .disabled(selectedAgentId == nil || isAdding)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
 
     private func addBinding() {
@@ -593,11 +705,7 @@ struct ChannelAgentPickerSheet: View {
         isAdding = true
         let binding = AgentBinding(
             agentId: agentId,
-            channel: channelType.rawValue,
-            accountId: accountId.isEmpty ? nil : accountId,
-            peerId: peerId.isEmpty ? nil : peerId,
-            peerKind: peerKind.isEmpty ? nil : peerKind,
-            guildId: guildId.isEmpty ? nil : guildId
+            channel: channelType.rawValue
         )
         Task {
             do {

@@ -1162,7 +1162,7 @@ struct UserDetailView: View {
 
             overviewSupplementaryCard(
                 title: L10n.k("user.detail.auto.channel", fallback: "IM 绑定"),
-                subtitle: L10n.k("user.detail.auto.feishu_wechat_configuration", fallback: "飞书/微信均通过独立流程扫码绑定，支持首次配置和重新绑定。")
+                subtitle: L10n.k("user.detail.auto.feishu_telegram_configuration", fallback: "当前仅保留飞书与 Telegram 入口；飞书支持扫码配对，Telegram 通过原生配置接入。")
             ) {
                 HStack(spacing: 8) {
                     overviewCompactActionButton(
@@ -1175,13 +1175,13 @@ struct UserDetailView: View {
                         openChannelOnboarding(.feishu)
                     }
                     overviewCompactActionButton(
-                        title: L10n.k("user.detail.auto.wechat", fallback: "微信配对"),
-                        systemImage: "message.badge",
+                        title: L10n.k("user.detail.auto.telegram", fallback: "Telegram 配置"),
+                        systemImage: "paperplane",
                         tint: Color.secondary.opacity(0.08),
                         foreground: .primary,
                         disabled: !helperClient.isConnected
                     ) {
-                        openChannelOnboarding(.weixin)
+                        openIMChannelNativeConfig()
                     }
                 }
             }
@@ -1835,7 +1835,7 @@ struct UserDetailView: View {
                 Divider()
                 HStack {
                     Text(L10n.k("user.detail.auto.channel", fallback: "频道")).foregroundStyle(.secondary).frame(width: 80, alignment: .leading)
-                    Text(L10n.k("user.detail.auto.feishu_weixin", fallback: "飞书 / 微信"))
+                    Text(L10n.k("user.detail.auto.feishu_telegram", fallback: "飞书 / Telegram"))
                         .font(.caption).foregroundStyle(.tertiary)
                     Spacer()
                     Button(L10n.k("user.detail.auto.feishu", fallback: "飞书配对")) {
@@ -1850,17 +1850,14 @@ struct UserDetailView: View {
                     Text("·")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
-                    Button(L10n.k("user.detail.auto.wechat", fallback: "微信配对")) {
-                        openWindow(
-                            id: "channel-onboarding",
-                            value: "\(ChannelOnboardingFlow.weixin.rawValue):\(user.username)"
-                        )
+                    Button(L10n.k("user.detail.auto.telegram", fallback: "Telegram 配置")) {
+                        openIMChannelNativeConfig()
                     }
                         .buttonStyle(.plain)
                         .foregroundStyle(Color.accentColor)
                         .disabled(!helperClient.isConnected)
                 }
-                Text(L10n.k("user.detail.auto.feishu_wechat_configuration", fallback: "飞书/微信均通过独立流程扫码绑定，支持首次配置和重新绑定。"))
+                Text(L10n.k("user.detail.auto.feishu_telegram_configuration", fallback: "当前仅保留飞书与 Telegram 入口；飞书支持扫码配对，Telegram 通过原生配置接入。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -3215,6 +3212,15 @@ struct UserDetailView: View {
             id: "channel-onboarding",
             value: "\(flow.rawValue):\(user.username)"
         )
+    }
+
+    private func openIMChannelNativeConfig() {
+        let payload = maintenanceWindowRegistry.makePayload(
+            username: user.username,
+            title: L10n.k("wizard.channel.native_config.window_title", fallback: "IM 频道原生配置"),
+            command: ["openclaw", "channels", "add"]
+        )
+        openWindow(id: "maintenance-terminal", value: payload)
     }
 
     private func installOpenclaw(version: String? = nil) async {

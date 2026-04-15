@@ -16,6 +16,16 @@
 import SwiftUI
 
 struct ChannelPairingSheet: View {
+    private enum SheetFont {
+        static let title: CGFloat = 20
+        static let subtitle: CGFloat = 15
+        static let section: CGFloat = 15
+        static let body: CGFloat = 15
+        static let meta: CGFloat = 13
+        static let mono: CGFloat = 13
+        static let action: CGFloat = 16
+    }
+
     let channelType: ChannelType
 
     @Environment(\.dismiss) private var dismiss
@@ -30,12 +40,6 @@ struct ChannelPairingSheet: View {
     // 手动审批码输入
     @State private var manualCode = ""
     @State private var isApproving = false
-
-    // 手动添加配对
-    @State private var showAddForm = false
-    @State private var newPeerId = ""
-    @State private var newPeerKind = "direct"
-    @State private var isAdding = false
 
     // 移除确认
     @State private var peerToRemove: PairingPeer?
@@ -77,15 +81,16 @@ struct ChannelPairingSheet: View {
 
     @ViewBuilder
     private var header: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: channelType.iconName)
-                .font(.title2)
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(channelType.swiftUIColor)
+                .frame(width: 42, height: 42)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(channelType.displayName) · 配对管理")
-                    .font(.headline)
+                    .font(.system(size: SheetFont.title, weight: .semibold))
                 Text("审批配对请求，管理已授权的用户和群组")
-                    .font(.caption)
+                    .font(.system(size: SheetFont.subtitle))
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -98,9 +103,10 @@ struct ChannelPairingSheet: View {
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
+            .buttonStyle(.bordered)
             .disabled(isLoading)
         }
-        .padding(16)
+        .padding(20)
     }
 
     // MARK: - 内容区
@@ -111,27 +117,17 @@ struct ChannelPairingSheet: View {
             ProgressView("加载中…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
-                // 消息提示
-                messageSection
-
-                // 手动输入配对码
-                approveCodeSection
-
-                // 待审批请求
-                if !pendingRequests.isEmpty {
-                    pendingSection
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    messageSection
+                    approveCodeSection
+                    if !pendingRequests.isEmpty {
+                        pendingSection
+                    }
+                    approvedSection
                 }
-
-                // 手动添加
-                if showAddForm {
-                    addPeerSection
-                }
-
-                // 已配对
-                approvedSection
+                .padding(20)
             }
-            .listStyle(.inset)
         }
     }
 
@@ -140,16 +136,16 @@ struct ChannelPairingSheet: View {
     @ViewBuilder
     private var messageSection: some View {
         if let successMessage {
-            Section {
+            sectionCard {
                 Label(successMessage, systemImage: "checkmark.circle.fill")
-                    .font(.callout)
+                    .font(.system(size: SheetFont.body, weight: .medium))
                     .foregroundStyle(.green)
             }
         }
         if let errorMessage {
-            Section {
+            sectionCard {
                 Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.callout)
+                    .font(.system(size: SheetFont.body, weight: .medium))
                     .foregroundStyle(.red)
             }
         }
@@ -159,27 +155,29 @@ struct ChannelPairingSheet: View {
 
     @ViewBuilder
     private var approveCodeSection: some View {
-        Section {
+        sectionBlock(
+            title: "配对审批",
+            systemImage: "key.fill"
+        ) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("用户给机器人发消息后会收到一个配对码，在此输入即可审批通过。")
-                    .font(.caption)
+                    .font(.system(size: SheetFont.body))
                     .foregroundStyle(.secondary)
                 HStack(spacing: 8) {
                     TextField("输入配对码（如 LHSTVRP9）", text: $manualCode)
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(size: SheetFont.body, design: .monospaced))
                     Button {
                         Task { await approveCode(manualCode) }
                     } label: {
                         Label("审批通过", systemImage: "checkmark.circle")
                     }
+                    .font(.system(size: SheetFont.action, weight: .semibold))
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
                     .disabled(manualCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isApproving)
                 }
             }
-        } header: {
-            Label("配对审批", systemImage: "key.fill")
         }
     }
 
@@ -187,21 +185,23 @@ struct ChannelPairingSheet: View {
 
     @ViewBuilder
     private var pendingSection: some View {
-        Section {
-            ForEach(pendingRequests) { request in
-                pendingRequestRow(request)
-            }
-        } header: {
-            HStack {
-                Label("待审批请求", systemImage: "bell.badge")
-                Spacer()
+        sectionBlock(
+            title: "待审批请求",
+            systemImage: "bell.badge",
+            trailing: {
                 Text("\(pendingRequests.count)")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .font(.system(size: SheetFont.meta, weight: .medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(Color.orange.opacity(0.15))
                     .foregroundStyle(.orange)
                     .clipShape(Capsule())
+            }
+        ) {
+            VStack(spacing: 10) {
+                ForEach(pendingRequests) { request in
+                    pendingRequestRow(request)
+                }
             }
         }
     }
@@ -210,7 +210,7 @@ struct ChannelPairingSheet: View {
     private func pendingRequestRow(_ request: PairingRequest) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "person.crop.circle.badge.questionmark")
-                .font(.title3)
+                .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.orange)
                 .frame(width: 28)
 
@@ -218,19 +218,19 @@ struct ChannelPairingSheet: View {
                 HStack(spacing: 6) {
                     if let name = request.displayName {
                         Text(name)
-                            .font(.subheadline)
+                            .font(.system(size: SheetFont.body, weight: .semibold))
                             .fontWeight(.medium)
                     }
                     Text("ID: \(request.userId)")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: SheetFont.mono, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
                 HStack(spacing: 6) {
                     Text("配对码")
-                        .font(.system(size: 10))
+                        .font(.system(size: SheetFont.meta))
                         .foregroundStyle(.secondary)
                     Text(request.code)
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.system(size: SheetFont.mono, design: .monospaced))
                         .fontWeight(.semibold)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
@@ -238,7 +238,7 @@ struct ChannelPairingSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                     if let ts = request.requestedAt {
                         Text(ts)
-                            .font(.system(size: 10))
+                            .font(.system(size: SheetFont.meta))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -267,26 +267,34 @@ struct ChannelPairingSheet: View {
             .foregroundStyle(.red.opacity(0.7))
             .help("拒绝")
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - 已配对列表
 
     @ViewBuilder
     private var approvedSection: some View {
-        Section {
+        sectionBlock(
+            title: "已配对 (\(approvedPeers.count))",
+            systemImage: "person.crop.circle.badge.checkmark"
+        ) {
             if approvedPeers.isEmpty {
                 Text("暂无已配对的用户或群组")
-                    .font(.callout)
+                    .font(.system(size: SheetFont.body))
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(approvedPeers) { peer in
-                    approvedPeerRow(peer)
+                VStack(spacing: 10) {
+                    ForEach(approvedPeers) { peer in
+                        approvedPeerRow(peer)
+                    }
                 }
-            }
-        } header: {
-            HStack {
-                Label("已配对 (\(approvedPeers.count))", systemImage: "person.crop.circle.badge.checkmark")
             }
         }
     }
@@ -300,18 +308,18 @@ struct ChannelPairingSheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(peer.displayName ?? peer.id)
-                    .font(.subheadline)
+                    .font(.system(size: SheetFont.body, weight: .semibold))
                     .fontWeight(.medium)
                 HStack(spacing: 6) {
                     Text(peer.kindLabel)
-                        .font(.system(size: 10))
+                        .font(.system(size: SheetFont.meta))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(peer.isGroup ? Color.purple.opacity(0.12) : Color.blue.opacity(0.12))
                         .foregroundStyle(peer.isGroup ? .purple : .blue)
                         .clipShape(Capsule())
                     Text("ID: \(peer.id)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: SheetFont.mono, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -320,7 +328,7 @@ struct ChannelPairingSheet: View {
 
             if let ts = peer.pairedAt {
                 Text(ts)
-                    .font(.system(size: 10))
+                    .font(.system(size: SheetFont.meta))
                     .foregroundStyle(.tertiary)
             }
 
@@ -333,41 +341,14 @@ struct ChannelPairingSheet: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
-    }
-
-    // MARK: - 手动添加配对表单
-
-    @ViewBuilder
-    private var addPeerSection: some View {
-        Section("手动添加配对") {
-            Picker("类型", selection: $newPeerKind) {
-                Text("私信用户").tag("direct")
-                if channelType.supportsGroupChat {
-                    Text("群组").tag("group")
-                }
-            }
-            .pickerStyle(.segmented)
-
-            TextField(
-                newPeerKind == "group" ? "群组 ID" : "用户 ID（如 Telegram user ID、飞书 open_id）",
-                text: $newPeerId
-            )
-            .textFieldStyle(.roundedBorder)
-
-            HStack {
-                Spacer()
-                Button("取消") {
-                    withAnimation { showAddForm = false }
-                    newPeerId = ""
-                }
-                Button("确认添加") {
-                    Task { await addPeer() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(newPeerId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAdding)
-            }
-        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - 底栏
@@ -375,25 +356,55 @@ struct ChannelPairingSheet: View {
     @ViewBuilder
     private var bottomBar: some View {
         HStack {
-            Button {
-                withAnimation { showAddForm = true }
-            } label: {
-                Label("手动添加", systemImage: "plus")
-            }
-            .disabled(showAddForm)
-
-            Spacer()
-
             if !pendingRequests.isEmpty {
                 Text("\(pendingRequests.count) 个待审批")
-                    .font(.caption)
+                    .font(.system(size: SheetFont.meta, weight: .medium))
                     .foregroundStyle(.orange)
             }
 
+            Spacer()
+
             Button("关闭") { dismiss() }
+                .font(.system(size: SheetFont.action, weight: .semibold))
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.cancelAction)
         }
-        .padding(12)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+    }
+
+    @ViewBuilder
+    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(nsColor: .windowBackgroundColor).opacity(0.65))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private func sectionBlock<Trailing: View, Content: View>(
+        title: String,
+        systemImage: String,
+        @ViewBuilder trailing: () -> Trailing = { EmptyView() },
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(title, systemImage: systemImage)
+                    .font(.system(size: SheetFont.section, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                trailing()
+            }
+            sectionCard {
+                content()
+            }
+        }
     }
 
     // MARK: - 数据操作
@@ -490,33 +501,6 @@ struct ChannelPairingSheet: View {
             }
         } else {
             errorMessage = "拒绝失败：\(output)"
-        }
-    }
-
-    /// 手动添加配对
-    private func addPeer() async {
-        let id = newPeerId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !id.isEmpty else { return }
-        isAdding = true
-        errorMessage = nil
-        successMessage = nil
-        defer { isAdding = false }
-
-        var args = ["add", channelType.rawValue, id]
-        if newPeerKind == "group" {
-            args += ["--kind", "group"]
-        }
-
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["pairing"] + args
-        )
-
-        if ok {
-            newPeerId = ""
-            withAnimation { showAddForm = false }
-            successMessage = "已添加配对"
-            await loadAll()
-        } else {
-            errorMessage = "添加失败：\(output)"
         }
     }
 

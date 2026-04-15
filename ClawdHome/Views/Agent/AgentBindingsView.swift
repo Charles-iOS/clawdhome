@@ -104,11 +104,6 @@ private struct AddBindingSheet: View {
     @State private var channelConfigs: [ChannelType: Bool] = [:]
     @State private var isLoadingConfigs = true
 
-    // 绑定匹配字段
-    @State private var accountId = ""
-    @State private var peerId = ""
-    @State private var peerKind = ""
-    @State private var guildId = ""
     @State private var isAdding = false
 
     // 凭据配置 / QR 子 sheet
@@ -162,7 +157,7 @@ private struct AddBindingSheet: View {
                         .padding(.horizontal, 20)
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(ChannelType.allCases) { channel in
+                        ForEach(ChannelType.enabledCases) { channel in
                             channelCard(channel)
                         }
                     }
@@ -385,36 +380,9 @@ private struct AddBindingSheet: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(channel.displayName)
                                 .font(.subheadline).fontWeight(.medium)
-                            Text(L10n.k("agent.binding.match_hint", fallback: "配置消息路由匹配条件（可选，留空匹配所有消息）"))
+                            Text("此绑定将处理该渠道的默认消息")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
-                    }
-                }
-
-                Section(L10n.k("agent.binding.account", fallback: "账号（可选）")) {
-                    TextField(
-                        L10n.k("agent.binding.account_placeholder", fallback: "账号 ID（留空使用默认账号）"),
-                        text: $accountId
-                    )
-                }
-
-                Section(L10n.k("agent.binding.peer", fallback: "Peer 匹配（可选）")) {
-                    TextField(
-                        L10n.k("agent.binding.peer_id", fallback: "Peer ID（如电话号码、群组 ID）"),
-                        text: $peerId
-                    )
-                    Picker(L10n.k("agent.binding.peer_kind", fallback: "Peer 类型"), selection: $peerKind) {
-                        Text(L10n.k("agent.binding.peer_any", fallback: "不限")).tag("")
-                        Text(L10n.k("agent.binding.peer_direct", fallback: "私信")).tag("direct")
-                        if channel.supportsGroupChat {
-                            Text(L10n.k("agent.binding.peer_group", fallback: "群组")).tag("group")
-                        }
-                    }
-                }
-
-                if channel == .discord {
-                    Section("Discord") {
-                        TextField("Guild ID", text: $guildId)
                     }
                 }
             }
@@ -450,7 +418,7 @@ private struct AddBindingSheet: View {
             let (config, _) = try await gateway.configGetFull()
             let channelsDict = config["channels"] as? [String: Any] ?? [:]
             var result: [ChannelType: Bool] = [:]
-            for channel in ChannelType.allCases {
+            for channel in ChannelType.enabledCases {
                 if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
                     // 微信无 configFields，有配置即视为已配置
                     if channel.configFields.isEmpty {
@@ -477,11 +445,7 @@ private struct AddBindingSheet: View {
         isAdding = true
         let binding = AgentBinding(
             agentId: agentId,
-            channel: channel.rawValue,
-            accountId: accountId.isEmpty ? nil : accountId,
-            peerId: peerId.isEmpty ? nil : peerId,
-            peerKind: peerKind.isEmpty ? nil : peerKind,
-            guildId: guildId.isEmpty ? nil : guildId
+            channel: channel.rawValue
         )
         Task {
             do {

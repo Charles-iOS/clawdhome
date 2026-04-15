@@ -471,7 +471,7 @@ private enum ZAIModel: String, CaseIterable {
 
 private enum WizardChannelType: String {
     case feishu
-    case weixin
+    case telegram
 }
 
 private enum OpenclawVersionPreset: String {
@@ -1696,21 +1696,11 @@ struct UserInitWizardView: View {
                     value: "\(ChannelOnboardingFlow.feishu.rawValue):\(user.username)"
                 )
             }
-            channelBindingRow(
-                channel: .weixin,
-                title: L10n.k("views.user_init_wizard_view.wechat", fallback: "微信 IM 扫码绑定"),
-                subtitle: L10n.k("views.user_init_wizard_view.donewechat", fallback: "在独立窗口生成二维码，扫码完成微信 IM 频道配对。")
-            ) {
-                selectedChannel = .weixin
-                openWindow(
-                    id: "channel-onboarding",
-                    value: "\(ChannelOnboardingFlow.weixin.rawValue):\(user.username)"
-                )
-            }
             channelNativeConfigRow(
-                title: L10n.k("wizard.channel.more_im_bindings", fallback: "更多 IM 频道绑定"),
-                subtitle: L10n.k("wizard.channel.more_im_bindings_hint", fallback: "通过 openclaw 原生配置界面进行操作。")
+                title: L10n.k("views.user_init_wizard_view.telegram", fallback: "Telegram 机器人配置"),
+                subtitle: L10n.k("views.user_init_wizard_view.telegram_hint", fallback: "打开 openclaw 原生配置界面，填写 Telegram Bot Token。")
             ) {
+                selectedChannel = .telegram
                 openIMChannelNativeConfig()
             }
         }
