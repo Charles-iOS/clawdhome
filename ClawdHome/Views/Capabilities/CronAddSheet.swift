@@ -25,6 +25,7 @@ struct CronAddSheet: View {
     @State private var showingDatePopover = false
     @State private var showingTimePopover = false
     @State private var configuredChannels: [ChannelType] = []
+    @State private var showingTemplatePicker = false
     @State private var isSaving = false
     @State private var errorText: String?
 
@@ -75,10 +76,13 @@ struct CronAddSheet: View {
 
             Spacer()
 
-            Button(L10n.k("cron.add.use_template", fallback: "使用模板")) {}
+            Button(L10n.k("cron.add.use_template", fallback: "使用模板")) {
+                showingTemplatePicker = true
+            }
                 .buttonStyle(CronGhostButtonStyle())
-                .disabled(true)
-                .help(L10n.k("cron.add.template_unavailable", fallback: "模板功能即将上线"))
+                .popover(isPresented: $showingTemplatePicker, arrowEdge: .top) {
+                    templatePickerContent
+                }
         }
         .padding(.horizontal, 56)
         .padding(.top, 42)
@@ -588,6 +592,71 @@ struct CronAddSheet: View {
             )
     }
 
+    private var templatePickerContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("选择模板")
+                .font(.system(size: 20, weight: .semibold))
+
+            Text("从常用预设开始，系统会自动填充名称、提示词、目标和调度方式，你还可以继续修改。")
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
+                ForEach(CronTemplate.presets) { template in
+                    templateCard(template)
+                }
+            }
+        }
+        .padding(22)
+        .frame(width: 620)
+        .background(Color.white)
+    }
+
+    private func templateCard(_ template: CronTemplate) -> some View {
+        Button {
+            applyTemplate(template)
+            showingTemplatePicker = false
+        } label: {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(template.icon)
+                        .font(.system(size: 26))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(template.title)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.leading)
+
+                        Text(template.summary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                Text(template.scheduleDescription)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 144, alignment: .leading)
+            .padding(18)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var dateDisplayText: String {
         selectedDate.formatted(.dateTime.year().month().day())
     }
@@ -797,6 +866,76 @@ struct CronAddSheet: View {
         if selectedSessionKey == nil {
             selectedSessionKey = availableSessions.first?.key
         }
+    }
+
+    private func applyTemplate(_ template: CronTemplate) {
+        name = template.name
+        message = template.message
+        errorText = nil
+
+        selectedDeliveryMode = template.deliveryMode
+        switch template.deliveryMode {
+        case .agent:
+            selectedAgentId = resolvedAgentId(for: template)
+        case .session:
+            selectedSessionKey = availableSessions.first?.key
+        }
+
+        let desiredPayloadMode = resolvedPayloadMode(for: template)
+        selectedPayloadMode = desiredPayloadMode
+
+        if desiredPayloadMode == .agentTurn,
+           channel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let firstChannel = configuredChannels.first {
+            channel = firstChannel.rawValue
+        }
+
+        switch template.schedule {
+        case let .daily(weekdays, hour, minute):
+            selectedScheduleMode = .daily
+            selectedWeekdays = Set(weekdays)
+            selectedTime = resolvedTime(hour: hour, minute: minute)
+        case let .once(offsetDays, hour, minute):
+            selectedScheduleMode = .once
+            selectedDate = Calendar.current.date(byAdding: .day, value: offsetDays, to: .now) ?? .now
+            selectedTime = resolvedTime(hour: hour, minute: minute)
+        case let .interval(value, unit):
+            selectedScheduleMode = .interval
+            intervalValue = String(value)
+            selectedIntervalUnit = unit
+        }
+
+        normalizeSelectionAfterModeChange()
+    }
+
+    private func resolvedAgentId(for template: CronTemplate) -> String {
+        switch template.agentPreference {
+        case .main:
+            if availableAgents.contains(where: { $0.id == "main" }) {
+                return "main"
+            }
+            return availableAgents.first?.id ?? "main"
+        case .nonMainPreferred:
+            return availableAgents.first(where: { $0.id != "main" })?.id
+                ?? availableAgents.first?.id
+                ?? "main"
+        }
+    }
+
+    private func resolvedPayloadMode(for template: CronTemplate) -> PayloadMode {
+        if template.payloadMode == .agentTurn, resolvedAgentId(for: template) == "main" {
+            return .systemEvent
+        }
+        return template.payloadMode
+    }
+
+    private func resolvedTime(hour: Int, minute: Int) -> Date {
+        Calendar.current.date(
+            bySettingHour: hour,
+            minute: minute,
+            second: 0,
+            of: .now
+        ) ?? .now
     }
 
     private func loadAvailableSessions() async {
@@ -1031,6 +1170,123 @@ private enum Weekday: Int, CaseIterable, Identifiable {
     }
 }
 
+private struct CronTemplate: Identifiable {
+    enum AgentPreference {
+        case main
+        case nonMainPreferred
+    }
+
+    enum SchedulePreset {
+        case daily(weekdays: [Weekday], hour: Int, minute: Int)
+        case once(offsetDays: Int, hour: Int, minute: Int)
+        case interval(value: Int, unit: IntervalUnit)
+    }
+
+    let id: String
+    let icon: String
+    let title: String
+    let summary: String
+    let name: String
+    let message: String
+    let deliveryMode: DeliveryMode
+    let payloadMode: PayloadMode
+    let agentPreference: AgentPreference
+    let schedule: SchedulePreset
+
+    var scheduleDescription: String {
+        switch schedule {
+        case let .daily(weekdays, hour, minute):
+            if weekdays.count == Weekday.workdays.count && Set(weekdays) == Set(Weekday.workdays) {
+                return "工作日 \(String(format: "%02d:%02d", hour, minute))"
+            }
+            if weekdays.count == 1, let day = weekdays.first {
+                return "\(day.localizedLabel) \(String(format: "%02d:%02d", hour, minute))"
+            }
+            return "每天 \(String(format: "%02d:%02d", hour, minute))"
+        case let .once(offsetDays, hour, minute):
+            let dayText = offsetDays == 0 ? "今天" : (offsetDays == 1 ? "明天" : "\(offsetDays) 天后")
+            return "\(dayText) \(String(format: "%02d:%02d", hour, minute))"
+        case let .interval(value, unit):
+            return "每 \(value) \(unit.title)"
+        }
+    }
+
+    static let presets: [CronTemplate] = [
+        CronTemplate(
+            id: "workday-standup",
+            icon: "☀️",
+            title: "工作日站会总结",
+            summary: "每天上班前自动整理昨天的进展、阻塞和待跟进事项。",
+            name: "工作日站会总结",
+            message: "请总结昨天的项目进展，按“已完成 / 进行中 / 风险与阻塞 / 今日建议”输出，方便我直接用于站会。",
+            deliveryMode: .agent,
+            payloadMode: .systemEvent,
+            agentPreference: .main,
+            schedule: .daily(weekdays: Weekday.workdays, hour: 9, minute: 30)
+        ),
+        CronTemplate(
+            id: "end-of-day-brief",
+            icon: "📝",
+            title: "下班前日报草稿",
+            summary: "在工作日傍晚生成一份日报草稿，适合收尾回顾和同步。",
+            name: "下班前日报草稿",
+            message: "请根据今天的上下文整理一份简洁日报，包含：今日完成、关键决策、未完成事项、明日计划。",
+            deliveryMode: .agent,
+            payloadMode: .systemEvent,
+            agentPreference: .main,
+            schedule: .daily(weekdays: Weekday.workdays, hour: 18, minute: 0)
+        ),
+        CronTemplate(
+            id: "weekly-retro",
+            icon: "📊",
+            title: "周五复盘",
+            summary: "每周固定输出本周回顾，包括亮点、问题和下周关注点。",
+            name: "周五复盘",
+            message: "请回顾本周工作，输出：本周亮点、重要决策、遗留问题、下周优先级建议，语气简洁直接。",
+            deliveryMode: .agent,
+            payloadMode: .systemEvent,
+            agentPreference: .main,
+            schedule: .daily(weekdays: [.friday], hour: 16, minute: 30)
+        ),
+        CronTemplate(
+            id: "inbox-triage",
+            icon: "📬",
+            title: "定期任务巡检",
+            summary: "按固定间隔提醒梳理当前待办、消息和需要推进的事情。",
+            name: "定期任务巡检",
+            message: "请检查最近需要我处理的事项，整理成一份按优先级排序的清单，并标出可以立即推进的下一步。",
+            deliveryMode: .agent,
+            payloadMode: .systemEvent,
+            agentPreference: .main,
+            schedule: .interval(value: 4, unit: .hours)
+        ),
+        CronTemplate(
+            id: "morning-broadcast",
+            icon: "📣",
+            title: "晨间提醒广播",
+            summary: "适合投递到外部渠道，自动生成一条简短晨间提醒。",
+            name: "晨间提醒广播",
+            message: "请生成一条简短的晨间提醒，包含一句鼓励、一条今日重点和一句行动建议，适合直接发送到聊天渠道。",
+            deliveryMode: .agent,
+            payloadMode: .agentTurn,
+            agentPreference: .nonMainPreferred,
+            schedule: .daily(weekdays: Weekday.allCases, hour: 8, minute: 30)
+        ),
+        CronTemplate(
+            id: "tomorrow-follow-up",
+            icon: "⏰",
+            title: "明日一次性跟进",
+            summary: "快速创建一个明天执行一次的提醒或跟进任务。",
+            name: "明日一次性跟进",
+            message: "请在任务触发时提醒我跟进当前最重要的一件待办，并附上一句简短行动建议。",
+            deliveryMode: .agent,
+            payloadMode: .systemEvent,
+            agentPreference: .main,
+            schedule: .once(offsetDays: 1, hour: 10, minute: 0)
+        )
+    ]
+}
+
 private struct CronGhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -1058,5 +1314,19 @@ private extension Date {
             second: 0,
             of: .now
         ) ?? .now
+    }
+}
+
+private extension Weekday {
+    var localizedLabel: String {
+        switch self {
+        case .monday: return "周一"
+        case .tuesday: return "周二"
+        case .wednesday: return "周三"
+        case .thursday: return "周四"
+        case .friday: return "周五"
+        case .saturday: return "周六"
+        case .sunday: return "周日"
+        }
     }
 }
