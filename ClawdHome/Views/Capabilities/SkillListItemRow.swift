@@ -12,20 +12,20 @@ struct SkillListItemRow: View {
     private var isPending: Bool { store.pendingOps[skill.skillKey] != nil }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             Text(skill.emoji ?? "🔧")
-                .font(.title2)
+                .font(.system(size: 28))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(skill.name)
-                    .fontWeight(.medium)
+                    .font(.system(size: 17, weight: .semibold))
                 Text(skill.description)
-                    .font(.caption)
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                 if let err = errorText {
                     Text(err)
-                        .font(.caption2)
+                        .font(.system(size: 12))
                         .foregroundStyle(.red)
                 }
             }
@@ -33,10 +33,8 @@ struct SkillListItemRow: View {
             Spacer()
 
             statusBadge
-
-            actionButtons
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
@@ -44,56 +42,22 @@ struct SkillListItemRow: View {
         if let op = store.pendingOps[skill.skillKey] {
             HStack(spacing: 4) {
                 ProgressView().controlSize(.small)
-                Text(op).font(.caption)
+                Text(op)
+                    .font(.system(size: 13, weight: .medium))
             }
         } else if skill.disabled {
             Text(L10n.k("skills.disabled", fallback: "已禁用"))
-                .font(.caption)
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.orange)
         } else if skill.eligible {
             Text(L10n.k("skills.active", fallback: "可用"))
-                .font(.caption)
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.green)
         } else if !skill.missing.isEmpty {
             Text(L10n.k("skills.missing_deps", fallback: "缺少依赖"))
-                .font(.caption)
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.red)
         }
     }
 
-    @ViewBuilder
-    private var actionButtons: some View {
-        if !isPending {
-            HStack(spacing: 4) {
-                if skill.eligible {
-                    Button(L10n.k("skills.update", fallback: "更新")) {
-                        Task { await update() }
-                    }
-                    .controlSize(.small)
-                    Button(L10n.k("skills.remove", fallback: "卸载")) {
-                        Task { await remove() }
-                    }
-                    .controlSize(.small)
-                }
-            }
-        }
-    }
-
-    private func update() async {
-        errorText = nil
-        do {
-            try await store.update(skillKey: skill.skillKey)
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
-
-    private func remove() async {
-        errorText = nil
-        do {
-            try await store.remove(skillKey: skill.skillKey)
-        } catch {
-            errorText = error.localizedDescription
-        }
-    }
 }

@@ -4258,7 +4258,6 @@ private struct SkillsTabContent: View {
 private struct SkillItemRow: View {
     let skill: GatewaySkillStatus
     let store: GatewaySkillsStore
-    @State private var showRemoveConfirm = false
 
     private var isPending: Bool { store.pendingOps[skill.skillKey] != nil }
     private var pendingLabel: String { store.pendingOps[skill.skillKey] ?? "" }
@@ -4296,28 +4295,6 @@ private struct SkillItemRow: View {
                 HStack(spacing: 4) {
                     ProgressView().scaleEffect(0.7)
                     Text(pendingLabel).font(.caption).foregroundStyle(.secondary)
-                }
-            } else {
-                HStack(spacing: 6) {
-                    if !skill.disabled {
-                        Button(L10n.k("user.detail.skills.update", fallback: "更新")) {
-                            Task { try? await store.update(skillKey: skill.skillKey) }
-                        }
-                        .buttonStyle(.bordered).controlSize(.small)
-                    }
-                    Button(L10n.k("user.detail.skills.remove", fallback: "卸载")) {
-                        showRemoveConfirm = true
-                    }
-                    .buttonStyle(.bordered).controlSize(.small)
-                    .confirmationDialog(
-                        L10n.f("user.detail.skills.remove_confirm", fallback: "卸载 %@？", skill.name),
-                        isPresented: $showRemoveConfirm,
-                        titleVisibility: .visible
-                    ) {
-                        Button(L10n.k("user.detail.skills.remove", fallback: "卸载"), role: .destructive) {
-                            Task { try? await store.remove(skillKey: skill.skillKey) }
-                        }
-                    }
                 }
             }
         }

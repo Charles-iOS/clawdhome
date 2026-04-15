@@ -11,6 +11,7 @@ final class GatewaySkillsStore {
     private(set) var skills: [GatewaySkillStatus] = []
     private(set) var isLoading = false
     private(set) var error: String?
+    private(set) var supportsRemove = false
     /// skillKey → 正在执行的操作描述（"安装中" / "卸载中" / "更新中"）
     private(set) var pendingOps: [String: String] = [:]
 
@@ -64,6 +65,9 @@ final class GatewaySkillsStore {
     }
 
     func remove(skillKey: String) async throws {
+        guard supportsRemove else {
+            throw GatewayClientError.requestFailed(code: "UNSUPPORTED", message: "当前 Gateway 暂不支持卸载技能")
+        }
         guard let client else { throw GatewayClientError.notConnected }
         pendingOps[skillKey] = "卸载中"
         defer { pendingOps.removeValue(forKey: skillKey) }
