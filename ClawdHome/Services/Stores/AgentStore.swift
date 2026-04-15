@@ -634,7 +634,7 @@ final class AgentStore {
             ))
         }
 
-        agents = parsedAgents
+        var finalizedAgents = parsedAgents
 
         // 解析 bindings
         if let bindingsArray = config["bindings"] as? [[String: Any]] {
@@ -668,32 +668,35 @@ final class AgentStore {
         }
 
         // 关联 bindings 到 agents
-        for i in agents.indices {
-            agents[i].boundBindings = bindings.filter { $0.agentId == agents[i].id }
+        for i in finalizedAgents.indices {
+            finalizedAgents[i].boundBindings = bindings.filter { $0.agentId == finalizedAgents[i].id }
         }
+        agents = finalizedAgents
     }
 
     // MARK: - Workspace 状态扫描
 
     private func refreshWorkspaceStatus() async {
         guard let workspaceManager else { return }
-        for i in agents.indices {
-            let exists = await workspaceManager.workspaceExists(agentId: agents[i].id)
-            agents[i].status = exists ? .idle : .uninitialized
+        var updatedAgents = agents
+        for i in updatedAgents.indices {
+            let exists = await workspaceManager.workspaceExists(agentId: updatedAgents[i].id)
+            updatedAgents[i].status = exists ? .idle : .uninitialized
 
             // 检查 sessions 目录判断是否有活跃会话
             if exists {
                 do {
-                    let sessions = try await workspaceManager.listSessions(agentId: agents[i].id)
-                    agents[i].sessionCount = sessions.count
+                    let sessions = try await workspaceManager.listSessions(agentId: updatedAgents[i].id)
+                    updatedAgents[i].sessionCount = sessions.count
                     if !sessions.isEmpty {
-                        agents[i].status = .active
+                        updatedAgents[i].status = .active
                     }
                 } catch {
                     // sessions 目录可能不存在，忽略
                 }
             }
         }
+        agents = updatedAgents
     }
 
     private func ensureAgentWorkspaceSeeded(
@@ -723,17 +726,19 @@ final class AgentStore {
     private func applyPersistedMetadata() async {
         guard let workspaceManager else { return }
 
-        for i in agents.indices {
+        var updatedAgents = agents
+        for i in updatedAgents.indices {
             do {
-                let metadata = try await workspaceManager.readAgentMetadata(agentId: agents[i].id)
-                agents[i].emoji = metadata.emoji
-                agents[i].description = metadata.description
-                agents[i].category = metadata.category
-                agents[i].skills = metadata.skills
+                let metadata = try await workspaceManager.readAgentMetadata(agentId: updatedAgents[i].id)
+                updatedAgents[i].emoji = metadata.emoji
+                updatedAgents[i].description = metadata.description
+                updatedAgents[i].category = metadata.category
+                updatedAgents[i].skills = metadata.skills
             } catch {
                 // metadata 文件不存在或不可读时，继续使用配置/模板默认值
             }
         }
+        agents = updatedAgents
     }
 
     // MARK: - 数据迁移（旧 agents.json → 新架构）

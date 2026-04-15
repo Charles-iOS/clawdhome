@@ -1,5 +1,5 @@
 // ClawdHome/Views/Agent/CreateAgentWizard/WizardStep4UserInfoView.swift
-// 第 4 步：用户信息
+// 第 2 步：用户信息
 
 import SwiftUI
 
@@ -13,7 +13,7 @@ struct WizardStep4UserInfoView: View {
             // 标题
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(L10n.k("wizard.step4.step_label", fallback: "第 4 / 4 步"))
+                    Text(L10n.k("wizard.step4.step_label", fallback: "第 2 / 2 步"))
                         .font(.system(size: 11))
                         .foregroundColor(.accentColor)
 
@@ -23,17 +23,17 @@ struct WizardStep4UserInfoView: View {
 
                 Spacer()
 
-                Text(L10n.k("wizard.step4.progress", fallback: "完成 80%"))
+                Text(L10n.k("wizard.step4.progress", fallback: "完成 66%"))
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }
 
             // 进度条
-            ProgressView(value: 0.8)
+            ProgressView(value: 2.0 / 3.0)
                 .progressViewStyle(.linear)
                 .tint(.accentColor)
 
-            Text(L10n.k("wizard.step4.desc", fallback: "告诉智能体关于用户的信息，包括称呼、偏好和背景"))
+            Text(L10n.k("wizard.step4.desc", fallback: "告诉员工关于你的信息，包括称呼、偏好和背景"))
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
 

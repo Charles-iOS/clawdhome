@@ -9,9 +9,9 @@ final class CreateAgentWizardState {
 
     // MARK: - 导航
 
-    var currentStep: Int = 0  // 0 = 模板, 1 = 身份, 2 = 工具, 3 = 技能, 4 = 用户信息
+    var currentStep: Int = 0  // 0 = 模板, 1 = 身份, 2 = 用户信息
 
-    static let totalConfigSteps = 4  // Step 1-4 对应"第 1/4 步 ~ 第 4/4 步"
+    static let totalConfigSteps = 2  // Step 1-2 对应"第 1/2 步 ~ 第 2/2 步"
 
     /// 当前配置步骤编号（1-based），Step 0 不算
     var configStepNumber: Int { currentStep }

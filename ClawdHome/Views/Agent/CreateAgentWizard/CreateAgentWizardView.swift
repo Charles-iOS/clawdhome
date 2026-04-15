@@ -25,10 +25,6 @@ struct CreateAgentWizardView: View {
                     case 1:
                         WizardStep1IdentityView(state: wizardState)
                     case 2:
-                        WizardStep2ToolsView(state: wizardState)
-                    case 3:
-                        WizardStep3SkillsView(state: wizardState)
-                    case 4:
                         WizardStep4UserInfoView(state: wizardState)
                     default:
                         EmptyView()
@@ -64,7 +60,7 @@ struct CreateAgentWizardView: View {
 
             Spacer()
 
-            // 进度指示（Step 1-4 时显示）
+            // 进度指示（配置步骤时显示）
             if wizardState.currentStep > 0 {
                 HStack(spacing: 8) {
                     Text(L10n.k("wizard.progress", fallback: "完成 \(wizardState.progressPercent)%"))
@@ -120,7 +116,7 @@ struct CreateAgentWizardView: View {
             }
 
             // 右侧按钮
-            if wizardState.currentStep < 4 {
+            if wizardState.currentStep < 2 {
                 Button {
                     handleNext()
                 } label: {
@@ -152,11 +148,9 @@ struct CreateAgentWizardView: View {
 
     private var stepTitle: String {
         switch wizardState.currentStep {
-        case 0: return L10n.k("wizard.step0.title", fallback: "创建智能体")
+        case 0: return L10n.k("wizard.step0.title", fallback: "创建员工")
         case 1: return L10n.k("wizard.step1.title", fallback: "身份与模型")
-        case 2: return L10n.k("wizard.step2.title", fallback: "工具")
-        case 3: return L10n.k("wizard.step3.title", fallback: "技能")
-        case 4: return L10n.k("wizard.step4.title", fallback: "用户信息")
+        case 2: return L10n.k("wizard.step4.title", fallback: "用户信息")
         default: return ""
         }
     }
@@ -165,9 +159,7 @@ struct CreateAgentWizardView: View {
         switch wizardState.currentStep {
         case 0: return L10n.k("wizard.step0.breadcrumb", fallback: "第 0 步 > 选择模板")
         case 1: return L10n.k("wizard.step1.breadcrumb", fallback: "第 1 步 > 身份与模型")
-        case 2: return L10n.k("wizard.step2.breadcrumb", fallback: "第 2 步 > 工具")
-        case 3: return L10n.k("wizard.step3.breadcrumb", fallback: "第 3 步 > 技能")
-        case 4: return L10n.k("wizard.step4.breadcrumb", fallback: "第 4 步 > 用户信息")
+        case 2: return L10n.k("wizard.step4.breadcrumb", fallback: "第 2 步 > 用户信息")
         default: return ""
         }
     }
@@ -175,9 +167,7 @@ struct CreateAgentWizardView: View {
     private var nextButtonLabel: String {
         switch wizardState.currentStep {
         case 0: return L10n.k("wizard.next.identity", fallback: "下一步：身份")
-        case 1: return L10n.k("wizard.next.tools", fallback: "下一步：工具")
-        case 2: return L10n.k("wizard.next.skills", fallback: "下一步：技能")
-        case 3: return L10n.k("wizard.next.userinfo", fallback: "下一步：用户信息")
+        case 1: return L10n.k("wizard.next.userinfo", fallback: "下一步：用户信息")
         default: return ""
         }
     }
@@ -193,7 +183,7 @@ struct CreateAgentWizardView: View {
         } else if wizardState.currentStep == 1 {
             let trimmed = wizardState.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
-                wizardState.errorMessage = L10n.k("wizard.error.name_empty", fallback: "请填写智能体名称")
+                wizardState.errorMessage = L10n.k("wizard.error.name_empty", fallback: "请填写员工名称")
                 return
             }
             // 自动生成 agentId（如果还没手动填写）
@@ -202,7 +192,7 @@ struct CreateAgentWizardView: View {
             }
             // 检查 ID 冲突
             if store.agents.contains(where: { $0.id == wizardState.agentId }) {
-                wizardState.errorMessage = L10n.k("wizard.error.id_exists", fallback: "该智能体 ID 已被使用")
+                wizardState.errorMessage = L10n.k("wizard.error.id_exists", fallback: "该员工 ID 已被使用")
                 return
             }
         }
@@ -229,7 +219,7 @@ struct CreateAgentWizardView: View {
 
                 try await store.addAgent(
                     id: wizardState.agentId,
-                    name: wizardState.name.isEmpty ? "新智能体" : wizardState.name,
+                    name: wizardState.name.isEmpty ? "新员工" : wizardState.name,
                     emoji: wizardState.emoji,
                     description: wizardState.description,
                     category: wizardState.category,

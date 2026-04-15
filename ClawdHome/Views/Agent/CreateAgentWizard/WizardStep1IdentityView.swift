@@ -9,18 +9,6 @@ struct WizardStep1IdentityView: View {
     /// 预设头像 emoji 列表
     private let presetAvatars = ["🤖", "🧭", "🦞", "🐙", "🎯", "🧠", "💻", "📈", "🌿", "🎨", "📚", "🔮", "🛠️", "🌐", "💡", "⚖️"]
 
-    /// 模型供应商选项
-    private let providerOptions: [(id: String?, label: String)] = [
-        (nil, "自动"),
-        ("google", "Gemini"),
-        ("qwen", "Qwen"),
-        ("openai", "OpenAI"),
-        ("anthropic", "Claude"),
-        ("moonshot", "Moonshot"),
-        ("zai", "Zhipu"),
-        ("minimax", "MiniMax"),
-    ]
-
     var body: some View {
         HStack(alignment: .top, spacing: 24) {
             // 左面板：表单
@@ -49,7 +37,7 @@ struct WizardStep1IdentityView: View {
 
             // 头像选择
             VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.k("wizard.step1.avatar", fallback: "智能体头像"))
+                Text(L10n.k("wizard.step1.avatar", fallback: "员工头像"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.secondary)
 
@@ -129,19 +117,6 @@ struct WizardStep1IdentityView: View {
                     }
                 }
             }
-
-            // 模型供应商
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.k("wizard.step1.provider_label", fallback: "模型供应商"))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.secondary)
-
-                FlowLayout(spacing: 8) {
-                    ForEach(providerOptions, id: \.label) { option in
-                        providerChip(id: option.id, label: option.label)
-                    }
-                }
-            }
         }
     }
 
@@ -157,28 +132,6 @@ struct WizardStep1IdentityView: View {
             }
         } label: {
             Text(style.displayName)
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.primary.opacity(0.1) : Color(nsColor: .controlBackgroundColor))
-                .foregroundColor(isSelected ? .primary : .secondary)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(isSelected ? Color.primary.opacity(0.3) : Color.secondary.opacity(0.15), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - 供应商 Chip
-
-    private func providerChip(id: String?, label: String) -> some View {
-        let isSelected = state.selectedProvider == id
-        return Button {
-            state.selectedProvider = id
-        } label: {
-            Text(label)
                 .font(.system(size: 12, weight: .medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
