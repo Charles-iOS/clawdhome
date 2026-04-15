@@ -3,9 +3,7 @@
 import SwiftUI
 
 enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
-    case dashboard
     case agents
-    case models
     case cron
     case skills
     case channels
@@ -15,9 +13,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .dashboard: return L10n.k("sidebar.dashboard", fallback: "仪表盘")
-        case .agents:    return L10n.k("sidebar.agents", fallback: "智能体")
-        case .models:    return L10n.k("sidebar.models", fallback: "模型")
+        case .agents:    return L10n.k("sidebar.people", fallback: "数字员工")
         case .cron:      return L10n.k("sidebar.cron", fallback: "定时任务")
         case .skills:    return L10n.k("sidebar.skills", fallback: "技能")
         case .channels:  return L10n.k("sidebar.channels", fallback: "消息渠道")
@@ -27,9 +23,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .dashboard: return "gauge.medium"
         case .agents:    return "person.2.fill"
-        case .models:    return "cpu.fill"
         case .cron:      return "clock.fill"
         case .skills:    return "wrench.and.screwdriver.fill"
         case .channels:  return "bubble.left.and.bubble.right.fill"
@@ -39,8 +33,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
 
     var section: SidebarSection {
         switch self {
-        case .dashboard: return .overview
-        case .agents, .models: return .configuration
+        case .agents: return .configuration
         case .cron, .skills, .channels: return .capabilities
         case .settings: return .system
         }
@@ -48,15 +41,13 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
 }
 
 enum SidebarSection: String, CaseIterable {
-    case overview
     case configuration
     case capabilities
     case system
 
     var label: String {
         switch self {
-        case .overview:       return L10n.k("sidebar.section.overview", fallback: "概览")
-        case .configuration:  return L10n.k("sidebar.section.config", fallback: "配置")
+        case .configuration:  return L10n.k("sidebar.section.people", fallback: "数字员工")
         case .capabilities:   return L10n.k("sidebar.section.capabilities", fallback: "能力")
         case .system:         return L10n.k("sidebar.section.system", fallback: "系统")
         }
@@ -80,10 +71,15 @@ struct SidebarView: View {
                             .tag(dest)
                     }
                 } header: {
-                    Text(section.label)
-                        .font(.system(size: 18))
-                        .padding(.top, index == 0 ? 0 : 10)
-                        .padding(.bottom, 10)
+                    if index == 0 {
+                        Color.clear
+                            .frame(height: 12)
+                    } else {
+                        Text(section.label)
+                            .font(.system(size: 18))
+                            .padding(.top, 10)
+                            .padding(.bottom, 10)
+                    }
                 }
             }
         }

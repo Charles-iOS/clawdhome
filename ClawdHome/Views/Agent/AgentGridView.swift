@@ -40,7 +40,6 @@ struct AgentGridView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 heroHeader
-                categoryTags
                 agentGrid
             }
             .padding(.horizontal, 28)
@@ -133,34 +132,6 @@ struct AgentGridView: View {
             }
         }
     }
-
-    @ViewBuilder
-    private var categoryTags: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                categoryTag(nil, label: L10n.k("agent.grid.all", fallback: "全部"))
-                ForEach(AgentCategory.allCases) { cat in
-                    categoryTag(cat, label: cat.displayName)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func categoryTag(_ category: AgentCategory?, label: String) -> some View {
-        let isSelected = selectedCategory == category
-        Button(label) {
-            selectedCategory = category
-        }
-        .buttonStyle(.plain)
-        .font(.system(size: 13, weight: .medium))
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
-        .background(isSelected ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.08))
-        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-        .clipShape(Capsule())
-    }
-
     @ViewBuilder
     private var agentGrid: some View {
         let columns = [GridItem(.adaptive(minimum: 300, maximum: 360), spacing: 20)]

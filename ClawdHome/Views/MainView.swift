@@ -3,7 +3,7 @@
 import SwiftUI
 
 struct MainView: View {
-    @State private var selection: SidebarDestination? = .dashboard
+    @State private var selection: SidebarDestination? = .agents
 
     var body: some View {
         NavigationSplitView {
@@ -17,8 +17,6 @@ struct MainView: View {
     @ViewBuilder
     private var detailView: some View {
         switch selection {
-        case .dashboard:
-            HomeDashboardView()
         case .agents:
             NavigationStack {
                 AgentGridView()
@@ -26,8 +24,6 @@ struct MainView: View {
                         AgentWorkspaceView(agentId: agentId)
                     }
             }
-        case .models:
-            ModelConfigView()
         case .cron:
             CronTaskView()
         case .skills:

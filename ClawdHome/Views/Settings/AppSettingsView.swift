@@ -5,6 +5,7 @@ import SwiftUI
 struct AppSettingsView: View {
     @Environment(GatewayProcessManager.self) private var processManager
     @Environment(EnvironmentChecker.self) private var envChecker
+    @Environment(GatewayService.self) private var gatewayService
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,6 +39,30 @@ struct AppSettingsView: View {
                 L10n.k("settings.state", fallback: "状态"),
                 value: stateLabel
             )
+
+            HStack(spacing: 12) {
+                Button(L10n.k("user.detail.auto.start_action", fallback: "启动")) {
+                    processManager.start()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(processManager.state == .starting || processManager.state == .running)
+
+                Button(L10n.k("user.detail.auto.restart", fallback: "重启")) {
+                    processManager.restart()
+                }
+                .buttonStyle(.bordered)
+                .disabled(processManager.state == .starting || processManager.state == .stopping)
+
+                Button(L10n.k("user.detail.auto.stop", fallback: "停止")) {
+                    processManager.stop()
+                }
+                .buttonStyle(.bordered)
+                .disabled(processManager.state == .stopped || processManager.state == .stopping)
+            }
+
+            Text(gatewayActionHint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -93,6 +118,23 @@ struct AppSettingsView: View {
         case .starting: return L10n.k("dashboard.starting", fallback: "正在启动…")
         case .stopped: return L10n.k("dashboard.stopped", fallback: "已停止")
         case .failed(let msg): return msg
+        }
+    }
+
+    private var gatewayActionHint: String {
+        switch processManager.state {
+        case .running:
+            return gatewayService.isConnected
+                ? "Gateway 正在运行，可在这里重启或停止。"
+                : "Gateway 进程已启动，正在等待连接恢复。"
+        case .starting:
+            return "Gateway 正在启动中，请稍候。"
+        case .stopping:
+            return "Gateway 正在停止中，请稍候。"
+        case .stopped:
+            return "Gateway 当前已停止，可在这里重新启动。"
+        case .failed:
+            return "Gateway 当前处于异常状态，建议尝试重启。"
         }
     }
 }
