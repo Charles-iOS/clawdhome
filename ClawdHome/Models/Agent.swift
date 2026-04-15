@@ -26,6 +26,19 @@ struct Agent: Codable, Identifiable, Equatable {
 
     static func == (lhs: Agent, rhs: Agent) -> Bool {
         lhs.id == rhs.id
+            && lhs.name == rhs.name
+            && lhs.emoji == rhs.emoji
+            && lhs.description == rhs.description
+            && lhs.category == rhs.category
+            && lhs.preferredModel == rhs.preferredModel
+            && lhs.skills == rhs.skills
+            && lhs.isPreset == rhs.isPreset
+            && lhs.workspace == rhs.workspace
+            && lhs.agentDir == rhs.agentDir
+            && lhs.isDefault == rhs.isDefault
+            && lhs.status == rhs.status
+            && lhs.boundBindings == rhs.boundBindings
+            && lhs.sessionCount == rhs.sessionCount
     }
 
     // MARK: - Codable（跳过运行时字段）

@@ -36,6 +36,20 @@ struct AgentGridView: View {
         return results
     }
 
+    private var gridRefreshKey: String {
+        store.agents.map {
+            [
+                $0.id,
+                $0.status.rawValue,
+                String($0.sessionCount),
+                String($0.boundBindings.count),
+                $0.name,
+                $0.description
+            ].joined(separator: "|")
+        }
+        .joined(separator: "||")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -99,24 +113,24 @@ struct AgentGridView: View {
     private var heroHeader: some View {
         HStack(alignment: .top, spacing: 20) {
             PageHeroHeader(
-                title: L10n.k("agent.grid.title", fallback: "智能体"),
+                title: L10n.k("agent.grid.title", fallback: "数字员工"),
                 subtitle: L10n.k("agent.grid.subtitle", fallback: "管理你的个性化助手，创建新角色并开始对话。")
             )
             Spacer()
 
             VStack(alignment: .trailing, spacing: 12) {
-                Picker("Agent", selection: $segment) {
-                    ForEach(AgentGridSegment.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 340)
+                // Picker("Agent", selection: $segment) {
+                //     ForEach(AgentGridSegment.allCases) { option in
+                //         Text(option.title).tag(option)
+                //     }
+                // }
+                // .pickerStyle(.segmented)
+                // .frame(width: 340)
 
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField(L10n.k("agent.grid.search", fallback: "搜索智能体…"), text: $searchText)
+                    TextField(L10n.k("agent.grid.search", fallback: "搜索员工…"), text: $searchText)
                         .textFieldStyle(.plain)
                 }
                 .padding(.horizontal, 12)
@@ -155,6 +169,7 @@ struct AgentGridView: View {
                 }
             }
         }
+        .id(gridRefreshKey)
     }
 
     @ViewBuilder
@@ -171,7 +186,7 @@ struct AgentGridView: View {
                         .font(.system(size: 24, weight: .light))
                         .foregroundStyle(.secondary)
                 }
-                Text(L10n.k("agent.grid.create", fallback: "新建智能体"))
+                Text(L10n.k("agent.grid.create", fallback: "新建员工"))
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
@@ -203,7 +218,7 @@ struct AgentGridView: View {
                         fromPresetId: preset.id
                     )
                 } catch {
-                    appLog("从模板创建智能体失败: \(error)", level: .error)
+                    appLog("从模板创建员工失败: \(error)", level: .error)
                 }
             }
         } label: {
@@ -265,7 +280,7 @@ struct AgentGridView: View {
             Button(role: .destructive) {
                 agentToDelete = agent
             } label: {
-                Label(L10n.k("agent.menu.delete", fallback: "删除智能体"), systemImage: "trash")
+                Label(L10n.k("agent.menu.delete", fallback: "删除员工"), systemImage: "trash")
             }
             .disabled(deletingAgentId != nil)
         }
@@ -281,7 +296,7 @@ private enum AgentGridSegment: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .myAgents:
-            return L10n.k("agent.grid.segment.my_agents", fallback: "我的智能体")
+            return L10n.k("agent.grid.segment.my_agents", fallback: "我的数字员工")
         case .taskDerived:
             return L10n.k("agent.grid.segment.task_derived", fallback: "预置模板")
         }
