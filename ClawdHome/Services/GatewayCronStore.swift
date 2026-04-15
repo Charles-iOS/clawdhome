@@ -93,8 +93,26 @@ final class GatewayCronStore {
     func add(_ params: GatewayCronAddParams) async throws {
         guard let client else { throw GatewayClientError.notConnected }
         let newJob = try await client.cronAdd(params)
-        jobs.append(newJob)
-        selectedJobId = newJob.id
+
+        if let newJob {
+            jobs.append(newJob)
+            selectedJobId = newJob.id
+            return
+        }
+
+        await refresh()
+
+        selectedJobId = jobs
+            .filter { job in
+                job.name.trimmingCharacters(in: .whitespacesAndNewlines) ==
+                params.name.trimmingCharacters(in: .whitespacesAndNewlines) &&
+                job.schedule == params.schedule &&
+                job.payload == params.payload &&
+                job.sessionTarget == params.sessionTarget &&
+                job.wakeMode == params.wakeMode
+            }
+            .max(by: { $0.createdAtMs < $1.createdAtMs })?
+            .id
     }
 
     // MARK: - 私有

@@ -465,7 +465,7 @@ actor GatewayClient {
     }
 
     func cronRun(jobId: String) async throws {
-        _ = try await request(method: "cron.run", params: ["id": jobId, "force": true])
+        _ = try await request(method: "cron.run", params: ["id": jobId])
     }
 
     func cronRemove(jobId: String) async throws {
@@ -473,14 +473,20 @@ actor GatewayClient {
     }
 
     func cronUpdate(jobId: String, enabled: Bool) async throws {
-        _ = try await request(method: "cron.update", params: ["id": jobId, "enabled": enabled])
+        _ = try await request(method: "cron.update", params: [
+            "id": jobId,
+            "patch": ["enabled": enabled]
+        ])
     }
 
-    func cronAdd(_ params: GatewayCronAddParams) async throws -> GatewayCronJob {
+    func cronAdd(_ params: GatewayCronAddParams) async throws -> GatewayCronJob? {
         let dict = params.toDict()
-        guard let payload = try await request(method: "cron.add", params: dict),
-              let jobDict = payload["job"] as? [String: Any]
-        else { throw GatewayClientError.requestFailed(code: nil, message: "cron.add returned no job") }
+        guard let payload = try await request(method: "cron.add", params: dict) else {
+            return nil
+        }
+        guard let jobDict = payload["job"] as? [String: Any] else {
+            return nil
+        }
         let data = try JSONSerialization.data(withJSONObject: jobDict)
         return try JSONDecoder().decode(GatewayCronJob.self, from: data)
     }
