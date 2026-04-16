@@ -93,8 +93,10 @@ final class AgentStore {
         }
 
         // 2. 若 workspace 不存在，自动初始化
-        let exists = await workspaceManager.workspaceExists(agentId: "main")
-        if !exists {
+        switch await workspaceManager.probeWorkspace(agentId: "main") {
+        case .exists:
+            break
+        case .missing:
             do {
                 try await workspaceManager.initializeWorkspace(agentId: "main", seedContent: [:])
                 agents[mainIdx].status = .idle
@@ -102,6 +104,8 @@ final class AgentStore {
             } catch {
                 appLog("AgentStore: 创建默认 workspace 失败: \(error)", level: .error)
             }
+        case .indeterminate(let reason):
+            appLog("AgentStore: 无法确认默认智能体 workspace 状态，跳过自动创建: \(reason)", level: .warn)
         }
     }
 
@@ -680,11 +684,10 @@ final class AgentStore {
         guard let workspaceManager else { return }
         var updatedAgents = agents
         for i in updatedAgents.indices {
-            let exists = await workspaceManager.workspaceExists(agentId: updatedAgents[i].id)
-            updatedAgents[i].status = exists ? .idle : .uninitialized
-
-            // 检查 sessions 目录判断是否有活跃会话
-            if exists {
+            switch await workspaceManager.probeWorkspace(agentId: updatedAgents[i].id) {
+            case .exists:
+                updatedAgents[i].status = .idle
+                // 检查 sessions 目录判断是否有活跃会话
                 do {
                     let sessions = try await workspaceManager.listSessions(agentId: updatedAgents[i].id)
                     updatedAgents[i].sessionCount = sessions.count
@@ -694,6 +697,11 @@ final class AgentStore {
                 } catch {
                     // sessions 目录可能不存在，忽略
                 }
+            case .missing:
+                updatedAgents[i].status = .uninitialized
+                updatedAgents[i].sessionCount = 0
+            case .indeterminate(let reason):
+                appLog("AgentStore: workspace 探测失败，保留当前状态 id=\(updatedAgents[i].id): \(reason)", level: .warn)
             }
         }
         agents = updatedAgents
@@ -705,13 +713,17 @@ final class AgentStore {
     ) async throws {
         guard let workspaceManager else { return }
 
-        let workspaceExists = await workspaceManager.workspaceExists(agentId: agentId)
-        if !workspaceExists {
+        switch await workspaceManager.probeWorkspace(agentId: agentId) {
+        case .missing:
             try await workspaceManager.initializeWorkspace(
                 agentId: agentId,
                 seedContent: seedContent
             )
             return
+        case .exists:
+            break
+        case .indeterminate(let reason):
+            throw HelperError.operationFailed("无法确认智能体 \(agentId) 的 workspace 状态：\(reason)")
         }
 
         for (file, content) in seedContent where !content.isEmpty {

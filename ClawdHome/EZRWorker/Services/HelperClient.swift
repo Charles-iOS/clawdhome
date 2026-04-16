@@ -71,6 +71,24 @@ final class HelperClient {
         verifyConnection()
     }
 
+    /// 等待 Helper 对 XPC 探测产生成功响应，避免启动阶段文件探测误判。
+    @discardableResult
+    func waitUntilConnected(
+        timeoutNanoseconds: UInt64 = 6_000_000_000,
+        pollIntervalNanoseconds: UInt64 = 200_000_000
+    ) async -> Bool {
+        if isConnected { return true }
+
+        let start = DispatchTime.now().uptimeNanoseconds
+        while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
+            verifyConnection()
+            if isConnected { return true }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+            if isConnected { return true }
+        }
+        return isConnected
+    }
+
     func disconnect() {
         controlConnection?.invalidate(); controlConnection = nil
         dashboardConnection?.invalidate(); dashboardConnection = nil

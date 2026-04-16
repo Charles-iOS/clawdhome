@@ -205,6 +205,10 @@ struct ClawdHomeApp: App {
 
         // 先建立 XPC 连接，agentStore/workspaceManager 依赖 helperClient 读写文件
         helperClient.connect()
+        let helperReady = await helperClient.waitUntilConnected()
+        if !helperReady {
+            appLog("bootstrap: helper 连接未在预期时间内就绪，后续 workspace 探测将采用保守模式", level: .warn)
+        }
 
         // 加载智能体（从 gateway 配置 + workspace 扫描）
         await agentStore.load(

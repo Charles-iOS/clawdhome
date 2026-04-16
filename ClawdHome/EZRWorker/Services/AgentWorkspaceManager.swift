@@ -10,6 +10,12 @@
 import Foundation
 import Observation
 
+enum WorkspaceProbeResult: Equatable {
+    case exists
+    case missing
+    case indeterminate(String)
+}
+
 @MainActor @Observable
 final class AgentWorkspaceManager {
 
@@ -178,19 +184,35 @@ final class AgentWorkspaceManager {
 
     // MARK: - Workspace 检测
 
-    /// 检查智能体 workspace 是否存在（通过读取目录）
-    func workspaceExists(agentId: String) async -> Bool {
-        guard let helper = helperClient else { return false }
+    func probeWorkspace(agentId: String) async -> WorkspaceProbeResult {
+        guard let helper = helperClient else {
+            return .indeterminate(AgentWorkspaceError.notConfigured.localizedDescription)
+        }
+        guard helper.isConnected else {
+            return .indeterminate(HelperError.notConnected.localizedDescription)
+        }
+
         do {
             _ = try await helper.listDirectory(
                 username: username,
                 relativePath: workspacePath(for: agentId),
                 showHidden: false
             )
-            return true
+            return .exists
         } catch {
-            return false
+            if Self.isMissingWorkspaceError(error) {
+                return .missing
+            }
+            return .indeterminate(error.localizedDescription)
         }
+    }
+
+    /// 检查智能体 workspace 是否存在（通过读取目录）
+    func workspaceExists(agentId: String) async -> Bool {
+        if case .exists = await probeWorkspace(agentId: agentId) {
+            return true
+        }
+        return false
     }
 
     // MARK: - Workspace 删除
@@ -267,6 +289,18 @@ private extension AgentWorkspaceManager {
             .filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
             .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
         return normalized.isEmpty ? trimmed.lowercased() : normalized
+    }
+
+    static func isMissingWorkspaceError(_ error: Error) -> Bool {
+        let message = ((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            .lowercased()
+
+        return message.contains("no such file or directory")
+            || message.contains("doesn't exist")
+            || message.contains("doesn’t exist")
+            || message.contains("not found")
+            || message.contains("不存在")
+            || message.contains("不是目录")
     }
 }
 
