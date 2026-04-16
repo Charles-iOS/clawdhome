@@ -28,6 +28,7 @@ struct ChannelPairingSheet: View {
 
     let channelType: ChannelType
 
+    @Environment(GatewayService.self) private var gateway
     @Environment(\.dismiss) private var dismiss
 
     @State private var pendingRequests: [PairingRequest] = []
@@ -286,7 +287,7 @@ struct ChannelPairingSheet: View {
             systemImage: "person.crop.circle.badge.checkmark"
         ) {
             if approvedPeers.isEmpty {
-                Text("暂无已配对的用户或群组")
+                Text("暂无已配对的用户")
                     .font(.system(size: SheetFont.body))
                     .foregroundStyle(.secondary)
             } else {
@@ -411,7 +412,7 @@ struct ChannelPairingSheet: View {
 
     /// 直接读取本地 JSON 文件加载配对数据（无需启动 Node 进程）
     /// - 待审批：~/.openclaw/credentials/<channel>-pairing.json → { requests: [...] }
-    /// - 已配对：~/.openclaw/credentials/<channel>-*-allowFrom.json → { allowFrom: ["id", ...] }
+    /// - 已配对：合并 allowFrom store 与 `channels.<channel>.allowFrom`
     private func loadAll() async {
         isLoading = true
         defer {
@@ -421,38 +422,14 @@ struct ChannelPairingSheet: View {
 
         let credDir = GatewayProcessManager.openClawConfigDir
             .appendingPathComponent("credentials")
-        let fm = FileManager.default
-        let channel = channelType.rawValue
-
-        // 1. 读取待审批请求
-        let pairingFile = credDir.appendingPathComponent("\(channel)-pairing.json")
-        if let data = fm.contents(atPath: pairingFile.path),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let requests = json["requests"] as? [[String: Any]],
-           let reqData = try? JSONSerialization.data(withJSONObject: requests) {
-            pendingRequests = (try? JSONDecoder().decode([PairingRequest].self, from: reqData)) ?? []
-        } else {
-            pendingRequests = []
-        }
-
-        // 2. 扫描 allowFrom 文件获取已配对用户
-        var allPeers: [PairingPeer] = []
-        let prefix = "\(channel)-"
-        let suffix = "-allowFrom.json"
-        if let entries = try? fm.contentsOfDirectory(atPath: credDir.path) {
-            for entry in entries where entry.hasPrefix(prefix) && entry.hasSuffix(suffix) {
-                let filePath = credDir.appendingPathComponent(entry)
-                guard let data = fm.contents(atPath: filePath.path),
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let allowFrom = json["allowFrom"] as? [String] else { continue }
-                for peerId in allowFrom {
-                    if !allPeers.contains(where: { $0.id == peerId }) {
-                        allPeers.append(PairingPeer(id: peerId))
-                    }
-                }
-            }
-        }
-        approvedPeers = allPeers
+        pendingRequests = ChannelPairingDataLoader.pendingRequests(
+            for: channelType,
+            credentialsDirectory: credDir
+        )
+        approvedPeers = ChannelPairingDataLoader.approvedPeers(
+            for: channelType,
+            credentialsDirectory: credDir
+        )
     }
 
     /// 审批通过配对码
@@ -509,14 +486,20 @@ struct ChannelPairingSheet: View {
         errorMessage = nil
         successMessage = nil
 
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["pairing"] + ["remove", channelType.rawValue, peer.id]
-        )
-
-        if ok {
-            approvedPeers.removeAll { $0.id == peer.id }
-            successMessage = "已移除 \(peer.displayName ?? peer.id) 的配对"
-        } else {
-            errorMessage = "移除失败：\(output)"
+        do {
+            let changed = try await ChannelPairingMutationSupport.removeApprovedPeer(
+                peer,
+                channel: channelType,
+                gateway: gateway
+            )
+            if changed {
+                await loadAll()
+                successMessage = "已移除 \(peer.displayName ?? peer.id) 的私信授权"
+            } else {
+                errorMessage = "\(peer.displayName ?? peer.id) 不在当前白名单中"
+            }
+        } catch {
+            errorMessage = "移除失败：\(error.localizedDescription)"
         }
     }
 }
@@ -536,6 +519,11 @@ struct PairingRequest: Codable, Identifiable {
     }
 }
 
+enum PairingPeerSource: String, Codable, Hashable {
+    case storeAllowFrom
+    case configAllowFrom
+}
+
 // MARK: - 已配对 Peer 模型
 
 struct PairingPeer: Codable, Identifiable, Equatable {
@@ -543,9 +531,18 @@ struct PairingPeer: Codable, Identifiable, Equatable {
     var kind: String?
     var displayName: String?
     var pairedAt: String?
+    var sources: [PairingPeerSource] = [.storeAllowFrom]
 
     var isGroup: Bool {
         kind == "group"
+    }
+
+    var isStoreBacked: Bool {
+        sources.contains(.storeAllowFrom)
+    }
+
+    var isConfigBacked: Bool {
+        sources.contains(.configAllowFrom)
     }
 
     var kindLabel: String {
@@ -557,6 +554,6 @@ struct PairingPeer: Codable, Identifiable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, kind, displayName, pairedAt
+        case id, kind, displayName, pairedAt, sources
     }
 }

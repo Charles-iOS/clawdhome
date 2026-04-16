@@ -117,6 +117,21 @@ enum ChannelType: String, CaseIterable, Identifiable {
         self == .feishu
     }
 
+    /// 已配置后是否进入统一的渠道配置弹窗
+    var usesIntegratedConfigSheet: Bool {
+        switch self {
+        case .feishu, .telegram:
+            return true
+        case .weixin, .discord:
+            return false
+        }
+    }
+
+    /// 是否保留单独的配对管理入口
+    var showsStandalonePairingEntry: Bool {
+        !usesIntegratedConfigSheet
+    }
+
     /// 对应的交互式 onboarding 流程
     var onboardingFlow: ChannelOnboardingFlow {
         switch self {

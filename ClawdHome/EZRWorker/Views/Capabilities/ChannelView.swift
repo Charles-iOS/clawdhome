@@ -3,17 +3,62 @@
 
 import SwiftUI
 
+private enum ChannelConnectionStatus {
+    case disconnected
+    case connected
+    case disabled
+
+    var isConfigured: Bool {
+        self != .disconnected
+    }
+
+    var badgeTitle: String {
+        switch self {
+        case .disconnected:
+            return L10n.k("channel.status.disconnected", fallback: "未关联")
+        case .connected:
+            return L10n.k("channel.status.connected", fallback: "已关联")
+        case .disabled:
+            return "已禁用"
+        }
+    }
+
+    var badgeBackgroundColor: Color {
+        switch self {
+        case .disconnected:
+            return Color.secondary.opacity(0.1)
+        case .connected:
+            return Color.green.opacity(0.12)
+        case .disabled:
+            return Color.orange.opacity(0.12)
+        }
+    }
+
+    var badgeForegroundColor: Color {
+        switch self {
+        case .disconnected:
+            return .secondary
+        case .connected:
+            return .green
+        case .disabled:
+            return .orange
+        }
+    }
+}
+
 struct ChannelView: View {
     private enum ChannelSetupDestination: Identifiable {
         case methodPicker(ChannelType)
         case interactive(ChannelType)
         case credentials(ChannelType)
+        case channelConfig(ChannelType)
 
         var id: String {
             switch self {
             case .methodPicker(let channel): return "picker-\(channel.rawValue)"
             case .interactive(let channel): return "interactive-\(channel.rawValue)"
             case .credentials(let channel): return "credentials-\(channel.rawValue)"
+            case .channelConfig(let channel): return "config-\(channel.rawValue)"
             }
         }
     }
@@ -22,6 +67,7 @@ struct ChannelView: View {
     @Environment(AgentStore.self) private var agentStore
     @State private var setupDestination: ChannelSetupDestination?
     @State private var channelConfigs: [ChannelType: [String: String]] = [:]
+    @State private var channelEnabledStates: [ChannelType: Bool] = [:]
     @State private var pairingStats: [ChannelType: ChannelPairingStats] = [:]
     @State private var isLoading = false
 
@@ -48,7 +94,7 @@ struct ChannelView: View {
                     ForEach(ChannelType.enabledCases) { channel in
                         ChannelCardView(
                             channel: channel,
-                            isConnected: isChannelConnected(channel),
+                            connectionStatus: channelConnectionStatus(for: channel),
                             pairingStats: pairingStats[channel],
                             bindings: agentStore.bindings.filter { $0.channel == channel.rawValue },
                             agents: agentStore.agents,
@@ -112,11 +158,27 @@ struct ChannelView: View {
                     Task { await reloadChannelState() }
                 }
                 .environment(gateway)
+
+            case .channelConfig(let channel):
+                if channel == .feishu {
+                    FeishuChannelConfigSheet(username: agentStore.username) {
+                        Task { await reloadChannelState() }
+                    }
+                    .environment(gateway)
+                } else if channel == .telegram {
+                    TelegramChannelConfigSheet {
+                        Task { await reloadChannelState() }
+                    }
+                    .environment(gateway)
+                }
             }
         }
     }
 
     private func initialSetupDestination(for channel: ChannelType) -> ChannelSetupDestination {
+        if channel.usesIntegratedConfigSheet, channelConnectionStatus(for: channel).isConfigured {
+            return .channelConfig(channel)
+        }
         if channel.supportsSetupMethodPicker {
             return .methodPicker(channel)
         }
@@ -131,6 +193,18 @@ struct ChannelView: View {
         guard let config = channelConfigs[channel] else { return false }
         // 有任一非空凭据字段即视为已关联；飞书扫码模式会注入本地凭据标记字段。
         return config.values.contains(where: { !$0.isEmpty })
+    }
+
+    private func isChannelEnabled(_ channel: ChannelType) -> Bool {
+        channelEnabledStates[channel] ?? true
+    }
+
+    private func channelConnectionStatus(for channel: ChannelType) -> ChannelConnectionStatus {
+        guard isChannelConnected(channel) else { return .disconnected }
+        if !isChannelEnabled(channel) {
+            return .disabled
+        }
+        return .connected
     }
 
     private func reloadChannelState() async {
@@ -154,14 +228,18 @@ struct ChannelView: View {
         let hasFeishuQRCodeCredentials = hasFeishuQRCodeCredentials()
 
         var result: [ChannelType: [String: String]] = [:]
+        var enabledStates: [ChannelType: Bool] = [:]
         for channel in ChannelType.enabledCases {
             var fields: [String: String] = [:]
             if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
+                enabledStates[channel] = chConfig["enabled"] as? Bool ?? true
                 for field in channel.configFields {
                     if let value = chConfig[field.id] as? String, !value.isEmpty {
                         fields[field.id] = value
                     }
                 }
+            } else {
+                enabledStates[channel] = true
             }
             if channel == .feishu, hasFeishuQRCodeCredentials {
                 fields["qrPaired"] = "true"
@@ -171,6 +249,7 @@ struct ChannelView: View {
             }
         }
         channelConfigs = result
+        channelEnabledStates = enabledStates
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
@@ -210,39 +289,18 @@ struct ChannelView: View {
     private func loadPairingStats() async {
         let credDir = GatewayProcessManager.openClawConfigDir
             .appendingPathComponent("credentials")
-        let fm = FileManager.default
         var result: [ChannelType: ChannelPairingStats] = [:]
 
-        for channel in ChannelType.enabledCases where isChannelConnected(channel) {
-            let ch = channel.rawValue
-            var pendingCount = 0
-            var approvedCount = 0
-
-            // 待审批：<channel>-pairing.json → { requests: [...] }
-            let pairingFile = credDir.appendingPathComponent("\(ch)-pairing.json")
-            if let data = fm.contents(atPath: pairingFile.path),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let requests = json["requests"] as? [Any] {
-                pendingCount = requests.count
-            }
-
-            // 已配对：<channel>-*-allowFrom.json → { allowFrom: [...] }
-            let prefix = "\(ch)-"
-            let suffix = "-allowFrom.json"
-            if let entries = try? fm.contentsOfDirectory(atPath: credDir.path) {
-                for entry in entries where entry.hasPrefix(prefix) && entry.hasSuffix(suffix) {
-                    let filePath = credDir.appendingPathComponent(entry)
-                    if let data = fm.contents(atPath: filePath.path),
-                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let allowFrom = json["allowFrom"] as? [Any] {
-                        approvedCount += allowFrom.count
-                    }
-                }
-            }
-
+        for channel in ChannelType.enabledCases where channelConnectionStatus(for: channel).isConfigured {
             result[channel] = ChannelPairingStats(
-                directCount: approvedCount,
-                pendingCount: pendingCount
+                directCount: ChannelPairingDataLoader.approvedPeerIDs(
+                    for: channel,
+                    credentialsDirectory: credDir
+                ).count,
+                pendingCount: ChannelPairingDataLoader.pendingRequests(
+                    for: channel,
+                    credentialsDirectory: credDir
+                ).count
             )
         }
 
@@ -372,23 +430,33 @@ private struct ChannelCardView: View {
     }
 
     /// 网格内卡片统一高度（须 ≥ 头/统计/智能体区/配对行/主按钮 之和，否则底部按钮会被裁掉）
-    private static let cardHeight: CGFloat = 452
+    private static let cardHeightWithPairing: CGFloat = 452
+    private static let cardHeightWithoutPairing: CGFloat = 396
     /// 智能体区域固定高度，多绑定时内部滚动
     private static let agentAreaHeight: CGFloat = 148
     /// 与 `pairingButton` 视觉高度对齐，未关联时占位
     private static let pairingRowReservedHeight: CGFloat = 42
 
     let channel: ChannelType
-    let isConnected: Bool
+    let connectionStatus: ChannelConnectionStatus
     let pairingStats: ChannelPairingStats?
     let bindings: [AgentBinding]
     let agents: [Agent]
     let onSetup: () -> Void
     let onRemoveBinding: (AgentBinding) -> Void
 
+    @Environment(GatewayService.self) private var gateway
     @Environment(AgentStore.self) private var agentStore
     @State private var showAgentPicker = false
     @State private var showPairingSheet = false
+
+    private var isConfigured: Bool {
+        connectionStatus.isConfigured
+    }
+
+    private var cardHeight: CGFloat {
+        channel.showsStandalonePairingEntry ? Self.cardHeightWithPairing : Self.cardHeightWithoutPairing
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -401,18 +469,20 @@ private struct ChannelCardView: View {
                 .frame(height: Self.agentAreaHeight)
             // 配对管理入口：未关联时保留占位，保证卡片等高
             Group {
-                if isConnected {
-                    pairingButton
-                } else {
-                    Color.clear
-                        .frame(height: Self.pairingRowReservedHeight)
+                if channel.showsStandalonePairingEntry {
+                    if isConfigured {
+                        pairingButton
+                    } else {
+                        Color.clear
+                            .frame(height: Self.pairingRowReservedHeight)
+                    }
                 }
             }
             Spacer(minLength: 0)
             // 底部操作按钮
             actionButton
         }
-        .frame(maxWidth: .infinity, minHeight: Self.cardHeight, maxHeight: Self.cardHeight, alignment: .top)
+        .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight, alignment: .top)
         .padding(16)
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -429,6 +499,7 @@ private struct ChannelCardView: View {
         }
         .sheet(isPresented: $showPairingSheet) {
             ChannelPairingSheet(channelType: channel)
+                .environment(gateway)
         }
     }
 
@@ -457,14 +528,12 @@ private struct ChannelCardView: View {
             }
             Spacer()
             // 连接状态徽章
-            Text(isConnected
-                 ? L10n.k("channel.status.connected", fallback: "已关联")
-                 : L10n.k("channel.status.disconnected", fallback: "未关联"))
+            Text(connectionStatus.badgeTitle)
                 .font(.system(size: FontSize.badge, weight: .medium))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(isConnected ? Color.green.opacity(0.12) : Color.secondary.opacity(0.1))
-                .foregroundStyle(isConnected ? .green : .secondary)
+                .background(connectionStatus.badgeBackgroundColor)
+                .foregroundStyle(connectionStatus.badgeForegroundColor)
                 .clipShape(Capsule())
         }
     }

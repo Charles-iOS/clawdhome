@@ -109,6 +109,8 @@
 		886EB457EBB2E80B3D558001 /* WizardStep3SkillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98DC695A3E2FF18D32D50CE8 /* WizardStep3SkillsView.swift */; };
 		8880D4FA5302740F6CD8F7B2 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B9025469C59B7EE328F10ED /* main.swift */; };
 		892B6EBA19D9E9F7887F9D5E /* ChannelPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31DB92EC5EF2A36941AAC29 /* ChannelPairingSheet.swift */; };
+		7E1D8A3B4C5D6E7F8091A2B3 /* FeishuChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2E1D0C9B8A7F6E5D4C3B2A /* FeishuChannelConfigSheet.swift */; };
+		5A6B7C8D9E0F1A2B3C4D5E6F /* TelegramChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5E4D3C2B1A0F9E8D7C6B5A /* TelegramChannelConfigSheet.swift */; };
 		8ABC91BB2196F6C05E6647C9 /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F2D77C8262C551CBD26BA2 /* AppUpdateState.swift */; };
 		8AFA4AD60DEB4B506A0D2A6A /* GatewayCronStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D81E7B672B2A82591FEF1B /* GatewayCronStore.swift */; };
 		8DA5C8174C08A39388CA8388 /* PersonaDefView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77787365CF9FCFC1BABE9B81 /* PersonaDefView.swift */; };
@@ -222,6 +224,7 @@
 		2BD15AFBF24DE05D57194904 /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		2F837F1CD97FBADD4A87A567 /* ClawdHomeHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClawdHomeHelper.entitlements; sourceTree = "<group>"; };
 		304E3BEE50A0653474FF27FC /* DaemonInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonInstaller.swift; sourceTree = "<group>"; };
+		6F5E4D3C2B1A0F9E8D7C6B5A /* TelegramChannelConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramChannelConfigSheet.swift; sourceTree = "<group>"; };
 		32ACC218308D2CE4322109FC /* TerminalLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLogView.swift; sourceTree = "<group>"; };
 		335F70B73CF355F93B436AFA /* AppUpdateHeartbeatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateHeartbeatService.swift; sourceTree = "<group>"; };
 		33767C77A8325F8ED5543C55 /* WizardStep2ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep2ToolsView.swift; sourceTree = "<group>"; };
@@ -236,6 +239,7 @@
 		3E907E4755C5FB9F31613DAD /* WizardStep1IdentityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep1IdentityView.swift; sourceTree = "<group>"; };
 		3F177240AE99ADC3F3D2AD8F /* roles.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = roles.html; sourceTree = "<group>"; };
 		40305CC98880248434C11684 /* FeishuChannelOnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelOnboardingSheet.swift; sourceTree = "<group>"; };
+		3F2E1D0C9B8A7F6E5D4C3B2A /* FeishuChannelConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelConfigSheet.swift; sourceTree = "<group>"; };
 		41AF5BD2C3AB3FF4937565B2 /* ProviderKeyConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeyConfig.swift; sourceTree = "<group>"; };
 		41E6E607472BCCB5C61A50EA /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
 		442171CEA410BEA9920973CC /* DashboardCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCollector.swift; sourceTree = "<group>"; };
@@ -574,6 +578,8 @@
 				29698F149D09CD452FCFFF5A /* ChannelBindSheet.swift */,
 				190EA291E1A5AD3C454FAD8D /* ChannelBotConfigSheet.swift */,
 				B31DB92EC5EF2A36941AAC29 /* ChannelPairingSheet.swift */,
+				3F2E1D0C9B8A7F6E5D4C3B2A /* FeishuChannelConfigSheet.swift */,
+				6F5E4D3C2B1A0F9E8D7C6B5A /* TelegramChannelConfigSheet.swift */,
 				C98981F58B78359BB7A2503D /* ChannelView.swift */,
 				4802CF918041FF79978E4DA4 /* CronAddSheet.swift */,
 				A3B59F2E144B3C63DA276806 /* CronJobDetailView.swift */,
@@ -955,6 +961,8 @@
 				864BEE41DD89F2AB8B0C0B43 /* ChannelBindSheet.swift in Sources */,
 				96562AF174AF2E30934D9CE4 /* ChannelBotConfigSheet.swift in Sources */,
 				892B6EBA19D9E9F7887F9D5E /* ChannelPairingSheet.swift in Sources */,
+				7E1D8A3B4C5D6E7F8091A2B3 /* FeishuChannelConfigSheet.swift in Sources */,
+				5A6B7C8D9E0F1A2B3C4D5E6F /* TelegramChannelConfigSheet.swift in Sources */,
 				20C4F2BD47C1EBEF9252DF2D /* ChannelType.swift in Sources */,
 				2371095B34D07442965A5E43 /* ChannelView.swift in Sources */,
 				1D4EDB9DB0495FE0EFA54FE4 /* ClawPoolView.swift in Sources */,
