@@ -4,9 +4,23 @@
 import SwiftUI
 
 struct ChannelView: View {
+    private enum ChannelSetupDestination: Identifiable {
+        case methodPicker(ChannelType)
+        case interactive(ChannelType)
+        case credentials(ChannelType)
+
+        var id: String {
+            switch self {
+            case .methodPicker(let channel): return "picker-\(channel.rawValue)"
+            case .interactive(let channel): return "interactive-\(channel.rawValue)"
+            case .credentials(let channel): return "credentials-\(channel.rawValue)"
+            }
+        }
+    }
+
     @Environment(GatewayService.self) private var gateway
     @Environment(AgentStore.self) private var agentStore
-    @State private var configuringChannel: ChannelType?
+    @State private var setupDestination: ChannelSetupDestination?
     @State private var channelConfigs: [ChannelType: [String: String]] = [:]
     @State private var pairingStats: [ChannelType: ChannelPairingStats] = [:]
     @State private var isLoading = false
@@ -38,7 +52,7 @@ struct ChannelView: View {
                             pairingStats: pairingStats[channel],
                             bindings: agentStore.bindings.filter { $0.channel == channel.rawValue },
                             agents: agentStore.agents,
-                            onSetup: { configuringChannel = channel },
+                            onSetup: { setupDestination = initialSetupDestination(for: channel) },
                             onRemoveBinding: { binding in
                                 Task { try? await agentStore.removeBinding(binding) }
                             }
@@ -62,22 +76,44 @@ struct ChannelView: View {
             await loadChannelConfigs()
             await loadPairingStats()
         }
-        .sheet(item: $configuringChannel) { channel in
-            if channel.usesInteractiveOnboarding {
-                // 微信走 QR 配对流程
+        .sheet(item: $setupDestination) { destination in
+            switch destination {
+            case .methodPicker(let channel):
+                ChannelSetupMethodPickerSheet(channel: channel) { action in
+                    switch action {
+                    case .interactive:
+                        setupDestination = .interactive(channel)
+                    case .credentials:
+                        setupDestination = .credentials(channel)
+                    }
+                }
+                .frame(minWidth: 520, minHeight: 300)
+
+            case .interactive(let channel):
                 FeishuChannelOnboardingSheet(
-                    flow: .weixin,
+                    flow: channel.onboardingFlow,
                     displayName: "",
                     username: agentStore.username
                 )
                 .frame(minWidth: 900, minHeight: 460)
-            } else {
+
+            case .credentials(let channel):
                 ChannelBotConfigSheet(channelType: channel) {
                     Task { await loadChannelConfigs() }
                 }
                 .environment(gateway)
             }
         }
+    }
+
+    private func initialSetupDestination(for channel: ChannelType) -> ChannelSetupDestination {
+        if channel.supportsSetupMethodPicker {
+            return .methodPicker(channel)
+        }
+        if channel.usesInteractiveOnboarding {
+            return .interactive(channel)
+        }
+        return .credentials(channel)
     }
 
     /// 判断渠道是否已配置凭据
@@ -151,10 +187,101 @@ struct ChannelView: View {
 
             pairingStats[channel] = ChannelPairingStats(
                 directCount: approvedCount,
-                groupCount: 0,
                 pendingCount: pendingCount
             )
         }
+    }
+}
+
+private struct ChannelSetupMethodPickerSheet: View {
+    enum SetupAction {
+        case interactive
+        case credentials
+    }
+
+    let channel: ChannelType
+    let onSelect: (SetupAction) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(channel.displayName)支持两种接入方式，请选择：")
+                        .font(.title3.weight(.semibold))
+                    Text("扫码适合快速绑定，手动填写适合自建应用。")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("关闭") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            VStack(spacing: 12) {
+                methodCard(
+                    icon: "qrcode.viewfinder",
+                    accent: .blue,
+                    title: L10n.k("agent.binding.feishu.qr", fallback: "扫码配对"),
+                    description: L10n.k("agent.binding.feishu.qr_desc", fallback: "通过飞书官方工具生成 QR 码，扫码完成配对")
+                ) {
+                    onSelect(.interactive)
+                }
+
+                methodCard(
+                    icon: "key.fill",
+                    accent: .orange,
+                    title: L10n.k("agent.binding.feishu.manual", fallback: "手动填写凭据"),
+                    description: L10n.k("agent.binding.feishu.manual_desc", fallback: "输入 App ID 和 App Secret（适用于自建应用）")
+                ) {
+                    onSelect(.credentials)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private func methodCard(
+        icon: String,
+        accent: Color,
+        title: String,
+        description: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(accent)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                    Text(description)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(14)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 0.5)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -162,7 +289,6 @@ struct ChannelView: View {
 
 struct ChannelPairingStats {
     var directCount: Int
-    var groupCount: Int
     var pendingCount: Int
 }
 
@@ -295,15 +421,6 @@ private struct ChannelCardView: View {
                 label: L10n.k("channel.stat.paired_users", fallback: "已配对\n用户"),
                 value: pairingStats.map { "\($0.directCount)" } ?? "–"
             )
-            Divider().frame(height: 40)
-            if channel.supportsGroupChat {
-                statItem(
-                    label: L10n.k("channel.stat.paired_groups", fallback: "已配对\n群聊"),
-                    value: pairingStats.map { "\($0.groupCount)" } ?? "–"
-                )
-            } else {
-                statItem(label: L10n.k("channel.stat.no_group", fallback: "不支持群聊配\n对"), value: nil)
-            }
             Divider().frame(height: 40)
             statItem(
                 label: L10n.k("channel.stat.pending", fallback: "待处理\n请求"),

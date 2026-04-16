@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Foundation
 
 enum ChannelOnboardingFlow: String, Identifiable, CaseIterable {
     case feishu
@@ -43,11 +44,28 @@ struct FeishuChannelOnboardingSheet: View {
     @State private var didDetectPairingDone = false
     @State private var didScheduleAutoClose = false
 
-    private let commandExecutable = "npx"
+    private let commandExecutable = GatewayProcessManager.bundledNpxURL.path
     private let waitingThreshold: TimeInterval = 8
     private let uiTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var commandArgs: [String] { flow.commandArgs }
     private var logPrefix: String { flow.rawValue }
+    private var commandEnvironment: [String: String] {
+        let home = "/Users/\(username)"
+        let nodeBin = GatewayProcessManager.bundledNodeURL.deletingLastPathComponent().path
+        let openclawBin = GatewayProcessManager.bundledOpenClawEntry
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("bin")
+            .path
+        let npmGlobalBin = "\(home)/.npm-global/bin"
+        let existingPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        return [
+            "PATH": "\(nodeBin):\(openclawBin):\(npmGlobalBin):\(existingPath)",
+            "NODE_ENV": "production"
+        ]
+    }
 
     private var commandSummary: String {
         ([commandExecutable] + commandArgs).joined(separator: " ")
@@ -169,10 +187,12 @@ struct FeishuChannelOnboardingSheet: View {
             }
             if showTerminal {
                 runtimeToolbar
-                HelperMaintenanceTerminalPanel(
+                UserCommandTerminalPanel(
                     username: username,
-                    command: [commandExecutable] + commandArgs,
+                    executable: commandExecutable,
+                    args: commandArgs,
                     minHeight: 280,
+                    environmentOverrides: commandEnvironment,
                     onOutput: handleTerminalOutput,
                     control: terminalControl
                 ) { code in
@@ -221,6 +241,11 @@ struct FeishuChannelOnboardingSheet: View {
                 .foregroundStyle(.secondary)
 
             Spacer()
+
+            Button(L10n.k("common.close", fallback: "关闭")) {
+                dismiss()
+            }
+            .buttonStyle(.bordered)
         }
     }
 
@@ -258,6 +283,11 @@ struct FeishuChannelOnboardingSheet: View {
                 copyTerminalOutput()
             }
             .disabled(outputBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            Button(L10n.k("common.close", fallback: "关闭")) {
+                dismiss()
+            }
+            .buttonStyle(.bordered)
         }
     }
 

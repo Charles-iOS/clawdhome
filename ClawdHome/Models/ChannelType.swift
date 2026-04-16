@@ -112,6 +112,21 @@ enum ChannelType: String, CaseIterable, Identifiable {
         self == .weixin
     }
 
+    /// 是否在主入口先展示接入方式选择
+    var supportsSetupMethodPicker: Bool {
+        self == .feishu
+    }
+
+    /// 对应的交互式 onboarding 流程
+    var onboardingFlow: ChannelOnboardingFlow {
+        switch self {
+        case .feishu: return .feishu
+        case .weixin: return .weixin
+        case .telegram, .discord:
+            preconditionFailure("Channel \(rawValue) does not support interactive onboarding")
+        }
+    }
+
     /// gateway config 路径前缀
     var configPathPrefix: String {
         "channels.\(rawValue)"
