@@ -209,15 +209,7 @@ private struct CronTaskCard: View {
     }
 
     private var summaryText: String {
-        let raw: String
-        switch job.payload {
-        case let .systemEvent(text):
-            raw = text
-        case let .agentTurn(message, _, _, _, _, _, _):
-            raw = message
-        }
-
-        let normalized = raw
+        let normalized = job.payload.primaryText
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return normalized.isEmpty ? L10n.k("cron.card.no_summary", fallback: "暂无任务描述") : normalized

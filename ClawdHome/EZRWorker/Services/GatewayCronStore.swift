@@ -108,6 +108,7 @@ final class GatewayCronStore {
                 params.name.trimmingCharacters(in: .whitespacesAndNewlines) &&
                 job.schedule == params.schedule &&
                 job.payload == params.payload &&
+                job.delivery == params.delivery &&
                 job.agentId == params.agentId &&
                 job.sessionTarget == params.sessionTarget &&
                 job.wakeMode == params.wakeMode

@@ -46,6 +46,7 @@ struct CronAddSheet: View {
             Rectangle()
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+        .environment(\.colorScheme, .light)
         .interactiveDismissDisabled(isSaving)
         .task {
             await loadAvailableSessions()
@@ -824,13 +825,36 @@ struct CronAddSheet: View {
         case .agentTurn:
             payload = .agentTurn(
                 message: message.trimmingCharacters(in: .whitespacesAndNewlines),
+                model: nil,
                 thinking: nil,
                 timeoutSeconds: nil,
-                deliver: true,
-                channel: nil,
-                to: nil,
-                bestEffortDeliver: true
+                lightContext: nil,
+                tools: nil
             )
+        }
+
+        let delivery: GatewayCronDelivery?
+        switch effectivePayloadMode {
+        case .systemEvent:
+            delivery = nil
+        case .agentTurn:
+            if selectedDeliveryMode == .session {
+                delivery = GatewayCronDelivery(
+                    mode: "announce",
+                    channel: nil,
+                    to: nil,
+                    accountId: nil,
+                    failureDestination: nil
+                )
+            } else {
+                delivery = GatewayCronDelivery(
+                    mode: "none",
+                    channel: nil,
+                    to: nil,
+                    accountId: nil,
+                    failureDestination: nil
+                )
+            }
         }
 
         let params = GatewayCronAddParams(
@@ -842,7 +866,8 @@ struct CronAddSheet: View {
             agentId: selectedDeliveryMode == .agent ? selectedAgentId : nil,
             sessionTarget: normalizedSessionTarget,
             wakeMode: "now",
-            payload: payload
+            payload: payload,
+            delivery: delivery
         )
 
         do {

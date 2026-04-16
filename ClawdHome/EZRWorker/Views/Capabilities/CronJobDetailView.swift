@@ -36,6 +36,7 @@ struct CronJobDetailView: View {
                 }
                 overviewSection
                 payloadSection
+                deliverySection
                 stateSection
                 runHistorySection
             }
@@ -238,26 +239,59 @@ struct CronJobDetailView: View {
             switch currentJob.payload {
             case let .systemEvent(text):
                 detailRow("系统事件文本", text, multiline: true)
-            case let .agentTurn(message, thinking, timeoutSeconds, deliver, channel, to, bestEffortDeliver):
+            case let .agentTurn(message, model, thinking, timeoutSeconds, lightContext, tools):
                 detailRow("消息内容", message, multiline: true)
+                if let model, !model.isEmpty {
+                    detailRow("模型覆盖", model)
+                }
                 if let thinking, !thinking.isEmpty {
                     detailRow("思考提示", thinking, multiline: true)
                 }
                 if let timeoutSeconds {
                     detailRow("超时时间", "\(timeoutSeconds) 秒")
                 }
-                if let deliver {
-                    detailRow("允许投递", yesNo(deliver))
+                if let lightContext {
+                    detailRow("轻上下文", yesNo(lightContext))
                 }
-                if let bestEffortDeliver {
-                    detailRow("尽力投递", yesNo(bestEffortDeliver))
+                if let tools, !tools.isEmpty {
+                    detailRow("工具限制", tools.joined(separator: ", "), multiline: true)
                 }
-                if let channel, !channel.isEmpty {
-                    detailRow("渠道", channel)
+            }
+        }
+    }
+
+    private var deliverySection: some View {
+        detailCard(title: "交付") {
+            if let delivery = currentJob.delivery {
+                detailRow("交付方式", formatDeliveryMode(delivery.mode))
+                if let target = formatDeliveryTarget(
+                    mode: delivery.mode,
+                    channel: delivery.channel,
+                    to: delivery.to,
+                    accountId: delivery.accountId
+                ) {
+                    detailRow("交付目标", target, multiline: true)
                 }
-                if let to, !to.isEmpty {
-                    detailRow("目标", to)
+                if let failureDestination = delivery.failureDestination {
+                    detailRow(
+                        "失败通知",
+                        formatDeliveryTarget(
+                            mode: failureDestination.mode,
+                            channel: failureDestination.channel,
+                            to: failureDestination.to,
+                            accountId: failureDestination.accountId
+                        ) ?? formatDeliveryMode(failureDestination.mode),
+                        multiline: true
+                    )
                 }
+            } else if currentJob.payload.isAgentTurn {
+                Text("未显式配置交付；将沿用 Gateway 的默认行为。")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("主会话 system event 不使用独立交付配置。")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -464,12 +498,7 @@ struct CronJobDetailView: View {
     }
 
     private var summaryText: String {
-        switch currentJob.payload {
-        case let .systemEvent(text):
-            return normalizedText(text)
-        case let .agentTurn(message, _, _, _, _, _, _):
-            return normalizedText(message)
-        }
+        normalizedText(currentJob.payload.primaryText)
     }
 
     private var scheduleKindLabel: String {
@@ -503,6 +532,44 @@ struct CronJobDetailView: View {
         }
     }
 
+    private func formatDeliveryMode(_ mode: String?) -> String {
+        let trimmed = mode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch trimmed {
+        case "":
+            return "未设置"
+        case "announce":
+            return "announce"
+        case "webhook":
+            return "webhook"
+        case "none":
+            return "none"
+        default:
+            return trimmed
+        }
+    }
+
+    private func formatDeliveryTarget(
+        mode: String?,
+        channel: String?,
+        to: String?,
+        accountId: String?
+    ) -> String? {
+        let trimmedMode = mode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var lines: [String] = []
+
+        if let channel = normalizedOptional(channel) {
+            lines.append("渠道：\(channel)")
+        }
+        if let to = normalizedOptional(to) {
+            lines.append(trimmedMode == "webhook" ? "URL：\(to)" : "目标：\(to)")
+        }
+        if let accountId = normalizedOptional(accountId) {
+            lines.append("账号：\(accountId)")
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
     private var jobStatusSummary: String {
         if let running = currentJob.state.runningAtMs {
             return "正在执行中，自 \(formatDate(ms: running)) 开始"
@@ -519,6 +586,12 @@ struct CronJobDetailView: View {
     private func normalizedText(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "暂无内容" : trimmed
+    }
+
+    private func normalizedOptional(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func yesNo(_ value: Bool) -> String {

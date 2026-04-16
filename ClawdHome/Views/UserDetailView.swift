@@ -4134,6 +4134,7 @@ private struct CronJobDetailPane: View {
                     CronDetailGridRow(label: "Agent", value: displayAgentTarget)
                     CronDetailGridRow(label: "Session", value: displaySessionTarget)
                     CronDetailGridRow(label: "Wake", value: job.wakeMode)
+                    CronDetailGridRow(label: "Delivery", value: deliveryText)
                     CronDetailGridRow(label: "Next run", value: timeText(ms: job.state.nextRunAtMs))
                     CronDetailGridRow(label: "Last run", value: timeText(ms: job.state.lastRunAtMs))
                     if let status = job.state.lastStatus {
@@ -4267,10 +4268,16 @@ private struct CronJobDetailPane: View {
     }
 
     private var payloadText: String {
-        switch job.payload {
-        case let .systemEvent(text): return text
-        case let .agentTurn(message, _, _, _, _, _, _): return message
+        job.payload.primaryText
+    }
+
+    private var deliveryText: String {
+        guard let delivery = job.delivery else {
+            return job.payload.isAgentTurn ? "default" : "—"
         }
+
+        let trimmed = delivery.mode?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "configured" : trimmed
     }
 
     private static let dateFormatter: DateFormatter = {

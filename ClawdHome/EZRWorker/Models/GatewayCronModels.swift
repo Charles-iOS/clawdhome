@@ -115,15 +115,14 @@ enum GatewayCronPayload: Codable, Equatable {
     case systemEvent(text: String)
     case agentTurn(
         message: String,
+        model: String?,
         thinking: String?,
         timeoutSeconds: Int?,
-        deliver: Bool?,
-        channel: String?,
-        to: String?,
-        bestEffortDeliver: Bool?)
+        lightContext: Bool?,
+        tools: [String]?)
 
     enum CodingKeys: String, CodingKey {
-        case kind, text, message, thinking, timeoutSeconds, deliver, channel, provider, to, bestEffortDeliver
+        case kind, text, message, model, thinking, timeoutSeconds, lightContext, tools
     }
 
     var kind: String {
@@ -134,27 +133,7 @@ enum GatewayCronPayload: Codable, Equatable {
     }
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let kind = try container.decode(String.self, forKey: .kind)
-        switch kind {
-        case "systemEvent":
-            self = try .systemEvent(text: container.decode(String.self, forKey: .text))
-        case "agentTurn":
-            self = try .agentTurn(
-                message: container.decode(String.self, forKey: .message),
-                thinking: container.decodeIfPresent(String.self, forKey: .thinking),
-                timeoutSeconds: container.decodeIfPresent(Int.self, forKey: .timeoutSeconds),
-                deliver: container.decodeIfPresent(Bool.self, forKey: .deliver),
-                channel: container.decodeIfPresent(String.self, forKey: .channel)
-                    ?? container.decodeIfPresent(String.self, forKey: .provider),
-                to: container.decodeIfPresent(String.self, forKey: .to),
-                bestEffortDeliver: container.decodeIfPresent(Bool.self, forKey: .bestEffortDeliver))
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .kind,
-                in: container,
-                debugDescription: "Unknown payload kind: \(kind)")
-        }
+        self = try GatewayCronDecodedPayload(from: decoder).payload
     }
 
     func encode(to encoder: Encoder) throws {
@@ -163,15 +142,28 @@ enum GatewayCronPayload: Codable, Equatable {
         switch self {
         case let .systemEvent(text):
             try container.encode(text, forKey: .text)
-        case let .agentTurn(message, thinking, timeoutSeconds, deliver, channel, to, bestEffortDeliver):
+        case let .agentTurn(message, model, thinking, timeoutSeconds, lightContext, tools):
             try container.encode(message, forKey: .message)
+            try container.encodeIfPresent(model, forKey: .model)
             try container.encodeIfPresent(thinking, forKey: .thinking)
             try container.encodeIfPresent(timeoutSeconds, forKey: .timeoutSeconds)
-            try container.encodeIfPresent(deliver, forKey: .deliver)
-            try container.encodeIfPresent(channel, forKey: .channel)
-            try container.encodeIfPresent(to, forKey: .to)
-            try container.encodeIfPresent(bestEffortDeliver, forKey: .bestEffortDeliver)
+            try container.encodeIfPresent(lightContext, forKey: .lightContext)
+            try container.encodeIfPresent(tools, forKey: .tools)
         }
+    }
+
+    var primaryText: String {
+        switch self {
+        case let .systemEvent(text):
+            return text
+        case let .agentTurn(message, _, _, _, _, _):
+            return message
+        }
+    }
+
+    var isAgentTurn: Bool {
+        if case .agentTurn = self { return true }
+        return false
     }
 
     // MARK: 序列化为 RPC 参数字典
@@ -180,28 +172,183 @@ enum GatewayCronPayload: Codable, Equatable {
         switch self {
         case let .systemEvent(text):
             return ["kind": "systemEvent", "text": text]
-        case let .agentTurn(message, thinking, timeoutSeconds, deliver, channel, to, bestEffortDeliver):
+        case let .agentTurn(message, model, thinking, timeoutSeconds, lightContext, tools):
             var dict: [String: Any] = ["kind": "agentTurn", "message": message]
+            if let model { dict["model"] = model }
             if let thinking { dict["thinking"] = thinking }
             if let timeoutSeconds { dict["timeoutSeconds"] = timeoutSeconds }
-            if let deliver { dict["deliver"] = deliver }
-            if let channel { dict["channel"] = channel }
-            if let to { dict["to"] = to }
-            if let bestEffortDeliver { dict["bestEffortDeliver"] = bestEffortDeliver }
+            if let lightContext { dict["lightContext"] = lightContext }
+            if let tools, !tools.isEmpty { dict["tools"] = tools }
             return dict
         }
+    }
+
+    fileprivate static func decodeTools<K: CodingKey>(
+        from container: KeyedDecodingContainer<K>,
+        forKey key: K
+    ) throws -> [String]? {
+        if let items = try container.decodeIfPresent([String].self, forKey: key) {
+            return items.isEmpty ? nil : items
+        }
+        guard let text = try container.decodeIfPresent(String.self, forKey: key) else { return nil }
+        let values = text
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return values.isEmpty ? nil : values
+    }
+}
+
+private struct GatewayCronLegacyDeliveryFields: Equatable {
+    let deliver: Bool?
+    let channel: String?
+    let to: String?
+    let bestEffortDeliver: Bool?
+}
+
+private struct GatewayCronDecodedPayload {
+    let payload: GatewayCronPayload
+    let legacyDelivery: GatewayCronLegacyDeliveryFields?
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, text, message, model, thinking, timeoutSeconds, lightContext, tools
+        case deliver, channel, provider, to, bestEffortDeliver
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(String.self, forKey: .kind)
+
+        let legacyDeliver = try container.decodeIfPresent(Bool.self, forKey: .deliver)
+        let legacyChannel = try container.decodeIfPresent(String.self, forKey: .channel)
+            ?? container.decodeIfPresent(String.self, forKey: .provider)
+        let legacyTo = try container.decodeIfPresent(String.self, forKey: .to)
+        let legacyBestEffortDeliver = try container.decodeIfPresent(Bool.self, forKey: .bestEffortDeliver)
+
+        switch kind {
+        case "systemEvent":
+            payload = try .systemEvent(text: container.decode(String.self, forKey: .text))
+        case "agentTurn":
+            payload = try .agentTurn(
+                message: container.decode(String.self, forKey: .message),
+                model: container.decodeIfPresent(String.self, forKey: .model),
+                thinking: container.decodeIfPresent(String.self, forKey: .thinking),
+                timeoutSeconds: container.decodeIfPresent(Int.self, forKey: .timeoutSeconds),
+                lightContext: container.decodeIfPresent(Bool.self, forKey: .lightContext),
+                tools: GatewayCronPayload.decodeTools(from: container, forKey: .tools))
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .kind,
+                in: container,
+                debugDescription: "Unknown payload kind: \(kind)")
+        }
+
+        if legacyDeliver != nil || legacyChannel != nil || legacyTo != nil || legacyBestEffortDeliver != nil {
+            legacyDelivery = GatewayCronLegacyDeliveryFields(
+                deliver: legacyDeliver,
+                channel: legacyChannel,
+                to: legacyTo,
+                bestEffortDeliver: legacyBestEffortDeliver
+            )
+        } else {
+            legacyDelivery = nil
+        }
+    }
+}
+
+// MARK: - GatewayCronDelivery
+
+struct GatewayCronFailureDestination: Codable, Equatable {
+    let mode: String?
+    let channel: String?
+    let to: String?
+    let accountId: String?
+
+    fileprivate func toDict() -> [String: Any] {
+        var dict: [String: Any] = [:]
+        if let mode = Self.normalizeValue(self.mode) { dict["mode"] = mode }
+        if let channel = Self.normalizeValue(self.channel) { dict["channel"] = channel }
+        if let to = Self.normalizeValue(self.to) { dict["to"] = to }
+        if let accountId = Self.normalizeValue(self.accountId) { dict["accountId"] = accountId }
+        return dict
+    }
+
+    private static func normalizeValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+struct GatewayCronDelivery: Codable, Equatable {
+    let mode: String?
+    let channel: String?
+    let to: String?
+    let accountId: String?
+    let failureDestination: GatewayCronFailureDestination?
+
+    fileprivate func toDict() -> [String: Any] {
+        var dict: [String: Any] = [:]
+        if let mode = Self.normalizeValue(self.mode) { dict["mode"] = mode }
+        if let channel = Self.normalizeValue(self.channel) { dict["channel"] = channel }
+        if let to = Self.normalizeValue(self.to) { dict["to"] = to }
+        if let accountId = Self.normalizeValue(self.accountId) { dict["accountId"] = accountId }
+        if let failureDestination {
+            let nested = failureDestination.toDict()
+            if !nested.isEmpty {
+                dict["failureDestination"] = nested
+            }
+        }
+        return dict
+    }
+
+    fileprivate static func fromLegacy(
+        _ legacy: GatewayCronLegacyDeliveryFields?,
+        payload: GatewayCronPayload
+    ) -> GatewayCronDelivery? {
+        guard let legacy else { return nil }
+
+        let normalizedChannel = normalizeValue(legacy.channel)
+        let normalizedTo = normalizeValue(legacy.to)
+
+        let mode: String?
+        if legacy.deliver == false {
+            mode = "none"
+        } else if normalizedChannel != nil || normalizedTo != nil {
+            mode = "announce"
+        } else if legacy.deliver == true, payload.isAgentTurn {
+            mode = "announce"
+        } else {
+            mode = nil
+        }
+
+        guard mode != nil || normalizedChannel != nil || normalizedTo != nil else { return nil }
+
+        return GatewayCronDelivery(
+            mode: mode,
+            channel: normalizedChannel,
+            to: normalizedTo,
+            accountId: nil,
+            failureDestination: nil
+        )
+    }
+
+    private static func normalizeValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
 // MARK: - GatewayCronJobState
 
 struct GatewayCronJobState: Codable, Equatable {
-    var nextRunAtMs: Int?
-    var runningAtMs: Int?
-    var lastRunAtMs: Int?
-    var lastStatus: String?
-    var lastError: String?
-    var lastDurationMs: Int?
+    var nextRunAtMs: Int? = nil
+    var runningAtMs: Int? = nil
+    var lastRunAtMs: Int? = nil
+    var lastStatus: String? = nil
+    var lastError: String? = nil
+    var lastDurationMs: Int? = nil
 }
 
 // MARK: - GatewayCronJob
@@ -222,7 +369,64 @@ struct GatewayCronJob: Identifiable, Codable, Equatable {
     /// "now" / "next-heartbeat"
     let wakeMode: String
     let payload: GatewayCronPayload
+    let delivery: GatewayCronDelivery?
     let state: GatewayCronJobState
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case description
+        case enabled
+        case deleteAfterRun
+        case createdAtMs
+        case updatedAtMs
+        case schedule
+        case agentId
+        case sessionTarget
+        case wakeMode
+        case payload
+        case delivery
+        case state
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        deleteAfterRun = try container.decodeIfPresent(Bool.self, forKey: .deleteAfterRun)
+        createdAtMs = try container.decode(Int.self, forKey: .createdAtMs)
+        updatedAtMs = try container.decode(Int.self, forKey: .updatedAtMs)
+        schedule = try container.decode(GatewayCronSchedule.self, forKey: .schedule)
+        agentId = try container.decodeIfPresent(String.self, forKey: .agentId)
+        sessionTarget = try container.decode(String.self, forKey: .sessionTarget)
+        wakeMode = try container.decode(String.self, forKey: .wakeMode)
+
+        let decodedPayload = try GatewayCronDecodedPayload(from: container.superDecoder(forKey: .payload))
+        payload = decodedPayload.payload
+        delivery = try container.decodeIfPresent(GatewayCronDelivery.self, forKey: .delivery)
+            ?? GatewayCronDelivery.fromLegacy(decodedPayload.legacyDelivery, payload: payload)
+        state = try container.decodeIfPresent(GatewayCronJobState.self, forKey: .state) ?? GatewayCronJobState()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encodeIfPresent(deleteAfterRun, forKey: .deleteAfterRun)
+        try container.encode(createdAtMs, forKey: .createdAtMs)
+        try container.encode(updatedAtMs, forKey: .updatedAtMs)
+        try container.encode(schedule, forKey: .schedule)
+        try container.encodeIfPresent(agentId, forKey: .agentId)
+        try container.encode(sessionTarget, forKey: .sessionTarget)
+        try container.encode(wakeMode, forKey: .wakeMode)
+        try container.encode(payload, forKey: .payload)
+        try container.encodeIfPresent(delivery, forKey: .delivery)
+        try container.encode(state, forKey: .state)
+    }
 
     var displayName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -274,6 +478,7 @@ struct GatewayCronAddParams {
     /// "now" / "next-heartbeat"
     let wakeMode: String
     let payload: GatewayCronPayload
+    let delivery: GatewayCronDelivery?
 
     func toDict() -> [String: Any] {
         var dict: [String: Any] = [
@@ -287,6 +492,12 @@ struct GatewayCronAddParams {
         if let description { dict["description"] = description }
         if let enabled { dict["enabled"] = enabled }
         if let deleteAfterRun { dict["deleteAfterRun"] = deleteAfterRun }
+        if let delivery {
+            let deliveryDict = delivery.toDict()
+            if !deliveryDict.isEmpty {
+                dict["delivery"] = deliveryDict
+            }
+        }
         return dict
     }
 }
