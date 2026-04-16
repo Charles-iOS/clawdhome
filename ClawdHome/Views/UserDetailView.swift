@@ -3979,6 +3979,7 @@ private struct CronTabContent: View {
 
 private struct CronJobListRow: View {
     let job: GatewayCronJob
+    @Environment(AgentStore.self) private var agentStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -3996,11 +3997,72 @@ private struct CronJobListRow: View {
                 }
             }
             HStack(spacing: 4) {
-                CronTagBadge(job.sessionTarget)
+                CronTagBadge(displayAgentTarget)
+                CronTagBadge(displaySessionTarget)
                 CronTagBadge(job.wakeMode)
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private var displayAgentTarget: String {
+        let explicit = job.agentId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let explicit, !explicit.isEmpty {
+            return displayName(forAgentID: explicit)
+        }
+        if let derived = agentIDFromSessionTarget(job.sessionTarget) {
+            return displayName(forAgentID: derived)
+        }
+        return "默认智能体"
+    }
+
+    private var displaySessionTarget: String {
+        let trimmed = job.sessionTarget.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "未设置" }
+
+        switch trimmed {
+        case "main":
+            return "主会话"
+        case "isolated":
+            return "隔离会话"
+        case "current":
+            return "当前会话"
+        default:
+            break
+        }
+
+        if trimmed.hasPrefix("session:") {
+            let sessionID = String(trimmed.dropFirst("session:".count))
+            if let agentID = agentIDFromSessionIdentifier(sessionID) {
+                return "会话 · \(displayName(forAgentID: agentID))"
+            }
+            return "指定会话"
+        }
+
+        return trimmed
+    }
+
+    private func agentIDFromSessionTarget(_ target: String) -> String? {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("session:") else { return nil }
+        let sessionID = String(trimmed.dropFirst("session:".count))
+        return agentIDFromSessionIdentifier(sessionID)
+    }
+
+    private func agentIDFromSessionIdentifier(_ sessionID: String) -> String? {
+        let parts = sessionID.split(separator: ":").map(String.init)
+        guard parts.count >= 2, parts[0] == "agent" else { return nil }
+        return parts[1]
+    }
+
+    private func displayName(forAgentID agentID: String) -> String {
+        guard let agent = agentStore.agents.first(where: { $0.id == agentID }) else { return agentID }
+        return displayName(for: agent)
+    }
+
+    private func displayName(for agent: Agent) -> String {
+        let emoji = agent.emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        return emoji.isEmpty ? agent.name : "\(emoji) \(agent.name)"
     }
 
     private func relativeTime(ms: Int) -> String {
@@ -4031,6 +4093,7 @@ private struct CronTagBadge: View {
 private struct CronJobDetailPane: View {
     let job: GatewayCronJob
     let store: GatewayCronStore
+    @Environment(AgentStore.self) private var agentStore
     @State private var isRunning = false
     @State private var showRemoveConfirm = false
 
@@ -4068,7 +4131,8 @@ private struct CronJobDetailPane: View {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 8) {
                     CronDetailGridRow(label: "Schedule", value: scheduleText)
                     CronDetailGridRow(label: "Auto-delete", value: job.deleteAfterRun == true ? "after success" : "—")
-                    CronDetailGridRow(label: "Session", value: job.sessionTarget)
+                    CronDetailGridRow(label: "Agent", value: displayAgentTarget)
+                    CronDetailGridRow(label: "Session", value: displaySessionTarget)
                     CronDetailGridRow(label: "Wake", value: job.wakeMode)
                     CronDetailGridRow(label: "Next run", value: timeText(ms: job.state.nextRunAtMs))
                     CronDetailGridRow(label: "Last run", value: timeText(ms: job.state.lastRunAtMs))
@@ -4127,6 +4191,66 @@ private struct CronJobDetailPane: View {
         .task(id: job.id) {
             await store.refreshRuns(jobId: job.id)
         }
+    }
+
+    private var displayAgentTarget: String {
+        let explicit = job.agentId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let explicit, !explicit.isEmpty {
+            return "Agent · \(displayName(forAgentID: explicit))"
+        }
+        if let derived = agentIDFromSessionTarget(job.sessionTarget) {
+            return "Agent · \(displayName(forAgentID: derived)) (derived)"
+        }
+        return "Agent · default"
+    }
+
+    private var displaySessionTarget: String {
+        let trimmed = job.sessionTarget.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "—" }
+
+        switch trimmed {
+        case "main":
+            return "Session · main"
+        case "isolated":
+            return "Session · isolated"
+        case "current":
+            return "Session · current"
+        default:
+            break
+        }
+
+        if trimmed.hasPrefix("session:") {
+            let sessionID = String(trimmed.dropFirst("session:".count))
+            if let agentID = agentIDFromSessionIdentifier(sessionID) {
+                return "Session · \(displayName(forAgentID: agentID)) · \(sessionID)"
+            }
+            return "Session · \(sessionID)"
+        }
+
+        return trimmed
+    }
+
+    private func agentIDFromSessionTarget(_ target: String) -> String? {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("session:") else { return nil }
+        let sessionID = String(trimmed.dropFirst("session:".count))
+        return agentIDFromSessionIdentifier(sessionID)
+    }
+
+    private func agentIDFromSessionIdentifier(_ sessionID: String) -> String? {
+        let parts = sessionID.split(separator: ":").map(String.init)
+        guard parts.count >= 2, parts[0] == "agent" else { return nil }
+        return parts[1]
+    }
+
+    private func displayName(forAgentID agentID: String) -> String {
+        guard let agent = agentStore.agents.first(where: { $0.id == agentID }) else { return agentID }
+        return displayName(for: agent)
+    }
+
+    private func displayName(for agent: Agent) -> String {
+        let emoji = agent.emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        return emoji.isEmpty ? agent.name : "\(emoji) \(agent.name)"
     }
 
     private var scheduleText: String {

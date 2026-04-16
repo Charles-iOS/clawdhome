@@ -13,9 +13,6 @@ struct CronAddSheet: View {
     @State private var selectedAgentId = "main"
     @State private var availableSessions: [SessionEntry] = []
     @State private var selectedSessionKey: String?
-    @State private var selectedPayloadMode: PayloadMode = .systemEvent
-    @State private var channel = ""
-    @State private var recipient = ""
     @State private var selectedScheduleMode: ScheduleMode = .daily
     @State private var selectedWeekdays = Set(Weekday.workdays)
     @State private var selectedDate = Date()
@@ -24,7 +21,6 @@ struct CronAddSheet: View {
     @State private var selectedIntervalUnit: IntervalUnit = .hours
     @State private var showingDatePopover = false
     @State private var showingTimePopover = false
-    @State private var configuredChannels: [ChannelType] = []
     @State private var showingTemplatePicker = false
     @State private var isSaving = false
     @State private var errorText: String?
@@ -53,18 +49,7 @@ struct CronAddSheet: View {
         .interactiveDismissDisabled(isSaving)
         .task {
             await loadAvailableSessions()
-            await loadConfiguredChannels()
             syncDefaultsIfNeeded()
-        }
-        .onChange(of: selectedDeliveryMode) { _, newValue in
-            if newValue == .agent, selectedAgentId == "main" {
-                selectedPayloadMode = .systemEvent
-            }
-        }
-        .onChange(of: selectedAgentId) { _, newValue in
-            if newValue == "main" {
-                selectedPayloadMode = .systemEvent
-            }
         }
     }
 
@@ -113,71 +98,39 @@ struct CronAddSheet: View {
 
                 if selectedDeliveryMode == .agent {
                     labeledBlock("数字员工") {
-                        Menu {
-                            ForEach(availableAgents) { agent in
-                                Button(agent.name) {
-                                    selectedAgentId = agent.id
+                        VStack(alignment: .leading, spacing: 12) {
+                            Menu {
+                                ForEach(availableAgents) { agent in
+                                    Button(agent.name) {
+                                        selectedAgentId = agent.id
+                                    }
                                 }
+                            } label: {
+                                selectionMenuLabel(text: selectedAgentName, width: nil)
                             }
-                        } label: {
-                            selectionMenuLabel(text: selectedAgentName, width: nil)
+                            .buttonStyle(.plain)
+
+                            Text(payloadHint)
+                                .font(.system(size: 15))
+                                .foregroundStyle(.tertiary)
                         }
-                        .buttonStyle(.plain)
                     }
                 } else {
                     labeledBlock("指定会话") {
-                        Menu {
-                            ForEach(availableSessions) { session in
-                                Button(sessionPickerLabel(for: session)) {
-                                    selectedSessionKey = session.key
-                                }
-                            }
-                        } label: {
-                            selectionMenuLabel(text: selectedSessionLabel, width: nil)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-
-                labeledBlock("消息类型") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        payloadModePicker
-                        Text(payloadHint)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-
-                if effectivePayloadMode == .agentTurn {
-                    labeledBlock("渠道与目标") {
-                        VStack(alignment: .leading, spacing: 14) {
-                            HStack(spacing: 16) {
-                                if configuredChannels.isEmpty {
-                                    inlineField(
-                                        title: "渠道",
-                                        placeholder: "例如：telegram / discord / weixin",
-                                        text: $channel
-                                    )
-                                } else {
-                                    inlineMenuField(
-                                        title: "渠道",
-                                        text: selectedChannelLabel
-                                    ) {
-                                        ForEach(configuredChannels) { channelType in
-                                            Button(channelType.displayName) {
-                                                channel = channelType.rawValue
-                                            }
-                                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Menu {
+                                ForEach(availableSessions) { session in
+                                    Button(sessionPickerLabel(for: session)) {
+                                        selectedSessionKey = session.key
                                     }
                                 }
-                                inlineField(
-                                    title: "目标",
-                                    placeholder: "例如：群组 ID、用户 ID 或频道 ID",
-                                    text: $recipient
-                                )
+                            } label: {
+                                selectionMenuLabel(text: selectedSessionLabel, width: nil)
                             }
-                            Text("留空则由 Gateway 使用默认投递设置；填写后会作为 agentTurn 的 channel/to 参数发送。")
-                                .font(.system(size: 14))
+                            .buttonStyle(.plain)
+
+                            Text(payloadHint)
+                                .font(.system(size: 15))
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -310,78 +263,6 @@ struct CronAddSheet: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(mutedFill)
         )
-    }
-
-    private var payloadModePicker: some View {
-        HStack(spacing: 0) {
-            ForEach(PayloadMode.allCases) { mode in
-                let isSelected = mode == effectivePayloadMode
-                Button {
-                    guard !isMainAgentTarget || mode == .systemEvent else { return }
-                    selectedPayloadMode = mode
-                } label: {
-                    Text(mode.title)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 58)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(isSelected ? Color.white : Color.clear)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(isSelected ? borderColor : .clear, lineWidth: 1)
-                                )
-                                .shadow(
-                                    color: isSelected ? Color.black.opacity(0.06) : Color.clear,
-                                    radius: 8,
-                                    y: 2
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(isMainAgentTarget && mode == .agentTurn)
-            }
-        }
-        .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(mutedFill)
-        )
-    }
-
-    private func inlineField(title: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-            TextField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 17))
-                .padding(.horizontal, 18)
-                .frame(height: 56)
-                .background(fieldBackground)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func inlineMenuField<MenuContent: View>(
-        title: String,
-        text: String,
-        @ViewBuilder content: () -> MenuContent
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.secondary)
-            Menu {
-                content()
-            } label: {
-                selectionMenuLabel(text: text, width: nil)
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var scheduleModePicker: some View {
@@ -709,7 +590,7 @@ struct CronAddSheet: View {
     private var normalizedSessionTarget: String {
         switch selectedDeliveryMode {
         case .agent:
-            return selectedAgentId
+            return selectedAgentId == "main" ? "main" : "isolated"
         case .session:
             guard
                 let selectedSessionKey,
@@ -722,18 +603,23 @@ struct CronAddSheet: View {
     }
 
     private var effectivePayloadMode: PayloadMode {
-        isMainAgentTarget ? .systemEvent : selectedPayloadMode
+        switch selectedDeliveryMode {
+        case .agent:
+            return selectedAgentId == "main" ? .systemEvent : .agentTurn
+        case .session:
+            return .agentTurn
+        }
     }
 
     private var payloadHint: String {
         switch effectivePayloadMode {
         case .systemEvent:
-            if isMainAgentTarget {
-                return "主数字员工任务当前只能使用系统事件类型。"
-            }
-            return "系统事件会把提示词直接作为文本事件投递到目标会话。"
+            return "发送到数字员工时会自动创建主会话 systemEvent，并通过 agent 参数指定目标智能体。"
         case .agentTurn:
-            return "智能体消息会按 agentTurn 创建任务，可额外指定 channel 和 to。"
+            if selectedDeliveryMode == .agent {
+                return "非默认数字员工会自动创建 isolated 会话，并通过 agent 参数指定目标智能体。"
+            }
+            return "指定会话时会自动使用智能体消息，并继续沿用该会话上下文。"
         }
     }
 
@@ -749,19 +635,14 @@ struct CronAddSheet: View {
     private var deliveryHint: String {
         switch selectedDeliveryMode {
         case .agent:
-            return "从已配置的数字员工里选择一个作为任务目标。主数字员工当前只支持系统事件。"
+            return selectedAgentId == "main"
+                ? "默认智能体会使用主会话 systemEvent。"
+                : "非默认智能体会自动切到 isolated 会话和 agentTurn。"
         case .session:
             return availableSessions.isEmpty
                 ? "当前还没有可用会话，请先在会话页或聊天中产生会话。"
-                : "从所有现有会话中选择一个，任务会持续发送到该会话。"
+                : "从所有现有会话中选择一个；指定会话时会自动按智能体消息发送。"
         }
-    }
-
-    private var selectedChannelLabel: String {
-        guard !channel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return "选择渠道"
-        }
-        return ChannelType(rawValue: channel)?.displayName ?? channel
     }
 
     private var availableAgents: [Agent] {
@@ -772,10 +653,6 @@ struct CronAddSheet: View {
             if rhs.id == "main" { return false }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
-    }
-
-    private var isMainAgentTarget: Bool {
-        selectedDeliveryMode == .agent && selectedAgentId == "main"
     }
 
     private var selectedAgentName: String {
@@ -881,15 +758,6 @@ struct CronAddSheet: View {
             selectedSessionKey = availableSessions.first?.key
         }
 
-        let desiredPayloadMode = resolvedPayloadMode(for: template)
-        selectedPayloadMode = desiredPayloadMode
-
-        if desiredPayloadMode == .agentTurn,
-           channel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           let firstChannel = configuredChannels.first {
-            channel = firstChannel.rawValue
-        }
-
         switch template.schedule {
         case let .daily(weekdays, hour, minute):
             selectedScheduleMode = .daily
@@ -922,13 +790,6 @@ struct CronAddSheet: View {
         }
     }
 
-    private func resolvedPayloadMode(for template: CronTemplate) -> PayloadMode {
-        if template.payloadMode == .agentTurn, resolvedAgentId(for: template) == "main" {
-            return .systemEvent
-        }
-        return template.payloadMode
-    }
-
     private func resolvedTime(hour: Int, minute: Int) -> Date {
         Calendar.current.date(
             bySettingHour: hour,
@@ -951,30 +812,6 @@ struct CronAddSheet: View {
         }
     }
 
-    private func loadConfiguredChannels() async {
-        do {
-            let (config, _) = try await gateway.configGetFull()
-            let channelsDict = config["channels"] as? [String: Any] ?? [:]
-
-            configuredChannels = ChannelType.enabledCases.filter { channelType in
-                guard let channelConfig = channelsDict[channelType.rawValue] as? [String: Any] else {
-                    return false
-                }
-                return channelType.configFields.contains { field in
-                    let value = channelConfig[field.id] as? String
-                    return value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-                }
-            }
-
-            if channel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let first = configuredChannels.first {
-                channel = first.rawValue
-            }
-        } catch {
-            configuredChannels = []
-        }
-    }
-
     private func create() async {
         errorText = nil
         isSaving = true
@@ -990,8 +827,8 @@ struct CronAddSheet: View {
                 thinking: nil,
                 timeoutSeconds: nil,
                 deliver: true,
-                channel: normalizedOptional(channel),
-                to: normalizedOptional(recipient),
+                channel: nil,
+                to: nil,
                 bestEffortDeliver: true
             )
         }
@@ -1002,6 +839,7 @@ struct CronAddSheet: View {
             enabled: true,
             deleteAfterRun: nil,
             schedule: scheduleValue,
+            agentId: selectedDeliveryMode == .agent ? selectedAgentId : nil,
             sessionTarget: normalizedSessionTarget,
             wakeMode: "now",
             payload: payload
@@ -1013,11 +851,6 @@ struct CronAddSheet: View {
         } catch {
             errorText = error.localizedDescription
         }
-    }
-
-    private func normalizedOptional(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
     }
 
     private var cronExpression: String {

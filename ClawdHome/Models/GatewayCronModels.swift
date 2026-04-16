@@ -215,6 +215,8 @@ struct GatewayCronJob: Identifiable, Codable, Equatable {
     let createdAtMs: Int
     let updatedAtMs: Int
     let schedule: GatewayCronSchedule
+    /// 对应 CLI 的 `--agent <id>`；未设置时使用默认智能体
+    let agentId: String?
     /// "main" / "isolated" / "current" 或 "session:<id>"
     let sessionTarget: String
     /// "now" / "next-heartbeat"
@@ -265,6 +267,8 @@ struct GatewayCronAddParams {
     let enabled: Bool?
     let deleteAfterRun: Bool?
     let schedule: GatewayCronSchedule
+    /// 对应 CLI 的 `--agent <id>`
+    let agentId: String?
     /// "main" / "isolated" / "current" 或 "session:<id>"
     let sessionTarget: String
     /// "now" / "next-heartbeat"
@@ -279,6 +283,7 @@ struct GatewayCronAddParams {
             "wakeMode": wakeMode,
             "payload": payload.toDict(),
         ]
+        if let agentId { dict["agentId"] = agentId }
         if let description { dict["description"] = description }
         if let enabled { dict["enabled"] = enabled }
         if let deleteAfterRun { dict["deleteAfterRun"] = deleteAfterRun }

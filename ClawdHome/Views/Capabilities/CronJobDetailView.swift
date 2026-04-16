@@ -6,6 +6,7 @@ struct CronJobDetailView: View {
     let job: GatewayCronJob
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(AgentStore.self) private var agentStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var isToggling = false
@@ -222,7 +223,8 @@ struct CronJobDetailView: View {
             detailRow("调度类型", scheduleKindLabel)
             detailRow("调度规则", scheduleDescription)
             detailRow("消息类型", payloadKindLabel)
-            detailRow("发送目标", currentJob.sessionTarget)
+            detailRow("目标智能体", displayAgentTarget)
+            detailRow("发送目标", displaySessionTarget, multiline: true)
             detailRow("唤醒方式", currentJob.wakeMode)
             detailRow("执行后删除", yesNo(currentJob.deleteAfterRun ?? false))
             detailRow("创建时间", formatDate(ms: currentJob.createdAtMs))
@@ -258,6 +260,70 @@ struct CronJobDetailView: View {
                 }
             }
         }
+    }
+
+    private var displaySessionTarget: String {
+        formatCronSessionTarget(currentJob.sessionTarget)
+    }
+
+    private var displayAgentTarget: String {
+        let explicit = currentJob.agentId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let explicit, !explicit.isEmpty {
+            return displayName(forAgentID: explicit)
+        }
+        if let derived = agentIDFromSessionTarget(currentJob.sessionTarget) {
+            return "\(displayName(forAgentID: derived))（由会话推断）"
+        }
+        return "默认智能体"
+    }
+
+    private func formatCronSessionTarget(_ target: String) -> String {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "未设置" }
+
+        switch trimmed {
+        case "main":
+            return "主会话"
+        case "isolated":
+            return "隔离会话"
+        case "current":
+            return "当前会话"
+        default:
+            break
+        }
+
+        if trimmed.hasPrefix("session:") {
+            let sessionID = String(trimmed.dropFirst("session:".count))
+            if let agentID = agentIDFromSessionIdentifier(sessionID) {
+                return "指定会话 · \(displayName(forAgentID: agentID))\n\(sessionID)"
+            }
+            return "指定会话\n\(sessionID)"
+        }
+
+        return trimmed
+    }
+
+    private func agentIDFromSessionTarget(_ target: String) -> String? {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("session:") else { return nil }
+        let sessionID = String(trimmed.dropFirst("session:".count))
+        return agentIDFromSessionIdentifier(sessionID)
+    }
+
+    private func agentIDFromSessionIdentifier(_ sessionID: String) -> String? {
+        let parts = sessionID.split(separator: ":").map(String.init)
+        guard parts.count >= 2, parts[0] == "agent" else { return nil }
+        return parts[1]
+    }
+
+    private func displayName(forAgentID agentID: String) -> String {
+        guard let agent = agentStore.agents.first(where: { $0.id == agentID }) else { return agentID }
+        return displayName(for: agent)
+    }
+
+    private func displayName(for agent: Agent) -> String {
+        let emoji = agent.emoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        return emoji.isEmpty ? agent.name : "\(emoji) \(agent.name)"
     }
 
     private var stateSection: some View {
