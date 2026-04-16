@@ -471,13 +471,20 @@ final class GatewayProcessManager {
     #if DEBUG
     /// 通过源码绝对路径推导仓库根目录（.../clawdhome）
     private static var debugRepoRootURL: URL? {
-        let sourceURL = URL(fileURLWithPath: #filePath)
-        // GatewayProcessManager.swift -> Gateway -> Services -> ClawdHome -> repoRoot
-        return sourceURL
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let fm = FileManager.default
+        var current = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+
+        while true {
+            let projectPath = current.appendingPathComponent("ClawdHome.xcodeproj").path
+            let runtimeScriptPath = current.appendingPathComponent("scripts/bundle-runtime.sh").path
+            if fm.fileExists(atPath: projectPath), fm.fileExists(atPath: runtimeScriptPath) {
+                return current
+            }
+
+            let parent = current.deletingLastPathComponent()
+            if parent == current { return nil }
+            current = parent
+        }
     }
     #endif
 }

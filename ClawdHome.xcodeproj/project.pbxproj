@@ -396,6 +396,16 @@
 			path = ChannelOnboarding;
 			sourceTree = "<group>";
 		};
+		0F4A6E117F2B4DB0A1C30001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1AF76BC505A9925D08297CB1 /* ClawdHomeApp.swift */,
+				86E5C2A957F371D7D8DC583C /* MainView.swift */,
+				5B6FC9BA214C03D8B13CC708 /* Sidebar */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
 		0E22AF879D521574E3BE0EE6 /* CreateAgentWizard */ = {
 			isa = PBXGroup;
 			children = (
@@ -479,6 +489,19 @@
 				C8CA7E043030EBA6AECA81CC /* SystemConfiguration.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		56E62AAB2F90BF28001E718C /* EZRWorker */ = {
+			isa = PBXGroup;
+			children = (
+				0F4A6E117F2B4DB0A1C30001 /* App */,
+				0F4A6E117F2B4DB0A1C30002 /* Views */,
+				9572E344E021584CF2DC9A63 /* Models */,
+				E6E948EC72CBB25E63E580A2 /* Resources */,
+				3D8863F2146A4E82963EC03B /* Services */,
+				D9AEFAE68497CFF499C58C38 /* Utils */,
+			);
+			path = EZRWorker;
 			sourceTree = "<group>";
 		};
 		5B6FC9BA214C03D8B13CC708 /* Sidebar */ = {
@@ -631,15 +654,11 @@
 				5D7D1F12DB908202E9E91105 /* AppIcon.icns */,
 				38A912F0A5514717350027B5 /* Assets.xcassets */,
 				5F97A493AAFD488D32EC70F5 /* ClawdHome.entitlements */,
-				1AF76BC505A9925D08297CB1 /* ClawdHomeApp.swift */,
 				13F07CE9D25F72DDB11AB739 /* ContentView.swift */,
 				BD7D77647990268437A60AA1 /* Info.plist */,
 				F15483BD5BB3DE26EC5C82BB /* Stable.xcstrings */,
+				56E62AAB2F90BF28001E718C /* EZRWorker */,
 				7DDDB6BDF87471A716820EF0 /* Localization */,
-				9572E344E021584CF2DC9A63 /* Models */,
-				E6E948EC72CBB25E63E580A2 /* Resources */,
-				3D8863F2146A4E82963EC03B /* Services */,
-				D9AEFAE68497CFF499C58C38 /* Utils */,
 				FB9F81F4D20FD77EE7AB7D7B /* Views */,
 			);
 			path = ClawdHome;
@@ -678,6 +697,27 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		0F4A6E117F2B4DB0A1C30002 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BC953D5E3DFF20B87A053D04 /* CLIConfigStep.swift */,
+				BFC7D68C6A9C0FEAD2BF30EA /* CommandOutputPanel.swift */,
+				3793B8613E7B9D05787DDB8B /* ConfigEditorSheet.swift */,
+				21D5AE60DA0449BC16B42DAA /* FallbackManagerSheet.swift */,
+				3C20B1E3239A0D8780AACFFE /* HealthCheckSheet.swift */,
+				922B9F0332920FE79B0EF0B8 /* ModelConfigWizard.swift */,
+				4E294E274D560257BC77114C /* ModelPickerSheet.swift */,
+				ED27F46F57A2556B2A4A6512 /* ModelPrioritySheet.swift */,
+				6F6987C9BABC280FA6D95EFC /* PageHeroHeader.swift */,
+				800B6FF59BBD8AF1F7721480 /* UpgradeConfirmSheet.swift */,
+				314580D65C640630AB7D1C50 /* Agent */,
+				89748282F87FEC2E9410F04A /* Capabilities */,
+				0836569296D71804D39AAEE4 /* ChannelOnboarding */,
+				16A2D97892691934D04CE980 /* Settings */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		FB9F81F4D20FD77EE7AB7D7B /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -690,40 +730,24 @@
 				0EB9584EDF129A0295EBB14A /* BackupManagerSheet.swift */,
 				41E6E607472BCCB5C61A50EA /* BackupView.swift */,
 				67AB0A69D9F15FA551CD2FFE /* ClawPoolView.swift */,
-				BC953D5E3DFF20B87A053D04 /* CLIConfigStep.swift */,
 				9A692ECF0806042C37B632CB /* CloneClawSheet.swift */,
-				BFC7D68C6A9C0FEAD2BF30EA /* CommandOutputPanel.swift */,
-				3793B8613E7B9D05787DDB8B /* ConfigEditorSheet.swift */,
 				A8FE553DC729ACE5F8E46933 /* DaemonSetupBanner.swift */,
 				B0C17363344B936997067010 /* DashboardView.swift */,
-				21D5AE60DA0449BC16B42DAA /* FallbackManagerSheet.swift */,
 				1DDA04FF248DF6DFABA79529 /* GatewayProviderKeySheet.swift */,
-				3C20B1E3239A0D8780AACFFE /* HealthCheckSheet.swift */,
 				E9F9AD8700941AFBF1F34673 /* LogViewerSheet.swift */,
-				86E5C2A957F371D7D8DC583C /* MainView.swift */,
 				8E37D8B7B0C66ACFBDB383D1 /* MemoryTabView.swift */,
-				922B9F0332920FE79B0EF0B8 /* ModelConfigWizard.swift */,
-				4E294E274D560257BC77114C /* ModelPickerSheet.swift */,
-				ED27F46F57A2556B2A4A6512 /* ModelPrioritySheet.swift */,
 				54673332FA3CBD020381CD20 /* NetworkPolicyView.swift */,
-				6F6987C9BABC280FA6D95EFC /* PageHeroHeader.swift */,
 				77787365CF9FCFC1BABE9B81 /* PersonaDefView.swift */,
 				0511A43DA0C20592D7181ABD /* RoleMarketView.swift */,
 				0BCB213B1B4677F1FBAC5433 /* SecurityAuditView.swift */,
 				AB940018E9820EB6455FA34C /* SessionsTabView.swift */,
 				D43A99B25B70AE3C7A8C23AB /* SettingsView.swift */,
 				32ACC218308D2CE4322109FC /* TerminalLogView.swift */,
-				800B6FF59BBD8AF1F7721480 /* UpgradeConfirmSheet.swift */,
 				E46E3226FB170F1C35BB73B5 /* UserDetailView.swift */,
 				A623F9F0DFBC22F900B5ACED /* UserFilesView.swift */,
 				0EE6965A7DA630D46B4F1B50 /* UserInitWizardView.swift */,
 				DF539DBE2E88C7DD0784E8F6 /* UserListView.swift */,
-				314580D65C640630AB7D1C50 /* Agent */,
-				89748282F87FEC2E9410F04A /* Capabilities */,
-				0836569296D71804D39AAEE4 /* ChannelOnboarding */,
 				78E04859045A1EC490479CDF /* ModelManager */,
-				16A2D97892691934D04CE980 /* Settings */,
-				5B6FC9BA214C03D8B13CC708 /* Sidebar */,
 			);
 			path = Views;
 			sourceTree = "<group>";

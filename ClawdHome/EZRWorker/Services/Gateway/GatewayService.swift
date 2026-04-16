@@ -10,6 +10,7 @@ final class GatewayService {
     private(set) var isConnected = false
 
     private var client: GatewayClient?
+    private var connectionSyncTask: Task<Void, Never>?
     private(set) var cronStore = GatewayCronStore()
     private(set) var skillsStore = GatewaySkillsStore()
 
@@ -40,6 +41,7 @@ final class GatewayService {
                 await cronStore.start(client: connectedClient)
                 await skillsStore.start(client: connectedClient)
             }
+            startConnectionSync()
             appLog("GatewayService: connected to port \(port)")
         } catch {
             isConnected = false
@@ -48,6 +50,7 @@ final class GatewayService {
     }
 
     func disconnect() async {
+        stopConnectionSync()
         if let c = client { await c.disconnect() }
         client = nil
         isConnected = false
@@ -56,6 +59,7 @@ final class GatewayService {
     }
 
     func prepareForAppTermination() {
+        stopConnectionSync()
         let existingClient = client
         client = nil
         isConnected = false
@@ -155,5 +159,32 @@ final class GatewayService {
             return ModelGroup(id: key, provider: key, models: models)
         }
         return groups.isEmpty ? nil : groups
+    }
+
+    private func startConnectionSync() {
+        stopConnectionSync()
+        connectionSyncTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                if let currentClient = self.client {
+                    let connected = await currentClient.connected
+                    if self.isConnected != connected {
+                        self.isConnected = connected
+                        if !connected {
+                            self.cronStore.stop()
+                            self.skillsStore.stop()
+                        }
+                    }
+                } else if self.isConnected {
+                    self.isConnected = false
+                }
+                try? await Task.sleep(nanoseconds: 800_000_000)
+            }
+        }
+    }
+
+    private func stopConnectionSync() {
+        connectionSyncTask?.cancel()
+        connectionSyncTask = nil
     }
 }
