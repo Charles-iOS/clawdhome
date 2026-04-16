@@ -65,16 +65,23 @@ struct ChannelView: View {
         .toolbar {
             ToolbarItem {
                 Button {
-                    Task { await loadChannelConfigs() }
+                    Task { await reloadChannelState() }
                 } label: {
                     Label(L10n.k("common.refresh", fallback: "刷新"), systemImage: "arrow.clockwise")
                 }
                 .disabled(!gateway.isConnected || isLoading)
             }
         }
-        .task {
-            await loadChannelConfigs()
-            await loadPairingStats()
+        .task(id: gateway.isConnected) {
+            await reloadChannelState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .channelOnboardingAutoDetected)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let username = userInfo["username"] as? String,
+                  username == agentStore.username,
+                  let flow = userInfo["flow"] as? String,
+                  flow == ChannelOnboardingFlow.feishu.rawValue else { return }
+            Task { await refreshAfterPairingSuccess() }
         }
         .sheet(item: $setupDestination) { destination in
             switch destination {
@@ -96,10 +103,13 @@ struct ChannelView: View {
                     username: agentStore.username
                 )
                 .frame(minWidth: 900, minHeight: 460)
+                .onDisappear {
+                    Task { await reloadChannelState() }
+                }
 
             case .credentials(let channel):
                 ChannelBotConfigSheet(channelType: channel) {
-                    Task { await loadChannelConfigs() }
+                    Task { await reloadChannelState() }
                 }
                 .environment(gateway)
             }
@@ -119,36 +129,80 @@ struct ChannelView: View {
     /// 判断渠道是否已配置凭据
     private func isChannelConnected(_ channel: ChannelType) -> Bool {
         guard let config = channelConfigs[channel] else { return false }
-        // 有任一非空凭据字段即视为已关联
+        // 有任一非空凭据字段即视为已关联；飞书扫码模式会注入本地凭据标记字段。
         return config.values.contains(where: { !$0.isEmpty })
+    }
+
+    private func reloadChannelState() async {
+        await loadChannelConfigs()
+        await loadPairingStats()
+    }
+
+    private func refreshAfterPairingSuccess() async {
+        await reloadChannelState()
+        // 配对成功提示可能早于配置文件最终落盘，短暂补拉一次避免徽章延迟。
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        await reloadChannelState()
     }
 
     /// 从 gateway config 加载各渠道的配置状态
     private func loadChannelConfigs() async {
-        guard gateway.isConnected else { return }
         isLoading = true
         defer { isLoading = false }
 
-        do {
-            let (config, _) = try await gateway.configGetFull()
-            let channelsDict = config["channels"] as? [String: Any] ?? [:]
+        let channelsDict = await loadChannelConfigDictionary()
+        let hasFeishuQRCodeCredentials = hasFeishuQRCodeCredentials()
 
-            var result: [ChannelType: [String: String]] = [:]
-            for channel in ChannelType.enabledCases {
-                guard let chConfig = channelsDict[channel.rawValue] as? [String: Any] else { continue }
-                var fields: [String: String] = [:]
+        var result: [ChannelType: [String: String]] = [:]
+        for channel in ChannelType.enabledCases {
+            var fields: [String: String] = [:]
+            if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
                 for field in channel.configFields {
                     if let value = chConfig[field.id] as? String, !value.isEmpty {
                         fields[field.id] = value
                     }
                 }
-                if !fields.isEmpty {
-                    result[channel] = fields
-                }
             }
-            channelConfigs = result
+            if channel == .feishu, hasFeishuQRCodeCredentials {
+                fields["qrPaired"] = "true"
+            }
+            if !fields.isEmpty {
+                result[channel] = fields
+            }
+        }
+        channelConfigs = result
+    }
+
+    private func hasFeishuQRCodeCredentials() -> Bool {
+        let credFile = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("credentials")
+            .appendingPathComponent("lark.secrets.json")
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
+              let fileSize = attrs[.size] as? NSNumber else {
+            return false
+        }
+        return fileSize.intValue > 0
+    }
+
+    private func loadLocalChannelConfigDictionary() -> [String: Any] {
+        let configURL = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("openclaw.json")
+        guard let data = FileManager.default.contents(atPath: configURL.path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return json["channels"] as? [String: Any] ?? [:]
+    }
+
+    private func loadChannelConfigDictionary() async -> [String: Any] {
+        let localChannels = loadLocalChannelConfigDictionary()
+        guard gateway.isConnected else { return localChannels }
+        do {
+            let (config, _) = try await gateway.configGetFull()
+            return (config["channels"] as? [String: Any]) ?? localChannels
         } catch {
-            appLog("[channel] 加载渠道配置失败: \(error)", level: .error)
+            appLog("[channel] 读取 gateway 配置失败，回退本地配置: \(error)", level: .warn)
+            return localChannels
         }
     }
 
@@ -157,6 +211,7 @@ struct ChannelView: View {
         let credDir = GatewayProcessManager.openClawConfigDir
             .appendingPathComponent("credentials")
         let fm = FileManager.default
+        var result: [ChannelType: ChannelPairingStats] = [:]
 
         for channel in ChannelType.enabledCases where isChannelConnected(channel) {
             let ch = channel.rawValue
@@ -185,11 +240,13 @@ struct ChannelView: View {
                 }
             }
 
-            pairingStats[channel] = ChannelPairingStats(
+            result[channel] = ChannelPairingStats(
                 directCount: approvedCount,
                 pendingCount: pendingCount
             )
         }
+
+        pairingStats = result
     }
 }
 

@@ -130,7 +130,7 @@ private struct AddBindingSheet: View {
             }
         }
         .frame(minWidth: 500, minHeight: 420)
-        .task { await loadChannelConfigs() }
+        .task(id: gateway.isConnected) { await loadChannelConfigs() }
     }
 
     private var stepTitle: String {
@@ -410,34 +410,63 @@ private struct AddBindingSheet: View {
     // MARK: - 数据操作
 
     private func loadChannelConfigs() async {
-        guard gateway.isConnected else {
-            isLoadingConfigs = false
-            return
+        let channelsDict = await loadChannelConfigDictionary()
+        let hasFeishuQRCodeCredentials = hasFeishuQRCodeCredentials()
+        var result: [ChannelType: Bool] = [:]
+        for channel in ChannelType.enabledCases {
+            if channel == .feishu, hasFeishuQRCodeCredentials {
+                result[channel] = true
+                continue
+            }
+            if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
+                // 微信无 configFields，有配置即视为已配置
+                if channel.configFields.isEmpty {
+                    result[channel] = !chConfig.isEmpty
+                } else {
+                    result[channel] = channel.configFields.contains { field in
+                        guard let value = chConfig[field.id] as? String else { return false }
+                        return !value.isEmpty
+                    }
+                }
+            } else {
+                result[channel] = false
+            }
         }
+        channelConfigs = result
+        isLoadingConfigs = false
+    }
+
+    private func hasFeishuQRCodeCredentials() -> Bool {
+        let credFile = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("credentials")
+            .appendingPathComponent("lark.secrets.json")
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
+              let fileSize = attrs[.size] as? NSNumber else {
+            return false
+        }
+        return fileSize.intValue > 0
+    }
+
+    private func loadLocalChannelConfigDictionary() -> [String: Any] {
+        let configURL = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("openclaw.json")
+        guard let data = FileManager.default.contents(atPath: configURL.path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return json["channels"] as? [String: Any] ?? [:]
+    }
+
+    private func loadChannelConfigDictionary() async -> [String: Any] {
+        let localChannels = loadLocalChannelConfigDictionary()
+        guard gateway.isConnected else { return localChannels }
         do {
             let (config, _) = try await gateway.configGetFull()
-            let channelsDict = config["channels"] as? [String: Any] ?? [:]
-            var result: [ChannelType: Bool] = [:]
-            for channel in ChannelType.enabledCases {
-                if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
-                    // 微信无 configFields，有配置即视为已配置
-                    if channel.configFields.isEmpty {
-                        result[channel] = !chConfig.isEmpty
-                    } else {
-                        result[channel] = channel.configFields.contains { field in
-                            guard let value = chConfig[field.id] as? String else { return false }
-                            return !value.isEmpty
-                        }
-                    }
-                } else {
-                    result[channel] = false
-                }
-            }
-            channelConfigs = result
+            return (config["channels"] as? [String: Any]) ?? localChannels
         } catch {
-            appLog("[binding] 加载渠道配置状态失败: \(error)", level: .error)
+            appLog("[binding] 读取 gateway 配置失败，回退本地配置: \(error)", level: .warn)
+            return localChannels
         }
-        isLoadingConfigs = false
     }
 
     private func addBinding() {
