@@ -257,9 +257,16 @@ struct UserFileManager {
 
     static func createDirectory(username: String, relativePath: String) throws {
         let url = try resolvedPath(username: username, relativePath: relativePath)
-        try FileManager.default.createDirectory(at: url,
-                                                withIntermediateDirectories: true,
-                                                attributes: nil)
+        let fm = FileManager.default
+        var isDir: ObjCBool = false
+        let existedBefore = fm.fileExists(atPath: url.path, isDirectory: &isDir)
+        if existedBefore, !isDir.boolValue {
+            throw UserFileError.notADirectory
+        }
+
+        try fm.createDirectory(at: url,
+                               withIntermediateDirectories: true,
+                               attributes: nil)
         
         let homePath = "/Users/\(username)"
         var currentUrl = url
@@ -272,11 +279,21 @@ struct UserFileManager {
             currentUrl = currentUrl.deletingLastPathComponent().standardized
         }
 
-        // 纠正所有权（递归处理目标目录自身及其可能已存在的内容）
-        do {
-            try ClawdHomeHelper.run("/usr/sbin/chown", args: ["-R", username, url.path])
-        } catch {
-            helperLog("[FileManager] chown -R failed for \(url.path): \(error.localizedDescription)", level: .warn)
+        // 已存在的目录可能已经包含大量 agent/runtime 内容。
+        // 这里避免对整棵树重复做 chown -R，防止初始化数字员工时被大目录拖到 XPC 超时。
+        if existedBefore {
+            do {
+                try ClawdHomeHelper.run("/usr/sbin/chown", args: [username, url.path])
+            } catch {
+                helperLog("[FileManager] chown failed for existing dir \(url.path): \(error.localizedDescription)", level: .warn)
+            }
+        } else {
+            // 新创建的目录树通常很小，这里仍保留递归 chown，确保中间目录所有权正确。
+            do {
+                try ClawdHomeHelper.run("/usr/sbin/chown", args: ["-R", username, url.path])
+            } catch {
+                helperLog("[FileManager] chown -R failed for \(url.path): \(error.localizedDescription)", level: .warn)
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ final class CreateAgentWizardState {
     // MARK: - Step 0: 模板选择
 
     var selectedTemplateId: String?
+    var templateSeedContent: [PersonaFile: String] = [:]
 
     // MARK: - Step 1: 身份与模型
 
@@ -58,12 +59,13 @@ final class CreateAgentWizardState {
 
     // MARK: - 从模板预填
 
-    func applyTemplate(_ template: Agent) {
+    func applyTemplate(_ template: Agent, seedContent: [PersonaFile: String] = [:]) {
         name = template.name
         emoji = template.emoji
         description = template.description
         category = template.category
         enabledSkills = Set(template.skills)
+        templateSeedContent = seedContent
     }
 
     /// 自动生成 agentId（仅 ASCII 小写字母 + 数字 + 连字符）

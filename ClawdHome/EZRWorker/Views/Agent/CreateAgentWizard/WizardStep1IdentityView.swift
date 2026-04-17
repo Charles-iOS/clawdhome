@@ -9,6 +9,14 @@ struct WizardStep1IdentityView: View {
     /// 预设头像 emoji 列表
     private let presetAvatars = ["🤖", "🧭", "🦞", "🐙", "🎯", "🧠", "💻", "📈", "🌿", "🎨", "📚", "🔮", "🛠️", "🌐", "💡", "⚖️"]
 
+    private var importedPersonaFiles: [PersonaFile] {
+        PersonaFile.allCases.filter { file in
+            let content = state.templateSeedContent[file]?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return !content.isEmpty
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 24) {
             // 左面板：表单
@@ -25,6 +33,10 @@ struct WizardStep1IdentityView: View {
 
     private var leftPanel: some View {
         VStack(alignment: .leading, spacing: 18) {
+            if !importedPersonaFiles.isEmpty {
+                templatePersonaNotice
+            }
+
             // 名称
             VStack(alignment: .leading, spacing: 6) {
                 TextField(
@@ -118,6 +130,36 @@ struct WizardStep1IdentityView: View {
                 }
             }
         }
+    }
+
+    private var templatePersonaNotice: some View {
+        let fileList = importedPersonaFiles.map(\.rawValue).joined(separator: " / ")
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Label(L10n.k("wizard.step1.template_persona", fallback: "已导入模板角色定义"), systemImage: "checkmark.seal.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.green)
+
+            Text(L10n.k("wizard.step1.template_persona_desc", fallback: "创建完成后会自动写入这些文件："))
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+
+            Text(fileList)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundColor(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.green.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.green.opacity(0.18), lineWidth: 1)
+        )
     }
 
     // MARK: - 风格 Chip

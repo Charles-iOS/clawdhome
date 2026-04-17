@@ -48,7 +48,10 @@ struct WizardStep0TemplateView: View {
         Button {
             if let id, let template = store.presetTemplates.first(where: { $0.id == id }) {
                 state.selectedTemplateId = id
-                state.applyTemplate(template)
+                state.applyTemplate(
+                    template,
+                    seedContent: AgentStore.extractPresetSeedContent(presetId: id)
+                )
             } else {
                 state.selectedTemplateId = nil
                 state.name = ""
@@ -56,6 +59,7 @@ struct WizardStep0TemplateView: View {
                 state.description = ""
                 state.category = .strategy
                 state.enabledSkills = []
+                state.templateSeedContent = [:]
             }
         } label: {
             VStack(alignment: .leading, spacing: 8) {

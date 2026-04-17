@@ -240,7 +240,9 @@ struct CreateAgentWizardView: View {
 
     private func composeSeedContent() -> [PersonaFile: String] {
         var seed: [PersonaFile: String] = [:]
-        let presetSeed = wizardState.selectedTemplateId.map(AgentStore.extractPresetSeedContent) ?? [:]
+        let presetSeed = wizardState.templateSeedContent.isEmpty
+            ? (wizardState.selectedTemplateId.map(AgentStore.extractPresetSeedContent) ?? [:])
+            : wizardState.templateSeedContent
         let presetTemplate = wizardState.selectedTemplateId.flatMap { id in
             store.presetTemplates.first(where: { $0.id == id })
         }
