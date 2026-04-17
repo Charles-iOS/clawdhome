@@ -5,6 +5,7 @@ import Foundation
 enum ChannelOnboardingFlow: String, Identifiable, CaseIterable {
     case feishu
     case weixin
+    case wecom
 
     var id: String { rawValue }
 
@@ -12,6 +13,7 @@ enum ChannelOnboardingFlow: String, Identifiable, CaseIterable {
         switch self {
         case .feishu: return L10n.k("channel.flow.feishu.title", fallback: "飞书")
         case .weixin: return L10n.k("channel.flow.weixin.title", fallback: "微信")
+        case .wecom:  return L10n.k("channel.flow.wecom.title", fallback: "企微")
         }
     }
 
@@ -21,8 +23,25 @@ enum ChannelOnboardingFlow: String, Identifiable, CaseIterable {
             return ["-y", "@larksuite/openclaw-lark-tools", "install"]
         case .weixin:
             return ["-y", "@tencent-weixin/openclaw-weixin-cli@latest", "install"]
+        case .wecom:
+            return ["-y", "@wecom/wecom-openclaw-cli", "install"]
         }
     }
+
+    var channelTypeForVerification: ChannelType? {
+        switch self {
+        case .feishu: return .feishu
+        case .weixin: return .weixin
+        case .wecom:  return .wecom
+        }
+    }
+}
+
+private struct ChannelConfigVerificationSnapshot {
+    let connected: Bool
+    let enabled: Bool?
+    let localConnected: Bool
+    let gatewayConnected: Bool
 }
 
 struct FeishuChannelOnboardingSheet: View {
@@ -30,6 +49,7 @@ struct FeishuChannelOnboardingSheet: View {
     let displayName: String
     let username: String
 
+    @Environment(GatewayService.self) private var gateway
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var terminalControl = LocalTerminalControl()
@@ -43,9 +63,16 @@ struct FeishuChannelOnboardingSheet: View {
     @State private var outputBuffer = ""
     @State private var didDetectPairingDone = false
     @State private var didScheduleAutoClose = false
+    @State private var verificationTask: Task<Void, Never>? = nil
+    @State private var didPostAutoDetectedNotification = false
+    @State private var didLogCompletionMarker = false
+    @State private var didConfirmConfiguredState = false
+    @State private var wasConfiguredBeforeRun = false
 
     private let commandExecutable = GatewayProcessManager.bundledNpxURL.path
     private let waitingThreshold: TimeInterval = 8
+    private let verificationTimeout: TimeInterval = 15
+    private let verificationPollInterval: UInt64 = 1_000_000_000
     private let uiTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var commandArgs: [String] { flow.commandArgs }
     private var logPrefix: String { flow.rawValue }
@@ -87,7 +114,20 @@ struct FeishuChannelOnboardingSheet: View {
                 "config overwrite:",
                 "正在重启 openclaw gateway"
             ]
+        case .wecom:
+            return [
+                "接入成功",
+                "绑定成功",
+                "配置成功",
+                "机器人配置成功",
+                "正在重启 openclaw gateway",
+                "gateway restart"
+            ]
         }
+    }
+
+    private var usesStrictConfigVerification: Bool {
+        flow == .wecom
     }
 
     private var isRunning: Bool {
@@ -126,10 +166,22 @@ struct FeishuChannelOnboardingSheet: View {
 
     private var pairingButtonTitle: String {
         switch pairingButtonState {
-        case .idle: return L10n.k("channel.pairing.button.generate", fallback: "生成配对二维码")
-        case .running: return L10n.k("channel.pairing.button.generating", fallback: "生成中…")
-        case .succeeded: return L10n.k("channel.pairing.button.regenerate", fallback: "重新生成二维码")
-        case .failed: return L10n.k("channel.pairing.button.retry", fallback: "重试生成二维码")
+        case .idle:
+            return flow == .wecom
+                ? L10n.k("channel.pairing.button.wecom.start", fallback: "开始扫码接入")
+                : L10n.k("channel.pairing.button.generate", fallback: "生成配对二维码")
+        case .running:
+            return flow == .wecom
+                ? L10n.k("channel.pairing.button.wecom.running", fallback: "接入中…")
+                : L10n.k("channel.pairing.button.generating", fallback: "生成中…")
+        case .succeeded:
+            return flow == .wecom
+                ? L10n.k("channel.pairing.button.wecom.retry", fallback: "重新扫码接入")
+                : L10n.k("channel.pairing.button.regenerate", fallback: "重新生成二维码")
+        case .failed:
+            return flow == .wecom
+                ? L10n.k("channel.pairing.button.wecom.retry", fallback: "重试扫码接入")
+                : L10n.k("channel.pairing.button.retry", fallback: "重试生成二维码")
         }
     }
 
@@ -174,16 +226,38 @@ struct FeishuChannelOnboardingSheet: View {
         "\(shrimpIdentityTitle) · \(flow.title) 通道配置 · \(stageTitle)"
     }
 
+    private var pairingHintText: String {
+        switch flow {
+        case .wecom:
+            return L10n.k(
+                "channel.pairing.hint.wecom",
+                fallback: "请点击按钮启动企微接入流程，在终端中选择“扫码接入”，完成授权后系统会自动检查是否已成功接入。"
+            )
+        case .feishu, .weixin:
+            return L10n.k(
+                "channel.pairing.hint",
+                fallback: "请点击按钮生成二维码，扫码配对后给龙虾发消息测试，正常即可关闭窗口。"
+            )
+        }
+    }
+
+    private var statusTextColor: Color {
+        if let exitCode, exitCode != 0 {
+            return .red
+        }
+        return .secondary
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.k("channel.pairing.hint", fallback: "请点击按钮生成二维码，扫码配对后给龙虾发消息测试，正常即可关闭窗口。"))
+            Text(pairingHintText)
                 .font(.callout)
                 .foregroundStyle(.secondary)
             actionRow
             if let statusText {
                 Text(statusText)
                     .font(.caption)
-                    .foregroundStyle(exitCode == 0 ? Color.secondary : Color.red)
+                    .foregroundStyle(statusTextColor)
             }
             if showTerminal {
                 runtimeToolbar
@@ -191,7 +265,7 @@ struct FeishuChannelOnboardingSheet: View {
                     username: username,
                     executable: commandExecutable,
                     args: commandArgs,
-                    minHeight: 280,
+                    minHeight: 360,
                     environmentOverrides: commandEnvironment,
                     onOutput: handleTerminalOutput,
                     control: terminalControl
@@ -208,12 +282,17 @@ struct FeishuChannelOnboardingSheet: View {
             now = tick
         }
         .onDisappear {
+            verificationTask?.cancel()
+            verificationTask = nil
             terminalControl.terminate()
+            if usesStrictConfigVerification && showTerminal && !didDetectPairingDone {
+                appLog("[\(logPrefix)] ui onboarding window closed before strict verification confirmed @\(username)", level: .warn)
+            }
             appLog("[\(logPrefix)] ui onboarding window disappeared; terminate active terminal session @\(username)")
         }
         .background(ChannelOnboardingWindowTitleBinder(title: windowTitle))
         .background(ChannelOnboardingWindowLevelBinder())
-        .frame(minWidth: 900, minHeight: 460)
+        .frame(minWidth: 900, minHeight: 560)
     }
 
 
@@ -292,7 +371,10 @@ struct FeishuChannelOnboardingSheet: View {
     }
 
     private func startInteractiveRun() {
-        appLog("[\(logPrefix)] ui interactive run start @\(username) cmd=\(commandSummary)")
+        verificationTask?.cancel()
+        verificationTask = nil
+        wasConfiguredBeforeRun = localChannelConfigSnapshot().connected
+        appLog("[\(logPrefix)] ui interactive run start @\(username) cmd=\(commandSummary) preConfiguredLocal=\(wasConfiguredBeforeRun)")
         exitCode = nil
         statusText = nil
         runStartedAt = Date()
@@ -301,6 +383,9 @@ struct FeishuChannelOnboardingSheet: View {
         outputBuffer = ""
         didDetectPairingDone = false
         didScheduleAutoClose = false
+        didPostAutoDetectedNotification = false
+        didLogCompletionMarker = false
+        didConfirmConfiguredState = false
         showTerminal = true
         terminalRunID += 1
     }
@@ -331,11 +416,45 @@ struct FeishuChannelOnboardingSheet: View {
     private func handleCommandExit(_ code: Int32?) {
         exitCode = code
         let normalized = code ?? -999
+        appLog("[\(logPrefix)] ui interactive run exited @\(username) exit=\(normalized)")
+
+        if usesStrictConfigVerification {
+            if normalized == 0 {
+                if didConfirmConfiguredState {
+                    finalizeStrictCompletion(reason: "process_exit_after_verified_config", snapshot: nil)
+                } else {
+                    statusText = L10n.k(
+                        "channel.runtime.exit.success.wecom_verifying",
+                        fallback: "命令执行完成，正在确认企微接入状态…"
+                    )
+                    requestStrictConfigVerification(
+                        reason: "process_exit_0",
+                        userVisibleStatus: L10n.k(
+                            "channel.runtime.exit.success.wecom_verifying",
+                            fallback: "命令执行完成，正在确认企微接入状态…"
+                        ),
+                        forceRestart: true
+                    )
+                }
+                appLog("[\(logPrefix)] strict verification pending after successful exit @\(username) preConfiguredLocal=\(wasConfiguredBeforeRun)")
+            } else {
+                verificationTask?.cancel()
+                verificationTask = nil
+                statusText = L10n.f(
+                    "channel.runtime.exit.failed",
+                    fallback: L10n.k("views.channel_onboarding.feishu_channel_onboarding_sheet.exit_num_retry", fallback: "命令已退出（exit %d）。请查看上方终端输出并重试。"),
+                    normalized
+                )
+                appLog("[\(logPrefix)] ui interactive run failed @\(username) exit=\(normalized)", level: .error)
+            }
+            return
+        }
+
         evaluatePairingCompletion(from: outputBuffer)
         if normalized == 0 {
             if didDetectPairingDone {
                 statusText = L10n.k("channel.runtime.exit.success_autoclose", fallback: "检测到配对已完成，窗口将自动关闭。")
-                scheduleAutoCloseIfNeeded()
+                scheduleAutoCloseIfNeeded(reason: "process_exit_after_completion_marker")
             } else {
                 statusText = L10n.k("channel.runtime.exit.success", fallback: "命令执行完成。若已扫码完成配对，可直接关闭窗口。")
             }
@@ -351,25 +470,33 @@ struct FeishuChannelOnboardingSheet: View {
     }
 
     private func evaluatePairingCompletion(from text: String) {
-        guard !didDetectPairingDone else { return }
         let normalized = normalizedOutput(text)
-        let matched = completionMarkers.contains { marker in
-            normalized.contains(marker.lowercased())
+        guard let matchedMarker = completionMarkers.first(where: { normalized.contains($0.lowercased()) }) else {
+            return
         }
-        guard matched else { return }
+
+        if usesStrictConfigVerification {
+            if !didLogCompletionMarker {
+                didLogCompletionMarker = true
+                appLog("[\(logPrefix)] potential completion marker observed @\(username) marker=\(matchedMarker)")
+            }
+            requestStrictConfigVerification(
+                reason: "completion_marker",
+                userVisibleStatus: L10n.k(
+                    "channel.runtime.pairing.detected.wecom_verifying",
+                    fallback: "已检测到接入完成提示，正在确认企微接入状态…"
+                )
+            )
+            return
+        }
+
+        guard !didDetectPairingDone else { return }
 
         didDetectPairingDone = true
         statusText = L10n.k("channel.runtime.pairing.detected_autoclose", fallback: "已检测到“配置成功/完成”提示，窗口将在 2 秒后自动关闭。")
-        NotificationCenter.default.post(
-            name: .channelOnboardingAutoDetected,
-            object: nil,
-            userInfo: [
-                "username": username,
-                "flow": flow.rawValue
-            ]
-        )
+        postAutoDetectedNotificationIfNeeded()
         appLog("[\(logPrefix)] completion marker detected; schedule auto close @\(username)")
-        scheduleAutoCloseIfNeeded()
+        scheduleAutoCloseIfNeeded(reason: "completion_marker")
     }
 
     private func normalizedOutput(_ text: String) -> String {
@@ -379,12 +506,179 @@ struct FeishuChannelOnboardingSheet: View {
         return stripped.lowercased()
     }
 
-    private func scheduleAutoCloseIfNeeded() {
+    private func requestStrictConfigVerification(
+        reason: String,
+        userVisibleStatus: String,
+        forceRestart: Bool = false
+    ) {
+        guard usesStrictConfigVerification, !didDetectPairingDone, !didConfirmConfiguredState else { return }
+
+        if forceRestart {
+            verificationTask?.cancel()
+            verificationTask = nil
+        } else if verificationTask != nil {
+            return
+        }
+
+        statusText = userVisibleStatus
+        let runID = terminalRunID
+        let reasonLabel = reason
+        verificationTask = Task {
+            appLog("[\(logPrefix)] strict verification started @\(username) reason=\(reasonLabel)")
+            let deadline = Date().addingTimeInterval(verificationTimeout)
+
+            while !Task.isCancelled, Date() < deadline {
+                let snapshot = await channelConfigSnapshot()
+                if snapshot.connected {
+                    await MainActor.run {
+                        guard self.terminalRunID == runID else { return }
+                        self.verificationTask = nil
+                        self.didConfirmConfiguredState = true
+                        if self.exitCode == nil {
+                            self.statusText = L10n.k(
+                                "channel.runtime.pairing.detected.wecom_waiting_exit",
+                                fallback: "已确认企微接入配置，等待命令完成后将自动关闭窗口。"
+                            )
+                        } else {
+                            self.finalizeStrictCompletion(
+                                reason: "strict_verification_\(reasonLabel)",
+                                snapshot: snapshot
+                            )
+                        }
+                    }
+                    if snapshot.enabled != nil {
+                        appLog(
+                            "[\(logPrefix)] strict verification confirmed config @\(username) reason=\(reasonLabel) local=\(snapshot.localConnected) gateway=\(snapshot.gatewayConnected) enabled=\(String(describing: snapshot.enabled))"
+                        )
+                    } else {
+                        appLog(
+                            "[\(logPrefix)] strict verification confirmed config @\(username) reason=\(reasonLabel) local=\(snapshot.localConnected) gateway=\(snapshot.gatewayConnected)"
+                        )
+                    }
+                    return
+                }
+                try? await Task.sleep(nanoseconds: verificationPollInterval)
+            }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self.terminalRunID == runID else { return }
+                self.verificationTask = nil
+                if self.exitCode == 0 && !self.didConfirmConfiguredState {
+                    self.statusText = L10n.k(
+                        "channel.runtime.exit.success.wecom_unverified",
+                        fallback: "尚未确认企微接入完成，请检查终端输出或稍后重试。"
+                    )
+                }
+            }
+            appLog(
+                "[\(logPrefix)] strict verification not confirmed @\(username) reason=\(reasonLabel) exit=\(String(describing: codeForLog()))",
+                level: .warn
+            )
+        }
+    }
+
+    private func finalizeStrictCompletion(
+        reason: String,
+        snapshot: ChannelConfigVerificationSnapshot?
+    ) {
+        guard !didDetectPairingDone else { return }
+        didDetectPairingDone = true
+        statusText = L10n.k(
+            "channel.runtime.exit.success.wecom_autoclose",
+            fallback: "已确认企微接入完成，窗口将在 2 秒后自动关闭。"
+        )
+        postAutoDetectedNotificationIfNeeded()
+        if let snapshot {
+            appLog(
+                "[\(logPrefix)] strict completion confirmed @\(username) reason=\(reason) local=\(snapshot.localConnected) gateway=\(snapshot.gatewayConnected) enabled=\(String(describing: snapshot.enabled))"
+            )
+        } else {
+            appLog("[\(logPrefix)] strict completion confirmed @\(username) reason=\(reason)")
+        }
+        scheduleAutoCloseIfNeeded(reason: reason)
+    }
+
+    private func postAutoDetectedNotificationIfNeeded() {
+        guard !didPostAutoDetectedNotification else { return }
+        didPostAutoDetectedNotification = true
+        NotificationCenter.default.post(
+            name: .channelOnboardingAutoDetected,
+            object: nil,
+            userInfo: [
+                "username": username,
+                "flow": flow.rawValue
+            ]
+        )
+    }
+
+    private func scheduleAutoCloseIfNeeded(reason: String) {
         guard !didScheduleAutoClose else { return }
         didScheduleAutoClose = true
+        appLog("[\(logPrefix)] auto close scheduled @\(username) reason=\(reason)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             dismiss()
         }
+    }
+
+    private func channelConfigSnapshot() async -> ChannelConfigVerificationSnapshot {
+        guard let channel = flow.channelTypeForVerification else {
+            return ChannelConfigVerificationSnapshot(
+                connected: false,
+                enabled: nil,
+                localConnected: false,
+                gatewayConnected: false
+            )
+        }
+
+        let localSnapshot = loadChannelConfigSnapshot(for: channel)
+        var enabled = localSnapshot.enabled
+        var gatewayConnected = false
+
+        if gateway.isConnected {
+            do {
+                let (config, _) = try await gateway.configGetFull()
+                let channels = config["channels"] as? [String: Any] ?? [:]
+                let gatewayConfig = channels[channel.rawValue] as? [String: Any] ?? [:]
+                gatewayConnected = !gatewayConfig.isEmpty
+                if let gatewayEnabled = gatewayConfig["enabled"] as? Bool {
+                    enabled = gatewayEnabled
+                }
+            } catch {
+                // gateway 在扫码接入成功前后可能短暂重启，这里静默回退到本地配置快照。
+            }
+        }
+
+        return ChannelConfigVerificationSnapshot(
+            connected: localSnapshot.connected || gatewayConnected,
+            enabled: enabled,
+            localConnected: localSnapshot.connected,
+            gatewayConnected: gatewayConnected
+        )
+    }
+
+    private func loadChannelConfigSnapshot(for channel: ChannelType) -> (connected: Bool, enabled: Bool?) {
+        let configURL = GatewayProcessManager.openClawConfigDir
+            .appendingPathComponent("openclaw.json")
+        guard let data = FileManager.default.contents(atPath: configURL.path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (false, nil)
+        }
+
+        let channels = json["channels"] as? [String: Any] ?? [:]
+        let channelConfig = channels[channel.rawValue] as? [String: Any] ?? [:]
+        return (!channelConfig.isEmpty, channelConfig["enabled"] as? Bool)
+    }
+
+    private func localChannelConfigSnapshot() -> (connected: Bool, enabled: Bool?) {
+        guard let channel = flow.channelTypeForVerification else {
+            return (false, nil)
+        }
+        return loadChannelConfigSnapshot(for: channel)
+    }
+
+    private func codeForLog() -> Int32 {
+        exitCode ?? -999
     }
 }
 

@@ -83,9 +83,7 @@ struct ChannelPairingSheet: View {
     @ViewBuilder
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: channelType.iconName)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(channelType.swiftUIColor)
+            channelType.iconView(size: 24, weight: .medium)
                 .frame(width: 42, height: 42)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(channelType.displayName) · 配对管理")

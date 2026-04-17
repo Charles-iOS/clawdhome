@@ -419,6 +419,7 @@ struct LocalProcessNSView: NSViewRepresentable {
     /// 可选：覆盖执行命令（默认执行 openclaw）
     var executable: String? = nil
     var executableArgs: [String] = []
+    var environmentOverrides: [String: String] = [:]
     var onOutput: ((String) -> Void)? = nil
     var control: LocalTerminalControl? = nil
     var onExit: ((Int32?) -> Void)?
@@ -448,7 +449,8 @@ struct LocalProcessNSView: NSViewRepresentable {
         let npmGlobalBin = "/Users/\(username)/.npm-global/bin"
         let npmGlobalDir = "/Users/\(username)/.npm-global"
         let userBrewBin = "/Users/\(username)/.brew/bin"
-        let pathEnv  = "\(npmGlobalBin):\(userBrewBin):/usr/bin:/bin"
+        let defaultPathEnv = "\(npmGlobalBin):\(userBrewBin):/usr/bin:/bin"
+        let pathEnv = environmentOverrides["PATH"] ?? defaultPathEnv
         let openclawPath = "\(npmGlobalBin)/openclaw"
         let command = executable ?? openclawPath
         let commandArgs = executable != nil ? executableArgs : subcommandArgs
@@ -456,14 +458,18 @@ struct LocalProcessNSView: NSViewRepresentable {
 
         // 所有交互命令都强制以虾用户身份执行，避免落到当前 GUI 登录用户。
         let runtimeExecutable = "/usr/bin/sudo"
-        let runtimeArgs = ["-n", "-u", username, "-H",
+        var runtimeArgs = ["-n", "-u", username, "-H",
                            "/usr/bin/env",
                            "HOME=\(homePath)",
                            "PATH=\(pathEnv)",
                            "NPM_CONFIG_PREFIX=\(npmGlobalDir)",
                            "npm_config_prefix=\(npmGlobalDir)",
-                           "TERM=xterm-256color",
-                           command] + commandArgs
+                           "TERM=xterm-256color"]
+        for (key, value) in environmentOverrides where key != "PATH" {
+            runtimeArgs.append("\(key)=\(value)")
+        }
+        runtimeArgs.append(command)
+        runtimeArgs.append(contentsOf: commandArgs)
 
         tv.startProcess(
             executable: runtimeExecutable,
@@ -521,6 +527,7 @@ struct UserCommandTerminalPanel: View {
     let executable: String
     let args: [String]
     var minHeight: CGFloat = 220
+    var environmentOverrides: [String: String] = [:]
     var onOutput: ((String) -> Void)? = nil
     var control: LocalTerminalControl? = nil
     var onExit: ((Int32?) -> Void)? = nil
@@ -551,6 +558,7 @@ struct UserCommandTerminalPanel: View {
                 username: username,
                 executable: executable,
                 executableArgs: args,
+                environmentOverrides: environmentOverrides,
                 onOutput: onOutput,
                 control: control,
                 onExit: onExit

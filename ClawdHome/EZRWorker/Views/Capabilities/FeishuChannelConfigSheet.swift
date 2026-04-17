@@ -624,7 +624,7 @@ struct FeishuChannelConfigSheet: View {
                 displayName: "",
                 username: username
             )
-            .frame(minWidth: 900, minHeight: 460)
+            .frame(minWidth: 900, minHeight: 560)
             .onDisappear {
                 Task { await refreshAfterExternalChange() }
             }
@@ -651,9 +651,7 @@ struct FeishuChannelConfigSheet: View {
     @ViewBuilder
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: ChannelType.feishu.iconName)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(ChannelType.feishu.swiftUIColor)
+            ChannelType.feishu.iconView(size: 24, weight: .medium)
                 .frame(width: 42, height: 42)
             VStack(alignment: .leading, spacing: 3) {
                 Text("飞书 · 渠道配置")

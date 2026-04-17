@@ -17,6 +17,7 @@ struct ChannelConfigField: Identifiable {
 
 enum ChannelType: String, CaseIterable, Identifiable {
     case weixin
+    case wecom
     case feishu
     case telegram
     case discord
@@ -26,6 +27,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
     /// 当前版本在 UI 中开放的渠道
     static let enabledCases: [ChannelType] = [
         .feishu,
+        .wecom,
         .telegram,
     ]
 
@@ -33,6 +35,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .weixin:    return "微信"
+        case .wecom:     return "企微"
         case .feishu:    return "飞书"
         case .telegram:  return "Telegram"
         case .discord:   return "Discord"
@@ -43,6 +46,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .weixin:    return "微信ClawBot"
+        case .wecom:     return "企业微信机器人"
         case .feishu:    return "飞书机器人"
         case .telegram:  return "Telegram Bot"
         case .discord:   return "Discord Bot"
@@ -53,9 +57,40 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var iconName: String {
         switch self {
         case .weixin:    return "message.circle.fill"
+        case .wecom:     return "building.2.crop.circle.fill"
         case .feishu:    return "paperplane.circle.fill"
         case .telegram:  return "paperplane.fill"
         case .discord:   return "gamecontroller.fill"
+        }
+    }
+
+    /// 渠道官方图标资源名（存在时优先使用）
+    var brandIconAssetName: String? {
+        switch self {
+        case .wecom:
+            return "ChannelWeCom"
+        case .feishu:
+            return "ChannelFeishu"
+        case .telegram:
+            return "ChannelTelegram"
+        case .weixin, .discord:
+            return nil
+        }
+    }
+
+    /// 统一图标视图：有官方图标时使用资源图，否则回退 SF Symbol
+    @ViewBuilder
+    func iconView(size: CGFloat, weight: Font.Weight = .medium) -> some View {
+        if let brandIconAssetName {
+            Image(brandIconAssetName)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: iconName)
+                .font(.system(size: size, weight: weight))
+                .foregroundStyle(swiftUIColor)
+                .frame(width: size, height: size)
         }
     }
 
@@ -63,6 +98,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var iconColor: String {
         switch self {
         case .weixin:    return "green"
+        case .wecom:     return "mint"
         case .feishu:    return "blue"
         case .telegram:  return "cyan"
         case .discord:   return "indigo"
@@ -73,6 +109,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var swiftUIColor: Color {
         switch self {
         case .weixin:    return .green
+        case .wecom:     return .mint
         case .feishu:    return .blue
         case .telegram:  return .cyan
         case .discord:   return .indigo
@@ -82,6 +119,8 @@ enum ChannelType: String, CaseIterable, Identifiable {
     /// "如何接入？"文档链接（部分渠道有）
     var howToConnectURL: URL? {
         switch self {
+        case .wecom:
+            return URL(string: "https://openclawgithub.cc/guide/channels/wecom/")
         case .feishu:
             return URL(string: "https://open.feishu.cn/document/home/develop-a-bot-in-5-minutes/create-an-app")
         case .telegram:
@@ -103,13 +142,14 @@ enum ChannelType: String, CaseIterable, Identifiable {
     var actionButtonTitle: String {
         switch self {
         case .weixin: return "绑定微信账号"
+        case .wecom:  return "立即接入"
         default:      return "设置机器人"
         }
     }
 
     /// 是否使用交互式终端配对（微信走 QR 流程）
     var usesInteractiveOnboarding: Bool {
-        self == .weixin
+        self == .weixin || self == .wecom
     }
 
     /// 是否在主入口先展示接入方式选择
@@ -122,14 +162,19 @@ enum ChannelType: String, CaseIterable, Identifiable {
         switch self {
         case .feishu, .telegram:
             return true
-        case .weixin, .discord:
+        case .weixin, .wecom, .discord:
             return false
         }
     }
 
     /// 是否保留单独的配对管理入口
     var showsStandalonePairingEntry: Bool {
-        !usesIntegratedConfigSheet
+        switch self {
+        case .wecom:
+            return false
+        default:
+            return !usesIntegratedConfigSheet
+        }
     }
 
     /// 对应的交互式 onboarding 流程
@@ -137,6 +182,7 @@ enum ChannelType: String, CaseIterable, Identifiable {
         switch self {
         case .feishu: return .feishu
         case .weixin: return .weixin
+        case .wecom:  return .wecom
         case .telegram, .discord:
             preconditionFailure("Channel \(rawValue) does not support interactive onboarding")
         }
@@ -164,8 +210,8 @@ enum ChannelType: String, CaseIterable, Identifiable {
                 ChannelConfigField(id: "botToken", label: "Bot Token", placeholder: "请输入 Bot Token", isSecure: true),
                 ChannelConfigField(id: "applicationId", label: "Application ID", placeholder: "请输入 Application ID", isSecure: false),
             ]
-        case .weixin:
-            return [] // 微信走 QR 配对流程，无需手动填写凭据
+        case .weixin, .wecom:
+            return [] // 纯扫码接入流程，无需手动填写凭据
         }
     }
 }

@@ -6,6 +6,8 @@ import SwiftUI
 struct AgentSessionsView: View {
     let agentId: String
 
+    private let autoRefreshIntervalNanoseconds: UInt64 = 3_000_000_000
+
     @Environment(AgentWorkspaceManager.self) private var workspaceManager
     @Environment(HelperClient.self) private var helperClient
 
@@ -25,8 +27,12 @@ struct AgentSessionsView: View {
             sessionDetail
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task {
+        .task(id: agentId) {
             await loadSessions()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: autoRefreshIntervalNanoseconds)
+                await refreshSessionsIfNeeded()
+            }
         }
     }
 
@@ -134,6 +140,22 @@ struct AgentSessionsView: View {
             sessionContent = String(data: data, encoding: .utf8) ?? ""
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    private func refreshSessionsIfNeeded() async {
+        do {
+            let latest = try await workspaceManager.listSessions(agentId: agentId)
+                .sorted(by: { $0.name > $1.name })
+            let latestNames = latest.map(\.name)
+            let currentNames = sessions.map(\.name)
+            guard latestNames != currentNames else { return }
+            sessions = latest
+            if let current = selectedSession {
+                selectedSession = latest.first(where: { $0.name == current.name })
+            }
+        } catch {
+            appLog("[agent.sessions] 刷新会话列表失败: \(error)", level: .warn)
         }
     }
 }

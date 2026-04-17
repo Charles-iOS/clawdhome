@@ -86,9 +86,7 @@ struct TelegramChannelConfigSheet: View {
     @ViewBuilder
     private var header: some View {
         HStack(spacing: 12) {
-            Image(systemName: ChannelType.telegram.iconName)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(ChannelType.telegram.swiftUIColor)
+            ChannelType.telegram.iconView(size: 24, weight: .medium)
                 .frame(width: 42, height: 42)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Telegram · 渠道配置")

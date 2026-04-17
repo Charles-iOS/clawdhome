@@ -20,8 +20,7 @@ struct ChannelBotConfigSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             // 标题
             HStack(spacing: 10) {
-                Image(systemName: channelType.iconName)
-                    .font(.title2)
+                channelType.iconView(size: 20, weight: .medium)
                 Text(L10n.f("channel.bot_config.title", fallback: "设置 %@ 机器人", channelType.displayName))
                     .font(.title3)
                     .fontWeight(.semibold)

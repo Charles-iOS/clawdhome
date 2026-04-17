@@ -838,6 +838,8 @@ private struct ChannelOnboardingWindow: View {
                 FeishuChannelOnboardingSheet(flow: .feishu, displayName: displayName, username: req.username)
             case .weixin:
                 FeishuChannelOnboardingSheet(flow: .weixin, displayName: displayName, username: req.username)
+            case .wecom:
+                FeishuChannelOnboardingSheet(flow: .wecom, displayName: displayName, username: req.username)
             }
         } else {
             ContentUnavailableView(

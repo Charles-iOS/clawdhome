@@ -7,6 +7,7 @@ struct AgentBindingsView: View {
     let agentId: String
 
     @Environment(AgentStore.self) private var store
+    @Environment(HelperClient.self) private var helperClient
     @State private var showAddSheet = false
 
     private var agentBindings: [AgentBinding] {
@@ -45,7 +46,12 @@ struct AgentBindingsView: View {
                     .onDelete { indexSet in
                         Task {
                             for index in indexSet {
-                                try? await store.removeBinding(agentBindings[index])
+                                do {
+                                    try await store.removeBinding(agentBindings[index])
+                                    await restartGatewayAfterBindingMutation()
+                                } catch {
+                                    appLog("[binding] 移除绑定失败: \(error)", level: .error)
+                                }
                             }
                         }
                     }
@@ -78,7 +84,14 @@ struct AgentBindingsView: View {
             Spacer()
 
             Button(role: .destructive) {
-                Task { try? await store.removeBinding(binding) }
+                Task {
+                    do {
+                        try await store.removeBinding(binding)
+                        await restartGatewayAfterBindingMutation()
+                    } catch {
+                        appLog("[binding] 移除绑定失败: \(error)", level: .error)
+                    }
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.caption)
@@ -87,6 +100,24 @@ struct AgentBindingsView: View {
             .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+
+    private func restartGatewayAfterBindingMutation() async {
+        let username = store.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        if !helperClient.isConnected {
+            helperClient.connect()
+            _ = await helperClient.waitUntilConnected()
+        }
+        guard helperClient.isConnected else {
+            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
+            return
+        }
+        do {
+            try await helperClient.restartGateway(username: username)
+        } catch {
+            appLog("[binding] 绑定变更后重启 gateway 失败: \(error)", level: .warn)
+        }
     }
 }
 
@@ -97,6 +128,7 @@ private struct AddBindingSheet: View {
 
     @Environment(AgentStore.self) private var store
     @Environment(GatewayService.self) private var gateway
+    @Environment(HelperClient.self) private var helperClient
     @Environment(\.dismiss) private var dismiss
 
     @State private var step: AddBindingStep = .selectChannel
@@ -176,12 +208,12 @@ private struct AddBindingSheet: View {
             if isConfigured {
                 // 渠道已配置，跳过凭据步骤，直接进入绑定匹配
                 step = .bindingMatch
-            } else if channel == .weixin {
-                // 微信：弹 QR 扫码终端
-                showQRSheet = true
-            } else if channel == .feishu {
+            } else if channel.supportsSetupMethodPicker {
                 // 飞书：进入配置步骤（提供双路径选择）
                 step = .configureCredentials
+            } else if channel.usesInteractiveOnboarding {
+                // 纯扫码渠道：弹交互式 onboarding 终端
+                showQRSheet = true
             } else {
                 // Telegram/Discord 等：弹凭据表单
                 showCredentialSheet = true
@@ -189,9 +221,7 @@ private struct AddBindingSheet: View {
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: channel.iconName)
-                        .font(.title2)
-                        .foregroundStyle(channel.swiftUIColor)
+                    channel.iconView(size: 20, weight: .medium)
                     Spacer()
                     // 配置状态徽章
                     Text(isConfigured
@@ -233,17 +263,16 @@ private struct AddBindingSheet: View {
         }
         .sheet(isPresented: $showQRSheet) {
             if let ch = selectedChannel {
-                let flow: ChannelOnboardingFlow = ch == .weixin ? .weixin : .feishu
                 FeishuChannelOnboardingSheet(
-                    flow: flow,
+                    flow: ch.onboardingFlow,
                     displayName: "",
                     username: store.username
                 )
-                .frame(minWidth: 900, minHeight: 460)
+                .frame(minWidth: 900, minHeight: 560)
                 .onDisappear {
                     // QR 窗口关闭后，刷新配置状态并进入绑定步骤
                     Task {
-                        await loadChannelConfigs()
+                        await refreshAfterChannelOnboardingClosed()
                         if channelConfigs[ch] == true {
                             step = .bindingMatch
                         }
@@ -354,10 +383,10 @@ private struct AddBindingSheet: View {
                 displayName: "",
                 username: store.username
             )
-            .frame(minWidth: 900, minHeight: 460)
+            .frame(minWidth: 900, minHeight: 560)
             .onDisappear {
                 Task {
-                    await loadChannelConfigs()
+                    await refreshAfterChannelOnboardingClosed()
                     if let ch = selectedChannel, channelConfigs[ch] == true {
                         step = .bindingMatch
                     }
@@ -374,9 +403,7 @@ private struct AddBindingSheet: View {
             if let channel = selectedChannel {
                 Section {
                     HStack(spacing: 10) {
-                        Image(systemName: channel.iconName)
-                            .font(.title3)
-                            .foregroundStyle(channel.swiftUIColor)
+                        channel.iconView(size: 18, weight: .medium)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(channel.displayName)
                                 .font(.subheadline).fontWeight(.medium)
@@ -419,7 +446,7 @@ private struct AddBindingSheet: View {
                 continue
             }
             if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
-                // 微信无 configFields，有配置即视为已配置
+                // 纯扫码渠道无 configFields，有配置即视为已配置
                 if channel.configFields.isEmpty {
                     result[channel] = !chConfig.isEmpty
                 } else {
@@ -434,6 +461,12 @@ private struct AddBindingSheet: View {
         }
         channelConfigs = result
         isLoadingConfigs = false
+    }
+
+    private func refreshAfterChannelOnboardingClosed() async {
+        await loadChannelConfigs()
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        await loadChannelConfigs()
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
@@ -474,16 +507,36 @@ private struct AddBindingSheet: View {
         isAdding = true
         let binding = AgentBinding(
             agentId: agentId,
-            channel: channel.rawValue
+            channel: channel.rawValue,
+            accountId: channel == .wecom ? "default" : nil
         )
         Task {
             do {
                 try await store.addBinding(binding)
+                await restartGatewayAfterBindingMutation()
                 dismiss()
             } catch {
                 appLog("添加绑定失败: \(error)", level: .error)
                 isAdding = false
             }
+        }
+    }
+
+    private func restartGatewayAfterBindingMutation() async {
+        let username = store.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        if !helperClient.isConnected {
+            helperClient.connect()
+            _ = await helperClient.waitUntilConnected()
+        }
+        guard helperClient.isConnected else {
+            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
+            return
+        }
+        do {
+            try await helperClient.restartGateway(username: username)
+        } catch {
+            appLog("[binding] 添加绑定后重启 gateway 失败: \(error)", level: .warn)
         }
     }
 }

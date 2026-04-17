@@ -65,6 +65,7 @@ struct ChannelView: View {
 
     @Environment(GatewayService.self) private var gateway
     @Environment(AgentStore.self) private var agentStore
+    @Environment(HelperClient.self) private var helperClient
     @State private var setupDestination: ChannelSetupDestination?
     @State private var channelConfigs: [ChannelType: [String: String]] = [:]
     @State private var channelEnabledStates: [ChannelType: Bool] = [:]
@@ -100,7 +101,14 @@ struct ChannelView: View {
                             agents: agentStore.agents,
                             onSetup: { setupDestination = initialSetupDestination(for: channel) },
                             onRemoveBinding: { binding in
-                                Task { try? await agentStore.removeBinding(binding) }
+                                Task {
+                                    do {
+                                        try await agentStore.removeBinding(binding)
+                                        await restartGatewayAfterBindingMutation()
+                                    } catch {
+                                        appLog("[channel] 移除绑定失败: \(error)", level: .error)
+                                    }
+                                }
                             }
                         )
                     }
@@ -126,7 +134,7 @@ struct ChannelView: View {
                   let username = userInfo["username"] as? String,
                   username == agentStore.username,
                   let flow = userInfo["flow"] as? String,
-                  flow == ChannelOnboardingFlow.feishu.rawValue else { return }
+                  flow == ChannelOnboardingFlow.feishu.rawValue || flow == ChannelOnboardingFlow.wecom.rawValue else { return }
             Task { await refreshAfterPairingSuccess() }
         }
         .sheet(item: $setupDestination) { destination in
@@ -148,9 +156,9 @@ struct ChannelView: View {
                     displayName: "",
                     username: agentStore.username
                 )
-                .frame(minWidth: 900, minHeight: 460)
+                .frame(minWidth: 900, minHeight: 560)
                 .onDisappear {
-                    Task { await reloadChannelState() }
+                    Task { await refreshAfterPairingSuccess() }
                 }
 
             case .credentials(let channel):
@@ -219,6 +227,25 @@ struct ChannelView: View {
         await reloadChannelState()
     }
 
+    private func restartGatewayAfterBindingMutation() async {
+        let username = agentStore.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        if !helperClient.isConnected {
+            helperClient.connect()
+            _ = await helperClient.waitUntilConnected()
+        }
+        guard helperClient.isConnected else {
+            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
+            return
+        }
+        do {
+            try await helperClient.restartGateway(username: username)
+            await reloadChannelState()
+        } catch {
+            appLog("[binding] 绑定变更后重启 gateway 失败: \(error)", level: .warn)
+        }
+    }
+
     /// 从 gateway config 加载各渠道的配置状态
     private func loadChannelConfigs() async {
         isLoading = true
@@ -237,6 +264,9 @@ struct ChannelView: View {
                     if let value = chConfig[field.id] as? String, !value.isEmpty {
                         fields[field.id] = value
                     }
+                }
+                if channel.configFields.isEmpty, !chConfig.isEmpty {
+                    fields["configured"] = "true"
                 }
             } else {
                 enabledStates[channel] = true
@@ -458,6 +488,14 @@ private struct ChannelCardView: View {
         channel.showsStandalonePairingEntry ? Self.cardHeightWithPairing : Self.cardHeightWithoutPairing
     }
 
+    private var pairedUsersStatValue: String {
+        channel == .wecom ? "–" : (pairingStats.map { "\($0.directCount)" } ?? "–")
+    }
+
+    private var pendingRequestsStatValue: String {
+        channel == .wecom ? "–" : (pairingStats.map { "\($0.pendingCount)" } ?? "–")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // 头部：图标 + 名称 + 状态
@@ -509,9 +547,7 @@ private struct ChannelCardView: View {
     private var channelHeader: some View {
         HStack(alignment: .top, spacing: 10) {
             // 渠道图标
-            Image(systemName: channel.iconName)
-                .font(.system(size: FontSize.icon, weight: .medium))
-                .foregroundStyle(channel.swiftUIColor)
+            channel.iconView(size: FontSize.icon, weight: .medium)
                 .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
@@ -545,12 +581,12 @@ private struct ChannelCardView: View {
         HStack(spacing: 0) {
             statItem(
                 label: L10n.k("channel.stat.paired_users", fallback: "已配对\n用户"),
-                value: pairingStats.map { "\($0.directCount)" } ?? "–"
+                value: pairedUsersStatValue
             )
             Divider().frame(height: 40)
             statItem(
                 label: L10n.k("channel.stat.pending", fallback: "待处理\n请求"),
-                value: pairingStats.map { "\($0.pendingCount)" } ?? "–"
+                value: pendingRequestsStatValue
             )
         }
         .padding(.vertical, 10)
@@ -786,6 +822,7 @@ struct ChannelAgentPickerSheet: View {
     let existingBindings: [AgentBinding]
 
     @Environment(AgentStore.self) private var store
+    @Environment(HelperClient.self) private var helperClient
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedAgentId: String?
@@ -798,6 +835,12 @@ struct ChannelAgentPickerSheet: View {
         return agents.filter {
             $0.name.lowercased().contains(q) || $0.description.lowercased().contains(q)
         }
+    }
+
+    private var defaultBindingAccountId: String? {
+        // WeCom plugin resolves the single-account runtime as accountId=default,
+        // so channel-level bindings need an explicit account scope to be matched.
+        channelType == .wecom ? "default" : nil
     }
 
     /// 已绑定到此渠道的智能体 ID 集合
@@ -825,9 +868,7 @@ struct ChannelAgentPickerSheet: View {
     @ViewBuilder
     private var pickerHeader: some View {
         HStack(spacing: 12) {
-            Image(systemName: channelType.iconName)
-                .font(.system(size: PickerFont.headerIcon, weight: .medium))
-                .foregroundStyle(channelType.swiftUIColor)
+            channelType.iconView(size: PickerFont.headerIcon, weight: .medium)
                 .frame(width: 42, height: 42)
             VStack(alignment: .leading, spacing: 3) {
                 Text(L10n.f("channel.picker.title", fallback: "%@ · 绑定数字员工", channelType.displayName))
@@ -948,16 +989,36 @@ struct ChannelAgentPickerSheet: View {
         isAdding = true
         let binding = AgentBinding(
             agentId: agentId,
-            channel: channelType.rawValue
+            channel: channelType.rawValue,
+            accountId: defaultBindingAccountId
         )
         Task {
             do {
                 try await store.addBinding(binding)
+                await restartGatewayAfterBindingMutation()
                 dismiss()
             } catch {
                 appLog("[channel] 添加绑定失败: \(error)", level: .error)
                 isAdding = false
             }
+        }
+    }
+
+    private func restartGatewayAfterBindingMutation() async {
+        let username = store.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        if !helperClient.isConnected {
+            helperClient.connect()
+            _ = await helperClient.waitUntilConnected()
+        }
+        guard helperClient.isConnected else {
+            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
+            return
+        }
+        do {
+            try await helperClient.restartGateway(username: username)
+        } catch {
+            appLog("[binding] 添加绑定后重启 gateway 失败: \(error)", level: .warn)
         }
     }
 }
