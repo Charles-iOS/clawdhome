@@ -4,7 +4,7 @@
 #
 # 用法：
 #   bash scripts/bundle-runtime.sh <app-resources-dir> [arch]
-#   bash scripts/bundle-runtime.sh build/export/ClawdHome.app/Contents/Resources arm64
+#   bash scripts/bundle-runtime.sh build/export/EZRWorker.app/Contents/Resources arm64
 #
 # 输出结构：
 #   <resources>/node/bin/node

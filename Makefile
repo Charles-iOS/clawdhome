@@ -4,6 +4,7 @@
 PROJECT    := ClawdHome.xcodeproj
 SCHEME_APP := ClawdHome
 SCHEME_HLP := ClawdHomeHelper
+APP_NAME   := EZRWorker
 INFO_PLIST := ClawdHome/Info.plist
 PLIST      := /usr/libexec/PlistBuddy
 BUILD_COUNTER_FILE := .build-version
@@ -224,8 +225,8 @@ release-notes-draft:
 
 # 直接运行 build/export 里的 Release app（无需安装 pkg）
 run-release:
-	@[ -d build/export/ClawdHome.app ] || (echo "❌ 先运行 make pkg"; exit 1)
-	@open build/export/ClawdHome.app
+	@[ -d build/export/$(APP_NAME).app ] || (echo "❌ 先运行 make pkg"; exit 1)
+	@open build/export/$(APP_NAME).app
 
 # 安装最新 pkg 到系统（需要密码）
 install-pkg:

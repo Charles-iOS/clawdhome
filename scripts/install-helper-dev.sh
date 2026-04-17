@@ -82,7 +82,7 @@ EOF
 
     echo "✅ ClawdHomeHelper 已安装并启动"
     echo "   日志：tail -f /tmp/clawdhome-helper.log"
-    echo "   现在可以运行 ClawdHome.app 进行测试"
+    echo "   现在可以运行 EZRWorker.app 进行测试"
     ;;
 
 # ── 卸载 ──────────────────────────────────────────────────────────────────────

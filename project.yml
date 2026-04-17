@@ -60,6 +60,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.clawdhome.mac
+        PRODUCT_NAME: EZRWorker
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_ENTITLEMENTS: ClawdHome/ClawdHome.entitlements
@@ -70,8 +71,8 @@ targets:
     info:
       path: ClawdHome/Info.plist
       properties:
-        CFBundleName: ClawdHome
-        CFBundleDisplayName: ClawdHome
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundleIconFile: AppIcon.icns
         NSHumanReadableDescription: OpenClaw 家庭管理器
         LSApplicationCategoryType: public.app-category.utilities

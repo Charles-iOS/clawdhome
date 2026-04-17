@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # build-pkg.sh
-# 构建 ClawdHome Release 并打包为可分发的 .pkg 安装包
+# 构建 Release 并打包为可分发的 .pkg 安装包
 #
 # 用法：
 #   bash scripts/build-pkg.sh              # 构建 + 打包
@@ -11,7 +11,7 @@
 #   SIGN_APP=true SIGN_PKG=true bash scripts/build-pkg.sh # 生成 Developer ID 签名 pkg
 #   SIGN_APP=true SIGN_PKG=true NOTARIZE=true NOTARY_PROFILE=clawdhome-release bash scripts/build-pkg.sh
 #
-# 输出：dist/ClawdHome-<VERSION>-<ARCH>.pkg（如 -arm64 / -x64 / -universal）
+# 输出：dist/EZRWorker-<VERSION>-<ARCH>.pkg（如 -arm64 / -x64 / -universal）
 #
 # 依赖：xcodebuild / codesign / productsign / notarytool（按需）
 
@@ -23,7 +23,8 @@ export LC_ALL=C  # 修复 Bash 3.2 UTF-8 编码问题
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-APP_NAME="ClawdHome"
+PROJECT_NAME="ClawdHome"
+APP_NAME="EZRWorker"
 BUNDLE_ID="ai.clawdhome.mac"        # 当前 bundle ID，将来可改为 app.clawdhome
 HELPER_LABEL="ai.clawdhome.mac.helper"
 SCHEME="ClawdHome"
@@ -188,7 +189,7 @@ if [ "$SKIP_BUILD" = false ]; then
   # 清除 DerivedData 增量缓存，确保 Release 从干净状态编译
   # （避免 Debug 残留中间产物影响 Release archive）
   XCODE_ARGS=(
-    -project "$REPO_ROOT/${APP_NAME}.xcodeproj"
+    -project "$REPO_ROOT/${PROJECT_NAME}.xcodeproj"
     -scheme "$SCHEME"
     -configuration "$CONFIGURATION"
   )
@@ -397,7 +398,7 @@ if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
   fi
 fi
 
-echo "ClawdHome 安装完成"
+echo "${APP_NAME} 安装完成"
 exit 0
 POSTINSTALL
 
