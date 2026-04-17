@@ -94,10 +94,8 @@ final class AgentWorkspaceManager {
     // MARK: - Persona 文件读写
 
     func readPersonaFile(agentId: String, file: PersonaFile) async throws -> String {
-        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
-        let data = try await helper.readFile(
-            username: username,
-            relativePath: personaFilePath(agentId: agentId, file: file)
+        let data = try await readRelativeFile(
+            personaFilePath(agentId: agentId, file: file)
         )
         return String(data: data, encoding: .utf8) ?? ""
     }
@@ -159,9 +157,7 @@ final class AgentWorkspaceManager {
     // MARK: - Workspace 文件浏览
 
     func listWorkspaceFiles(agentId: String) async throws -> [FileEntry] {
-        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
-        return try await helper.listDirectory(
-            username: username,
+        try await listDirectory(
             relativePath: workspacePath(for: agentId),
             showHidden: false
         )
@@ -169,9 +165,7 @@ final class AgentWorkspaceManager {
 
     /// 列出 sessions 目录
     func listSessions(agentId: String) async throws -> [FileEntry] {
-        guard let helper = helperClient else { throw AgentWorkspaceError.notConfigured }
-        return try await helper.listDirectory(
-            username: username,
+        try await listDirectory(
             relativePath: sessionsDirPath(for: agentId),
             showHidden: false
         )
@@ -182,29 +176,65 @@ final class AgentWorkspaceManager {
         }
     }
 
+    func readRelativeFile(_ relativePath: String) async throws -> Data {
+        if let helper = helperClient, helper.isConnected {
+            do {
+                return try await helper.readFile(
+                    username: username,
+                    relativePath: relativePath
+                )
+            } catch {
+                if let data = try? readFileLocally(relativePath: relativePath) {
+                    appLog("AgentWorkspace: 读取文件回退本地路径 \(relativePath): \(error)", level: .warn)
+                    return data
+                }
+                throw error
+            }
+        }
+
+        if currentUserHomeURL != nil {
+            return try readFileLocally(relativePath: relativePath)
+        }
+
+        if helperClient == nil {
+            throw AgentWorkspaceError.notConfigured
+        }
+        throw HelperError.notConnected
+    }
+
     // MARK: - Workspace 检测
 
     func probeWorkspace(agentId: String) async -> WorkspaceProbeResult {
-        guard let helper = helperClient else {
-            return .indeterminate(AgentWorkspaceError.notConfigured.localizedDescription)
-        }
-        guard helper.isConnected else {
-            return .indeterminate(HelperError.notConnected.localizedDescription)
+        let relativePath = workspacePath(for: agentId)
+
+        if let helper = helperClient, helper.isConnected {
+            do {
+                _ = try await helper.listDirectory(
+                    username: username,
+                    relativePath: relativePath,
+                    showHidden: false
+                )
+                return .exists
+            } catch {
+                if Self.isMissingWorkspaceError(error) {
+                    return .missing
+                }
+                if let localResult = probeWorkspaceLocally(relativePath: relativePath) {
+                    appLog("AgentWorkspace: workspace 探测回退本地路径 \(relativePath): \(error)", level: .warn)
+                    return localResult
+                }
+                return .indeterminate(error.localizedDescription)
+            }
         }
 
-        do {
-            _ = try await helper.listDirectory(
-                username: username,
-                relativePath: workspacePath(for: agentId),
-                showHidden: false
-            )
-            return .exists
-        } catch {
-            if Self.isMissingWorkspaceError(error) {
-                return .missing
-            }
-            return .indeterminate(error.localizedDescription)
+        if let localResult = probeWorkspaceLocally(relativePath: relativePath) {
+            return localResult
         }
+
+        if helperClient == nil {
+            return .indeterminate(AgentWorkspaceError.notConfigured.localizedDescription)
+        }
+        return .indeterminate(HelperError.notConnected.localizedDescription)
     }
 
     /// 检查智能体 workspace 是否存在（通过读取目录）
@@ -279,6 +309,36 @@ final class AgentWorkspaceManager {
 
         return Array(candidates).sorted()
     }
+
+    private func listDirectory(
+        relativePath: String,
+        showHidden: Bool
+    ) async throws -> [FileEntry] {
+        if let helper = helperClient, helper.isConnected {
+            do {
+                return try await helper.listDirectory(
+                    username: username,
+                    relativePath: relativePath,
+                    showHidden: showHidden
+                )
+            } catch {
+                if let entries = try? listDirectoryLocally(relativePath: relativePath, showHidden: showHidden) {
+                    appLog("AgentWorkspace: 列目录回退本地路径 \(relativePath): \(error)", level: .warn)
+                    return entries
+                }
+                throw error
+            }
+        }
+
+        if currentUserHomeURL != nil {
+            return try listDirectoryLocally(relativePath: relativePath, showHidden: showHidden)
+        }
+
+        if helperClient == nil {
+            throw AgentWorkspaceError.notConfigured
+        }
+        throw HelperError.notConnected
+    }
 }
 
 private extension AgentWorkspaceManager {
@@ -302,6 +362,79 @@ private extension AgentWorkspaceManager {
             || message.contains("不存在")
             || message.contains("不是目录")
     }
+
+    var currentUserHomeURL: URL? {
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedUsername.isEmpty, trimmedUsername == NSUserName() else { return nil }
+        return FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+    }
+
+    func resolvedLocalURL(relativePath: String) -> URL? {
+        guard let homeURL = currentUserHomeURL else { return nil }
+        let normalizedRelativePath = relativePath.isEmpty ? "." : relativePath
+        let url = homeURL.appendingPathComponent(normalizedRelativePath).standardizedFileURL
+        guard url.path == homeURL.path || url.path.hasPrefix(homeURL.path + "/") else { return nil }
+        return url
+    }
+
+    func probeWorkspaceLocally(relativePath: String) -> WorkspaceProbeResult? {
+        guard let url = resolvedLocalURL(relativePath: relativePath) else { return nil }
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+        if exists {
+            return isDirectory.boolValue ? .exists : .indeterminate("目标不是目录")
+        }
+        return .missing
+    }
+
+    func listDirectoryLocally(relativePath: String, showHidden: Bool) throws -> [FileEntry] {
+        guard let directoryURL = resolvedLocalURL(relativePath: relativePath) else {
+            throw AgentWorkspaceError.localAccessUnavailable
+        }
+
+        let fm = FileManager.default
+        let keys: [URLResourceKey] = [
+            .isDirectoryKey,
+            .fileSizeKey,
+            .contentModificationDateKey,
+            .isSymbolicLinkKey
+        ]
+        let options: FileManager.DirectoryEnumerationOptions = showHidden ? [] : [.skipsHiddenFiles]
+        let items = try fm.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: keys,
+            options: options
+        )
+        let homePrefix = "\(currentUserHomeURL!.path)/"
+
+        let entries: [FileEntry] = items.compactMap { itemURL in
+            let values = try? itemURL.resourceValues(forKeys: Set(keys))
+            let absolutePath = itemURL.standardizedFileURL.path
+            guard absolutePath.hasPrefix(homePrefix) else { return nil }
+            let relativeItemPath = String(absolutePath.dropFirst(homePrefix.count))
+            return FileEntry(
+                name: itemURL.lastPathComponent,
+                path: relativeItemPath,
+                isDirectory: values?.isDirectory ?? false,
+                size: Int64(values?.fileSize ?? 0),
+                modifiedAt: values?.contentModificationDate,
+                isSymlink: values?.isSymbolicLink ?? false,
+                ownerUsername: nil
+            )
+        }
+
+        return entries.sorted {
+            if $0.isDirectory != $1.isDirectory { return $0.isDirectory }
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+    }
+
+    func readFileLocally(relativePath: String) throws -> Data {
+        guard let url = resolvedLocalURL(relativePath: relativePath) else {
+            throw AgentWorkspaceError.localAccessUnavailable
+        }
+        return try Data(contentsOf: url)
+    }
 }
 
 // MARK: - 错误类型
@@ -309,6 +442,7 @@ private extension AgentWorkspaceManager {
 enum AgentWorkspaceError: LocalizedError {
     case notConfigured
     case workspaceNotFound(String)
+    case localAccessUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -316,6 +450,8 @@ enum AgentWorkspaceError: LocalizedError {
             return "AgentWorkspaceManager 未配置"
         case .workspaceNotFound(let agentId):
             return "智能体 \(agentId) 的 workspace 不存在"
+        case .localAccessUnavailable:
+            return "当前用户本地文件访问不可用"
         }
     }
 }

@@ -12,6 +12,8 @@ struct AgentGridView: View {
     @State private var deletingAgentId: String?
     @State private var deleteError: String?
 
+    private let runtimeRefreshIntervalNanoseconds: UInt64 = 8_000_000_000
+
     private var filteredAgents: [Agent] {
         var results: [Agent]
         switch segment {
@@ -43,6 +45,7 @@ struct AgentGridView: View {
                 $0.status.rawValue,
                 String($0.sessionCount),
                 String($0.boundBindings.count),
+                $0.lastActiveAt?.ISO8601Format() ?? "",
                 $0.name,
                 $0.description
             ].joined(separator: "|")
@@ -106,6 +109,9 @@ struct AgentGridView: View {
             if let err = deleteError {
                 Text(err)
             }
+        }
+        .task(id: store.username) {
+            await keepRuntimeStateFresh()
         }
     }
 
@@ -285,6 +291,17 @@ struct AgentGridView: View {
             .disabled(deletingAgentId != nil)
         }
     }
+
+    private func keepRuntimeStateFresh() async {
+        guard !store.username.isEmpty else { return }
+        await store.refreshRuntimeState()
+
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: runtimeRefreshIntervalNanoseconds)
+            guard !Task.isCancelled else { return }
+            await store.refreshRuntimeState()
+        }
+    }
 }
 
 private enum AgentGridSegment: String, CaseIterable, Identifiable {
@@ -306,6 +323,12 @@ private enum AgentGridSegment: String, CaseIterable, Identifiable {
 private struct AgentVisualCard: View {
     let agent: Agent
     let isDeleting: Bool
+
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
 
     private var displayEmoji: String {
         let trimmed = agent.emoji.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -337,7 +360,9 @@ private struct AgentVisualCard: View {
                     text: L10n.k("agent.card.sessions", fallback: "\(agent.sessionCount) 个会话")
                 )
                 capabilityRow(icon: "link", text: channelSummary)
-                capabilityRow(icon: "bolt", text: runtimeSummary)
+                if let runtimeSummary {
+                    capabilityRow(icon: "bolt", text: runtimeSummary)
+                }
             }
             .font(.system(size: 14))
             .foregroundStyle(.secondary)
@@ -372,18 +397,19 @@ private struct AgentVisualCard: View {
 
     @ViewBuilder
     private var statusTag: some View {
-        let cfg = statusConfig
-        HStack(spacing: 6) {
-            Circle()
-                .fill(cfg.color)
-                .frame(width: 7, height: 7)
-            Text(cfg.title)
-                .font(.system(size: 12, weight: .semibold))
+        if let cfg = statusConfig {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(cfg.color)
+                    .frame(width: 7, height: 7)
+                Text(cfg.title)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundStyle(cfg.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(cfg.color.opacity(0.14), in: Capsule())
         }
-        .foregroundStyle(cfg.color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(cfg.color.opacity(0.14), in: Capsule())
     }
 
     @ViewBuilder
@@ -404,23 +430,17 @@ private struct AgentVisualCard: View {
         return L10n.k("agent.card.channels.count", fallback: "已绑定 \(channels.count) 个渠道")
     }
 
-    private var runtimeSummary: String {
+    private var runtimeSummary: String? {
         switch agent.status {
-        case .active:
-            return L10n.k("agent.status.active", fallback: "运行中")
-        case .idle:
-            return L10n.k("agent.status.idle", fallback: "空闲")
-        case .uninitialized:
-            return L10n.k("agent.status.uninitialized", fallback: "未初始化")
+        case .active, .idle, .uninitialized:
+            return nil
         }
     }
 
-    private var statusConfig: (title: String, color: Color) {
+    private var statusConfig: (title: String, color: Color)? {
         switch agent.status {
-        case .active:
-            return (L10n.k("agent.status.active", fallback: "运行中"), .green)
-        case .idle:
-            return (L10n.k("agent.status.idle", fallback: "空闲"), .secondary)
+        case .active, .idle:
+            return nil
         case .uninitialized:
             return (L10n.k("agent.status.uninitialized", fallback: "未初始化"), .orange)
         }

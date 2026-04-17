@@ -41,6 +41,9 @@ struct AgentWorkspaceView: View {
                 AgentEditorView(agent: agent)
             }
         }
+        .task(id: agentId) {
+            await store.refreshRuntimeState()
+        }
     }
 
     // MARK: - Header
@@ -84,22 +87,8 @@ struct AgentWorkspaceView: View {
     @ViewBuilder
     private func statusBadge(_ status: AgentStatus) -> some View {
         switch status {
-        case .active:
-            Text(L10n.k("agent.status.active", fallback: "运行中"))
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.green.opacity(0.15))
-                .foregroundStyle(.green)
-                .clipShape(Capsule())
-        case .idle:
-            Text(L10n.k("agent.status.idle", fallback: "空闲"))
-                .font(.system(size: 10, weight: .medium))
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.secondary.opacity(0.1))
-                .foregroundStyle(.secondary)
-                .clipShape(Capsule())
+        case .active, .idle:
+            EmptyView()
         case .uninitialized:
             Text(L10n.k("agent.status.uninitialized", fallback: "未初始化"))
                 .font(.system(size: 10, weight: .medium))
@@ -308,7 +297,7 @@ private struct AgentPersonaEditorView: View {
             savedContents[file] = content
         } catch {
             let msg = error.localizedDescription
-            if msg.contains("No such file") || msg.contains("not found") || msg.contains("不存在") {
+            if isMissingFileError(msg) {
                 editorContents[file] = editorContents[file] ?? ""
                 savedContents[file] = savedContents[file] ?? ""
                 loadError = nil
@@ -332,6 +321,17 @@ private struct AgentPersonaEditorView: View {
         } catch {
             appLog("保存 persona 文件失败: \(error)", level: .error)
         }
+    }
+
+    private func isMissingFileError(_ message: String) -> Bool {
+        let normalized = message.lowercased()
+        return normalized.contains("no such file")
+            || normalized.contains("not found")
+            || normalized.contains("doesn't exist")
+            || normalized.contains("doesn’t exist")
+            || normalized.contains("couldn’t be opened")
+            || normalized.contains("could not be opened")
+            || normalized.contains("不存在")
     }
 }
 

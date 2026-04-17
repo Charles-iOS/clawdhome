@@ -39,6 +39,7 @@ struct Agent: Codable, Identifiable, Equatable {
             && lhs.status == rhs.status
             && lhs.boundBindings == rhs.boundBindings
             && lhs.sessionCount == rhs.sessionCount
+            && lhs.lastActiveAt == rhs.lastActiveAt
     }
 
     // MARK: - Codable（跳过运行时字段）

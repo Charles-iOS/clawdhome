@@ -80,24 +80,8 @@ struct AgentCardView: View {
     @ViewBuilder
     private var statusBadge: some View {
         switch agent.status {
-        case .active:
-            HStack(spacing: 3) {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 7, height: 7)
-                Text(L10n.k("agent.status.active", fallback: "运行中"))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.green)
-            }
-        case .idle:
-            HStack(spacing: 3) {
-                Circle()
-                    .fill(Color.secondary.opacity(0.5))
-                    .frame(width: 7, height: 7)
-                Text(L10n.k("agent.status.idle", fallback: "空闲"))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-            }
+        case .active, .idle:
+            EmptyView()
         case .uninitialized:
             HStack(spacing: 3) {
                 Circle()
@@ -114,14 +98,14 @@ struct AgentCardView: View {
 
     private var borderColor: Color {
         switch agent.status {
-        case .active: return .green
+        case .active: return .clear
         case .idle: return .clear
         case .uninitialized: return .clear
         }
     }
 
     private var borderWidth: CGFloat {
-        agent.status == .active ? 2 : 0
+        0
     }
 
     /// 去重后的渠道图标列表

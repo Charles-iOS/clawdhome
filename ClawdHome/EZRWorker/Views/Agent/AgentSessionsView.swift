@@ -9,7 +9,6 @@ struct AgentSessionsView: View {
     private let autoRefreshIntervalNanoseconds: UInt64 = 3_000_000_000
 
     @Environment(AgentWorkspaceManager.self) private var workspaceManager
-    @Environment(HelperClient.self) private var helperClient
 
     @State private var sessions: [FileEntry] = []
     @State private var selectedSession: FileEntry?
@@ -133,10 +132,7 @@ struct AgentSessionsView: View {
         defer { isLoading = false }
         do {
             let path = workspaceManager.sessionsDirPath(for: agentId) + "/\(entry.name)"
-            let data = try await helperClient.readFile(
-                username: workspaceManager.username,
-                relativePath: path
-            )
+            let data = try await workspaceManager.readRelativeFile(path)
             sessionContent = String(data: data, encoding: .utf8) ?? ""
         } catch {
             loadError = error.localizedDescription

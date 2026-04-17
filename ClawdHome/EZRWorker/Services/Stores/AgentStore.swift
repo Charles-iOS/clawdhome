@@ -66,6 +66,11 @@ final class AgentStore {
         await ensureDefaultAgentInitialized()
     }
 
+    /// 仅刷新智能体运行态（workspace / 会话数 / 活跃态），不重读 gateway 配置。
+    func refreshRuntimeState() async {
+        await refreshWorkspaceStatus()
+    }
+
     /// 确保默认 main 智能体存在于 gateway 配置中，且 workspace 已初始化
     /// 在新安装场景下，该方法负责完成首次初始化：
     ///   1. 若 gateway 配置中没有 main，追加到 agents.list
@@ -702,10 +707,13 @@ final class AgentStore {
             switch await workspaceManager.probeWorkspace(agentId: updatedAgents[i].id) {
             case .exists:
                 updatedAgents[i].status = .idle
-                // 检查 sessions 目录判断是否有活跃会话
+                updatedAgents[i].sessionCount = 0
+                updatedAgents[i].lastActiveAt = nil
+                // 只要存在任意会话文件，就视为运行中。
                 do {
                     let sessions = try await workspaceManager.listSessions(agentId: updatedAgents[i].id)
                     updatedAgents[i].sessionCount = sessions.count
+                    updatedAgents[i].lastActiveAt = sessions.compactMap(\.modifiedAt).max()
                     if !sessions.isEmpty {
                         updatedAgents[i].status = .active
                     }
@@ -715,6 +723,7 @@ final class AgentStore {
             case .missing:
                 updatedAgents[i].status = .uninitialized
                 updatedAgents[i].sessionCount = 0
+                updatedAgents[i].lastActiveAt = nil
             case .indeterminate(let reason):
                 appLog("AgentStore: workspace 探测失败，保留当前状态 id=\(updatedAgents[i].id): \(reason)", level: .warn)
             }
