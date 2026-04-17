@@ -364,7 +364,7 @@ struct GatewayCronJob: Identifiable, Codable, Equatable {
     let schedule: GatewayCronSchedule
     /// 对应 CLI 的 `--agent <id>`；未设置时使用默认智能体
     let agentId: String?
-    /// "main" / "isolated" / "current" 或 "session:<id>"
+    /// "main" / "isolated" / "current" 或 "session:<key>"
     let sessionTarget: String
     /// "now" / "next-heartbeat"
     let wakeMode: String
@@ -473,7 +473,7 @@ struct GatewayCronAddParams {
     let schedule: GatewayCronSchedule
     /// 对应 CLI 的 `--agent <id>`
     let agentId: String?
-    /// "main" / "isolated" / "current" 或 "session:<id>"
+    /// "main" / "isolated" / "current" 或 "session:<key>"
     let sessionTarget: String
     /// "now" / "next-heartbeat"
     let wakeMode: String

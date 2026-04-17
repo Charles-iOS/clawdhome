@@ -52,6 +52,11 @@ struct CronAddSheet: View {
             await loadAvailableSessions()
             syncDefaultsIfNeeded()
         }
+        .onChange(of: gateway.isConnected) { _, connected in
+            if connected {
+                errorText = nil
+            }
+        }
     }
 
     @ViewBuilder
@@ -88,12 +93,16 @@ struct CronAddSheet: View {
                         .background(fieldBackground)
                 }
 
-                labeledBlock(L10n.k("cron.add.delivery", fallback: "发送到")) {
+                labeledBlock("执行位置与回发") {
                     VStack(alignment: .leading, spacing: 12) {
                         deliveryModePicker
                         Text(deliveryHint)
                             .font(.system(size: 15))
                             .foregroundStyle(.tertiary)
+                        deliveryOutcomeCard
+                        Text("使用模板只会填充名称、提示词和调度，不会改动这里的选择。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -223,11 +232,41 @@ struct CronAddSheet: View {
             }
             .buttonStyle(.plain)
             .background(Capsule().fill(Color.black))
-            .disabled(!canCreate || isSaving)
-            .opacity((!canCreate || isSaving) ? 0.55 : 1)
+            .disabled(!canCreate || isSaving || !gateway.isConnected)
+            .opacity((!canCreate || isSaving || !gateway.isConnected) ? 0.55 : 1)
         }
         .padding(.horizontal, 56)
         .padding(.vertical, 26)
+    }
+
+    private var deliveryOutcomeCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: deliveryOutcomeIcon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.black.opacity(0.70))
+                .frame(width: 22, height: 22)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(deliveryOutcomeTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(deliveryOutcomeText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(mutedFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
     }
 
     private var deliveryModePicker: some View {
@@ -597,8 +636,12 @@ struct CronAddSheet: View {
                 let selectedSessionKey,
                 let session = availableSessions.first(where: { $0.key == selectedSessionKey })
             else { return "" }
+            // Cron custom sessions expect the persistent session key so channel-bound
+            // delivery context stays attached. A bare UUID sessionId can resolve to a
+            // derived internal session and lose the original channel target.
+            let rawKey = session.key.trimmingCharacters(in: .whitespacesAndNewlines)
             let rawId = session.sessionId?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let resolved = (rawId?.isEmpty == false) ? rawId! : session.key
+            let resolved = rawKey.isEmpty ? (rawId ?? "") : rawKey
             return resolved.hasPrefix("session:") ? resolved : "session:\(resolved)"
         }
     }
@@ -615,12 +658,12 @@ struct CronAddSheet: View {
     private var payloadHint: String {
         switch effectivePayloadMode {
         case .systemEvent:
-            return "发送到数字员工时会自动创建主会话 systemEvent，并通过 agent 参数指定目标智能体。"
+            return "当前会创建一条内部 systemEvent，停留在 main 主会话中。适合内部提醒，不会直接把消息发到 Telegram / 飞书。"
         case .agentTurn:
             if selectedDeliveryMode == .agent {
-                return "非默认数字员工会自动创建 isolated 会话，并通过 agent 参数指定目标智能体。"
+                return "当前会在该数字员工的 isolated 内部会话里发起一次 agentTurn。结果默认只停留在内部，不会自动外发。"
             }
-            return "指定会话时会自动使用智能体消息，并继续沿用该会话上下文。"
+            return "当前会在这个已有会话里发起一次 agentTurn，并继续沿用该会话上下文。"
         }
     }
 
@@ -637,12 +680,43 @@ struct CronAddSheet: View {
         switch selectedDeliveryMode {
         case .agent:
             return selectedAgentId == "main"
-                ? "默认智能体会使用主会话 systemEvent。"
-                : "非默认智能体会自动切到 isolated 会话和 agentTurn。"
+                ? "选择 main 时，任务只会在 OpenClaw 内部主会话里运行。"
+                : "选择非 main 数字员工时，任务会在它自己的内部 isolated 会话里运行。"
         case .session:
             return availableSessions.isEmpty
-                ? "当前还没有可用会话，请先在会话页或聊天中产生会话。"
-                : "从所有现有会话中选择一个；指定会话时会自动按智能体消息发送。"
+                ? "选择已有会话后，结果会尝试回发到该会话对应的聊天上下文；当前还没有可用会话。"
+                : "选择一个已有会话；如果它来自 Telegram / 飞书，结果会尽量回到那个会话里。"
+        }
+    }
+
+    private var deliveryOutcomeTitle: String {
+        switch selectedDeliveryMode {
+        case .agent:
+            return selectedAgentId == "main"
+                ? "当前结果：只停留在内部主会话"
+                : "当前结果：只停留在内部 isolated 会话"
+        case .session:
+            return "当前结果：会尝试回发到所选会话"
+        }
+    }
+
+    private var deliveryOutcomeText: String {
+        switch selectedDeliveryMode {
+        case .agent:
+            return selectedAgentId == "main"
+                ? "不会自动向 Telegram / 飞书发消息。要让用户真正收到，请改选“指定会话”。"
+                : "不会自动向 Telegram / 飞书发消息。适合后台执行、内部提醒或只在数字员工内部处理。"
+        case .session:
+            return "如果这个会话本身绑定了 Telegram / 飞书，用户通常会在对应聊天里收到结果。"
+        }
+    }
+
+    private var deliveryOutcomeIcon: String {
+        switch selectedDeliveryMode {
+        case .agent:
+            return "internaldrive"
+        case .session:
+            return "paperplane"
         }
     }
 
@@ -670,12 +744,13 @@ struct CronAddSheet: View {
 
     private func sessionPickerLabel(for session: SessionEntry) -> String {
         let owner = sessionOwnerLabel(for: session)
-        let title = session.displayName
+        let destination = sessionDestinationLabel(for: session)
+        let title = sessionTitleLabel(for: session)
 
-        if title == owner {
-            return "\(owner) · \(sessionKeyTail(for: session))"
+        if title.isEmpty || title == owner || title == destination {
+            return "\(owner) · \(destination)"
         }
-        return "\(owner) · \(title)"
+        return "\(owner) · \(destination) · \(title)"
     }
 
     private func sessionOwnerLabel(for session: SessionEntry) -> String {
@@ -695,6 +770,48 @@ struct CronAddSheet: View {
         let parts = session.key.split(separator: ":").map(String.init)
         guard parts.count > 2 else { return session.key }
         return parts.dropFirst(2).joined(separator: ":")
+    }
+
+    private func sessionDestinationLabel(for session: SessionEntry) -> String {
+        let channel = session.channelDisplayLabel
+        switch session.normalizedChatType {
+        case "group":
+            return channel.map { "\($0)群" } ?? "群聊"
+        case "direct":
+            return channel.map { "\($0)私聊" } ?? "私聊"
+        case "channel":
+            return channel.map { "\($0)频道" } ?? "频道"
+        case "cron":
+            return "定时任务"
+        default:
+            return channel ?? "内部会话"
+        }
+    }
+
+    private func sessionTitleLabel(for session: SessionEntry) -> String {
+        for candidate in [session.subject, session.rawDisplayName, session.label] {
+            let cleaned = normalizedSessionTitle(candidate, session: session)
+            if !cleaned.isEmpty { return cleaned }
+        }
+        return sessionKeyTail(for: session)
+    }
+
+    private func normalizedSessionTitle(_ raw: String?, session: SessionEntry) -> String {
+        guard var trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return ""
+        }
+
+        if let channel = session.normalizedChannel {
+            let lower = trimmed.lowercased()
+            for prefix in ["\(channel):g-", "\(channel):d-", "\(channel):dm-", "\(channel):"] {
+                if lower.hasPrefix(prefix) {
+                    trimmed.removeFirst(prefix.count)
+                    break
+                }
+            }
+        }
+
+        return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var scheduleHintText: String {
@@ -750,14 +867,6 @@ struct CronAddSheet: View {
         name = template.name
         message = template.message
         errorText = nil
-
-        selectedDeliveryMode = template.deliveryMode
-        switch template.deliveryMode {
-        case .agent:
-            selectedAgentId = resolvedAgentId(for: template)
-        case .session:
-            selectedSessionKey = availableSessions.first?.key
-        }
 
         switch template.schedule {
         case let .daily(weekdays, hour, minute):
@@ -817,6 +926,15 @@ struct CronAddSheet: View {
         errorText = nil
         isSaving = true
         defer { isSaving = false }
+
+        if !gateway.isConnected {
+            await gateway.connect()
+        }
+
+        guard gateway.isConnected else {
+            errorText = GatewayClientError.notConnected.localizedDescription
+            return
+        }
 
         let payload: GatewayCronPayload
         switch effectivePayloadMode {
@@ -935,8 +1053,8 @@ private enum DeliveryMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .agent: return "数字员工"
-        case .session: return "指定会话"
+        case .agent: return "数字员工（内部）"
+        case .session: return "指定会话（回发）"
         }
     }
 }

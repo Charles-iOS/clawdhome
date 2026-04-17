@@ -14,9 +14,17 @@ struct SessionEntry: Identifiable {
     let model: String?
     let modelProvider: String?
     let label: String?
+    let rawDisplayName: String?
     let sessionFile: String?    // JSONL 路径（可能是相对或绝对）
     let sessionId: String?      // Gateway sessions.list 提供的会话 ID
     let chatType: String?
+    let channel: String?
+    let subject: String?
+
+    private static let knownChatTypes: Set<String> = ["direct", "group", "channel", "cron"]
+    private static let knownChannels: Set<String> = [
+        "discord", "feishu", "slack", "telegram", "wecom", "webchat", "whatsapp"
+    ]
 
     /// 从 RPC 返回的字典解析
     static func from(_ d: [String: Any]) -> SessionEntry? {
@@ -30,14 +38,18 @@ struct SessionEntry: Identifiable {
             model:         d["model"]         as? String,
             modelProvider: d["modelProvider"] as? String,
             label:         d["label"]         as? String,
+            rawDisplayName: d["displayName"]  as? String,
             sessionFile:   d["sessionFile"]   as? String,
             sessionId:     d["sessionId"]     as? String,
-            chatType:      d["chatType"]       as? String
+            chatType:      d["chatType"]      as? String,
+            channel:       d["channel"]       as? String,
+            subject:       d["subject"]       as? String
         )
     }
 
     var displayName: String {
         if let label, !label.isEmpty { return label }
+        if let rawDisplayName, !rawDisplayName.isEmpty { return rawDisplayName }
         // 从 key 解析来源：agent:main:direct:telegram → "Telegram"
         let parts = key.split(separator: ":").map(String.init)
         if parts.count >= 3 {
@@ -53,10 +65,58 @@ struct SessionEntry: Identifiable {
         return key
     }
 
-    var platformIcon: String {
+    var normalizedChatType: String? {
+        if let chatType {
+            let trimmed = chatType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !trimmed.isEmpty { return trimmed }
+        }
+
         let parts = key.split(separator: ":").map(String.init)
-        let platform = parts.count >= 3 ? parts[2] : ""
-        switch platform {
+        if parts.count > 3 {
+            let candidate = parts[3].lowercased()
+            if Self.knownChatTypes.contains(candidate) { return candidate }
+        }
+        if parts.count > 2 {
+            let candidate = parts[2].lowercased()
+            if Self.knownChatTypes.contains(candidate) { return candidate }
+        }
+        return nil
+    }
+
+    var normalizedChannel: String? {
+        if let channel {
+            let trimmed = channel.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !trimmed.isEmpty { return trimmed }
+        }
+
+        let parts = key.split(separator: ":").map(String.init)
+        if parts.count > 2 {
+            let candidate = parts[2].lowercased()
+            if Self.knownChannels.contains(candidate) { return candidate }
+        }
+        if parts.count > 3 {
+            let candidate = parts[3].lowercased()
+            if Self.knownChannels.contains(candidate) { return candidate }
+        }
+        return nil
+    }
+
+    var channelDisplayLabel: String? {
+        switch normalizedChannel {
+        case "feishu": return "飞书"
+        case "telegram": return "Telegram"
+        case "wecom": return "企微"
+        case "discord": return "Discord"
+        case "slack": return "Slack"
+        case "webchat": return "网页聊天"
+        case "whatsapp": return "WhatsApp"
+        case let value?: return value.capitalized
+        case nil: return nil
+        }
+    }
+
+    var platformIcon: String {
+        switch normalizedChatType {
         case "direct":  return "message"
         case "group":   return "person.3"
         case "cron":    return "clock"

@@ -35,12 +35,10 @@ final class GatewayService {
 
         do {
             try await client!.connect()
-            isConnected = true
             let connectedClient = client!
-            Task {
-                await cronStore.start(client: connectedClient)
-                await skillsStore.start(client: connectedClient)
-            }
+            await cronStore.start(client: connectedClient)
+            await skillsStore.start(client: connectedClient)
+            isConnected = true
             startConnectionSync()
             appLog("GatewayService: connected to port \(port)")
         } catch {
