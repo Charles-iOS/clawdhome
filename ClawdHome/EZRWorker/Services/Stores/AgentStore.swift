@@ -489,6 +489,21 @@ final class AgentStore {
 
         let (config, baseHash) = try await gateway.configGetFull()
         var bindingsList = config["bindings"] as? [[String: Any]] ?? []
+
+        // WeCom plugin resolves its single-account bot as accountId=default.
+        // Drop the legacy unscoped binding before writing the account-scoped one,
+        // otherwise the UI can show duplicate "same channel, same agent" rows.
+        if binding.channel == "wecom", binding.accountId == "default", binding.peerId == nil {
+            bindingsList.removeAll { entry in
+                guard let aid = entry["agentId"] as? String, aid == binding.agentId else { return false }
+                guard let match = entry["match"] as? [String: Any],
+                      let ch = match["channel"] as? String, ch == binding.channel else { return false }
+                let acc = match["accountId"] as? String
+                let peer = match["peer"] as? [String: Any]
+                let pid = peer?["id"] as? String
+                return acc == nil && pid == nil
+            }
+        }
         bindingsList.append(binding.toPatchDict())
 
         let patch: [String: Any] = ["bindings": bindingsList]
@@ -517,21 +532,6 @@ final class AgentStore {
 
         let patch: [String: Any] = ["bindings": bindingsList]
         try await gateway.configPatch(patch: patch, baseHash: baseHash, note: "移除绑定: \(binding.agentId) ← \(binding.channel)")
-
-        // WeCom plugin resolves its single-account bot as accountId=default.
-        // Drop the legacy unscoped binding before writing the account-scoped one,
-        // otherwise the UI can show duplicate "same channel, same agent" rows.
-        if binding.channel == "wecom", binding.accountId == "default", binding.peerId == nil {
-            bindingsList.removeAll { entry in
-                guard let aid = entry["agentId"] as? String, aid == binding.agentId else { return false }
-                guard let match = entry["match"] as? [String: Any],
-                      let ch = match["channel"] as? String, ch == binding.channel else { return false }
-                let acc = match["accountId"] as? String
-                let peer = match["peer"] as? [String: Any]
-                let pid = peer?["id"] as? String
-                return acc == nil && pid == nil
-            }
-        }
 
         bindings.removeAll { $0.id == binding.id }
     }

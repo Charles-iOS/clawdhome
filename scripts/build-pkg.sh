@@ -235,9 +235,9 @@ if [ "$SKIP_BUILD" = false ]; then
 
   run_xcodebuild "$REPO_ROOT/build/logs/xcodebuild-archive.log" "${ARCHIVE_ARGS[@]}"
 
-  # 从 archive 中取出 app
+  # 从 archive 中取出 app（使用 ditto 保留符号链接，避免 Node/npm 运行时损坏）
   mkdir -p "$EXPORT_DIR"
-  cp -r "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$EXPORT_DIR/"
+  ditto "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$EXPORT_DIR/${APP_NAME}.app"
   ok "构建完成：$EXPORT_DIR/${APP_NAME}.app"
 else
   log "跳过构建，使用已有：$EXPORT_DIR/${APP_NAME}.app"
@@ -298,8 +298,8 @@ rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
 mkdir -p "$PKG_ROOT/Applications"
 mkdir -p "$PKG_SCRIPTS"
 
-# 拷贝 app（含嵌入的 Node.js + OpenClaw）
-cp -r "$APP_BUNDLE" "$PKG_ROOT/Applications/"
+# 拷贝 app（含嵌入的 Node.js + OpenClaw，保留符号链接）
+ditto "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
 
 # Helper 仍然按旧方式部署（过渡期保留，后续移除）
 HELPER_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchDaemons/ClawdHomeHelper"

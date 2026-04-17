@@ -39,6 +39,12 @@ struct AppSettingsView: View {
                 L10n.k("settings.state", fallback: "状态"),
                 value: stateLabel
             )
+            LabeledContent(
+                L10n.k("dashboard.gateway_status", fallback: "WebSocket"),
+                value: gatewayService.isConnected
+                    ? L10n.k("dashboard.connected", fallback: "已连接")
+                    : L10n.k("dashboard.disconnected", fallback: "未连接")
+            )
 
             HStack(spacing: 12) {
                 Button(L10n.k("user.detail.auto.start_action", fallback: "启动")) {

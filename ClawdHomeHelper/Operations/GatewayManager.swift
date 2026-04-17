@@ -276,11 +276,18 @@ struct GatewayManager {
     /// - Returns: (isRunning, pid) — pid 为 -1 表示未运行
     static func status(username: String, uid: Int) -> (running: Bool, pid: Int32) {
         let label = "\(gatewayLabel).\(username)"
-        guard let output = try? run("/bin/launchctl", args: ["print", "system/\(label)"]) else {
-            // service 未注册
-            return (false, -1)
-        }
-        let launchdPID = parseLaunchdPID(from: output)
+        let printTargets = [
+            "system/\(label)",
+            // 兼容升级前仍在运行的用户态 gateway。
+            "gui/\(uid)/ai.openclaw.gateway",
+            "gui/\(uid)/ai.clawdsetup.gateway",
+        ]
+        let launchdPID = printTargets
+            .lazy
+            .compactMap { try? run("/bin/launchctl", args: ["print", $0]) }
+            .compactMap(parseLaunchdPID)
+            .first
+
         return GatewayStatusResolver.resolve(
             launchdPID: launchdPID,
             processes: ProcessManager.listProcesses(username: username)

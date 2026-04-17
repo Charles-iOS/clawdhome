@@ -104,7 +104,7 @@ struct AgentWorkspaceView: View {
 
     @ViewBuilder
     private var tabPicker: some View {
-        Picker("Tab", selection: $selectedTab) {
+        Picker("", selection: $selectedTab) {
             ForEach(WorkspaceTab.allCases) { tab in
                 Label(tab.label, systemImage: tab.icon).tag(tab)
             }
@@ -405,6 +405,12 @@ private struct AgentSettingsView: View {
                                    value: "\(agent.boundBindings.count)")
                     LabeledContent(L10n.k("agent.settings.sessions_count", fallback: "会话数"),
                                    value: "\(agent.sessionCount)")
+                    if let lastActiveAt = agent.lastActiveAt {
+                        LabeledContent(
+                            L10n.k("agent.settings.last_active_at", fallback: "最近活跃"),
+                            value: lastActiveAt.formatted(date: .abbreviated, time: .shortened)
+                        )
+                    }
                 }
             }
         }

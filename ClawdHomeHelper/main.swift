@@ -257,21 +257,25 @@ private func managedGatewayUsers() -> [(username: String, uid: Int)] {
         }
     }
 
-    var users: [(username: String, uid: Int)] = []
-    setpwent()
-    defer { endpwent() }
-    while let pw = getpwent() {
-        let uid = pw.pointee.pw_uid
-        let signedUID = Int32(bitPattern: uid)
-        let name = String(cString: pw.pointee.pw_name)
-        guard ManagedUserFilter.isEligibleManagedUser(
-            username: name,
-            uid: Int(signedUID),
-            adminNames: adminNames
-        ) else { continue }
-        users.append((name, Int(uid)))
+    var consoleUID: uid_t = 0
+    guard let cfUser = SCDynamicStoreCopyConsoleUser(nil, &consoleUID, nil) else {
+        helperLog("[watchdog] no console user; managed gateway user list is empty", level: .debug)
+        return []
     }
-    return users
+
+    let username = cfUser as String
+    let uid = Int(consoleUID)
+    guard username != "loginwindow",
+          ManagedUserFilter.isEligibleManagedUser(
+            username: username,
+            uid: uid,
+            adminNames: adminNames
+          ) else {
+        helperLog("[watchdog] console user @\(username) is not eligible for managed gateway autostart", level: .debug)
+        return []
+    }
+
+    return [(username, uid)]
 }
 
 private func bootAutostartGatewaysIfNeeded() {

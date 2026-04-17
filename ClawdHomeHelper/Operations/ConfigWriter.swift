@@ -121,6 +121,20 @@ struct ConfigWriter {
     static func bundledResourcesPaths() -> [String] {
         var candidates: [String] = []
 
+        if let custom = ProcessInfo.processInfo.environment["CLAWDHOME_DEV_RUNTIME_DIR"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !custom.isEmpty {
+            candidates.append(custom)
+        }
+
+        if let derivedAppResources = bundledAppResourcesPath(from: Bundle.main.bundleURL.path) {
+            candidates.append(derivedAppResources)
+        }
+
+        if let bundleResources = Bundle.main.resourceURL?.path {
+            candidates.append(bundleResources)
+        }
+
         #if DEBUG
         // Debug 模式：通过源码路径推导仓库根目录 → build/dev-runtime
         let sourceURL = URL(fileURLWithPath: #filePath)
@@ -133,10 +147,15 @@ struct ConfigWriter {
         candidates.append(devRuntime)
         #endif
 
-        candidates.append("/Applications/ClawdHome.app/Contents/Resources")
-
         var seen = Set<String>()
         return candidates.filter { seen.insert($0).inserted }
+    }
+
+    private static func bundledAppResourcesPath(from bundlePath: String) -> String? {
+        guard let appRange = bundlePath.range(of: ".app/Contents/") else { return nil }
+        let appRoot = String(bundlePath[..<appRange.lowerBound]) + ".app"
+        let resources = "\(appRoot)/Contents/Resources"
+        return FileManager.default.fileExists(atPath: resources) ? resources : nil
     }
 
     /// App bundle 内打包的 node/bin 路径候选
