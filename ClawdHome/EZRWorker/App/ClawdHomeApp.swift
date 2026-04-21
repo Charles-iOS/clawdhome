@@ -27,43 +27,87 @@ struct ClawdHomeApp: App {
     @NSApplicationDelegateAdaptor(ClawdHomeAppDelegate.self) private var appDelegate
 
     // 新单实例架构服务
-    @State private var processManager = GatewayProcessManager()
-    @State private var envChecker = EnvironmentChecker()
-    @State private var gatewayService = GatewayService()
-    @State private var agentStore = AgentStore()
-    @State private var workspaceManager = AgentWorkspaceManager()
-    @State private var keychainStore = ProviderKeychainStore()
+    @State private var processManager: GatewayProcessManager
+    @State private var envChecker: EnvironmentChecker
+    @State private var gatewayService: GatewayService
+    @State private var agentStore: AgentStore
+    @State private var workspaceManager: AgentWorkspaceManager
+    @State private var keychainStore: ProviderKeychainStore
 
     // 旧服务（Phase 5 清理时移除）
     @State private var helperClient: HelperClient
     @State private var shrimpPool: ShrimpPool
-    @State private var updater = UpdateChecker()
-    @State private var modelStore = GlobalModelStore()
-    @State private var gatewayHub = GatewayHub()
-    @State private var lockStore = AppLockStore()
-    @State private var maintenanceWindowRegistry = MaintenanceWindowRegistry()
+    @State private var updater: UpdateChecker
+    @State private var modelStore: GlobalModelStore
+    @State private var gatewayHub: GatewayHub
+    @State private var lockStore: AppLockStore
+    @State private var maintenanceWindowRegistry: MaintenanceWindowRegistry
     @State private var gatewayReconnectTask: Task<Void, Never>?
-    @State private var didPrepareForTermination = false
+    @State private var didPrepareForTermination: Bool
+    @State private var authStore: AuthSessionStore
+    @State private var bootstrapCoordinator: AppBootstrapCoordinator
 
     @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.system.rawValue
 
     init() {
         UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
-        let client = HelperClient()
-        _helperClient = State(initialValue: client)
-        _shrimpPool   = State(initialValue: ShrimpPool(helperClient: client))
+        let processManager = GatewayProcessManager()
+        let envChecker = EnvironmentChecker()
+        let gatewayService = GatewayService()
+        let agentStore = AgentStore()
+        let workspaceManager = AgentWorkspaceManager()
+        let keychainStore = ProviderKeychainStore()
+        let helperClient = HelperClient()
+        let shrimpPool = ShrimpPool(helperClient: helperClient)
+        let updater = UpdateChecker()
+        let modelStore = GlobalModelStore()
+        let gatewayHub = GatewayHub()
+        let lockStore = AppLockStore()
+        let maintenanceWindowRegistry = MaintenanceWindowRegistry()
+        let authStore = AuthSessionStore(apiClient: BackendAuthClient())
+        let bootstrapCoordinator = AppBootstrapCoordinator(
+            processManager: processManager,
+            envChecker: envChecker,
+            gatewayService: gatewayService,
+            agentStore: agentStore,
+            workspaceManager: workspaceManager,
+            keychainStore: keychainStore,
+            helperClient: helperClient,
+            shrimpPool: shrimpPool,
+            modelStore: modelStore
+        )
+
+        _processManager = State(initialValue: processManager)
+        _envChecker = State(initialValue: envChecker)
+        _gatewayService = State(initialValue: gatewayService)
+        _agentStore = State(initialValue: agentStore)
+        _workspaceManager = State(initialValue: workspaceManager)
+        _keychainStore = State(initialValue: keychainStore)
+        _helperClient = State(initialValue: helperClient)
+        _shrimpPool = State(initialValue: shrimpPool)
+        _updater = State(initialValue: updater)
+        _modelStore = State(initialValue: modelStore)
+        _gatewayHub = State(initialValue: gatewayHub)
+        _lockStore = State(initialValue: lockStore)
+        _maintenanceWindowRegistry = State(initialValue: maintenanceWindowRegistry)
+        _gatewayReconnectTask = State(initialValue: nil)
+        _didPrepareForTermination = State(initialValue: false)
+        _authStore = State(initialValue: authStore)
+        _bootstrapCoordinator = State(initialValue: bootstrapCoordinator)
     }
 
     var body: some Scene {
         let appLanguage = AppLanguage(rawValue: appLanguageRaw) ?? .system
         WindowGroup {
-            MainView()
+            AppRootGateView()
                 .environment(processManager)
                 .environment(envChecker)
                 .environment(gatewayService)
                 .environment(agentStore)
                 .environment(workspaceManager)
                 .environment(keychainStore)
+                .environment(authStore)
+                .environment(bootstrapCoordinator)
                 .environment(\.locale, appLanguage.locale)
                 // 旧服务注入（Phase 5 移除）
                 .environment(helperClient)
@@ -74,8 +118,9 @@ struct ClawdHomeApp: App {
                 .environment(lockStore)
                 .environment(maintenanceWindowRegistry)
                 .task {
-                    appDelegate.onWillTerminate = handleAppTermination
-                    await bootstrap()
+                    appDelegate.onWillTerminate = {
+                        bootstrapCoordinator.prepareForAppTermination()
+                    }
                 }
         }
         .windowStyle(.hiddenTitleBar)
@@ -88,13 +133,16 @@ struct ClawdHomeApp: App {
         // 旧窗口组（Phase 5 移除）
         WindowGroup(id: "claw-detail", for: String.self) { $username in
             if let name = username {
-                ClawDetailWindow(username: name)
+                AuthenticatedSceneGate {
+                    ClawDetailWindow(username: name)
+                }
                     .environment(helperClient)
                     .environment(shrimpPool)
                     .environment(updater)
                     .environment(modelStore)
                     .environment(keychainStore)
                     .environment(gatewayHub)
+                    .environment(authStore)
                     .environment(maintenanceWindowRegistry)
                     .environment(\.locale, appLanguage.locale)
                     .background(ClawDetailWindowPositioner())
@@ -109,13 +157,16 @@ struct ClawdHomeApp: App {
 
         WindowGroup(id: "user-init-wizard", for: String.self) { $username in
             if let name = username {
-                UserInitWizardWindow(username: name)
+                AuthenticatedSceneGate {
+                    UserInitWizardWindow(username: name)
+                }
                     .environment(helperClient)
                     .environment(shrimpPool)
                     .environment(updater)
                     .environment(modelStore)
                     .environment(keychainStore)
                     .environment(gatewayHub)
+                    .environment(authStore)
                     .environment(maintenanceWindowRegistry)
                     .environment(\.locale, appLanguage.locale)
                     .background(UserInitWizardWindowPositioner())
@@ -126,7 +177,9 @@ struct ClawdHomeApp: App {
         .defaultSize(width: 980, height: 720)
 
         WindowGroup(id: "channel-onboarding", for: String.self) { $payload in
-            ChannelOnboardingWindow(payload: payload)
+            AuthenticatedSceneGate {
+                ChannelOnboardingWindow(payload: payload)
+            }
                 .environment(helperClient)
                 .environment(shrimpPool)
                 .environment(updater)
@@ -134,6 +187,7 @@ struct ClawdHomeApp: App {
                 .environment(keychainStore)
                 .environment(gatewayHub)
                 .environment(lockStore)
+                .environment(authStore)
                 .environment(maintenanceWindowRegistry)
                 .environment(\.locale, appLanguage.locale)
         }
@@ -142,9 +196,12 @@ struct ClawdHomeApp: App {
         .defaultSize(width: 980, height: 520)
 
         WindowGroup(id: "maintenance-terminal", for: String.self) { $payload in
-            MaintenanceTerminalWindow(payload: payload)
+            AuthenticatedSceneGate {
+                MaintenanceTerminalWindow(payload: payload)
+            }
                 .environment(helperClient)
                 .environment(shrimpPool)
+                .environment(authStore)
                 .environment(maintenanceWindowRegistry)
                 .environment(\.locale, appLanguage.locale)
         }
@@ -154,9 +211,12 @@ struct ClawdHomeApp: App {
 
         WindowGroup(id: "clone-claw", for: String.self) { $sourceUsername in
             if let username = sourceUsername {
-                CloneClawSheet(sourceUsername: username)
+                AuthenticatedSceneGate {
+                    CloneClawSheet(sourceUsername: username)
+                }
                     .environment(helperClient)
                     .environment(shrimpPool)
+                    .environment(authStore)
                     .environment(\.locale, appLanguage.locale)
             }
         }

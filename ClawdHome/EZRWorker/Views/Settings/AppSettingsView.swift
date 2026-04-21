@@ -6,6 +6,7 @@ struct AppSettingsView: View {
     @Environment(GatewayProcessManager.self) private var processManager
     @Environment(EnvironmentChecker.self) private var envChecker
     @Environment(GatewayService.self) private var gatewayService
+    @Environment(AuthSessionStore.self) private var authStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +20,7 @@ struct AppSettingsView: View {
             .padding(.bottom, 8)
 
             Form {
+                accountSection
                 gatewaySection
                 environmentSection
                 aboutSection
@@ -26,6 +28,28 @@ struct AppSettingsView: View {
             .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var accountSection: some View {
+        Section(L10n.k("auth.settings.section", fallback: "账户")) {
+            LabeledContent(
+                L10n.k("auth.settings.phone", fallback: "当前登录手机号"),
+                value: authStore.currentUser.map { displayMainlandChinaPhone($0.phone) } ?? "—"
+            )
+            LabeledContent(
+                L10n.k("auth.settings.display_name", fallback: "显示名称"),
+                value: authStore.currentUser?.displayName ?? "—"
+            )
+
+            Button(role: .destructive) {
+                Task {
+                    await authStore.signOut()
+                }
+            } label: {
+                Text(L10n.k("auth.settings.sign_out", fallback: "退出登录"))
+            }
+        }
     }
 
     @ViewBuilder

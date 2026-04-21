@@ -74,6 +74,7 @@ targets:
         CFBundleName: $(PRODUCT_NAME)
         CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundleIconFile: AppIcon.icns
+        AuthAPIBaseURL: "http://localhost:2222"
         NSHumanReadableDescription: OpenClaw 家庭管理器
         LSApplicationCategoryType: public.app-category.utilities
 

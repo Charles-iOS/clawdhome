@@ -25040,6 +25040,342 @@
         }
       }
     },
+    "auth.bootstrap.failed_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "App Initialization Failed" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用初始化失败" } }
+      }
+    },
+    "auth.bootstrap.loading_subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Connecting local services and preparing the workspace. Please wait." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在连接本地服务并准备工作区，请稍候。" } }
+      }
+    },
+    "auth.bootstrap.loading_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Entering ClawdHome" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在进入 ClawdHome" } }
+      }
+    },
+    "auth.error.bootstrap_failure": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "App initialization failed. Please sign in again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用初始化失败，请重新登录后再试。" } }
+      }
+    },
+    "auth.error.decode_failed": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unable to parse the login response. Please try again later." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法解析登录响应，请稍后再试。" } }
+      }
+    },
+    "auth.error.empty_password": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Please enter your password." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入密码。" } }
+      }
+    },
+    "auth.error.invalid_credentials": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Incorrect phone number or password." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "手机号或密码错误。" } }
+      }
+    },
+    "auth.error.invalid_phone_format": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Please enter a valid mainland China phone number." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入正确的中国大陆手机号。" } }
+      }
+    },
+    "auth.error.invalid_response": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The authentication service returned an invalid response." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "认证服务返回了无效响应。" } }
+      }
+    },
+    "auth.error.logged_out": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Signed out." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已退出登录。" } }
+      }
+    },
+    "auth.error.network_unavailable": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Network unavailable. Check your connection and try again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "网络不可用，请检查连接后重试。" } }
+      }
+    },
+    "auth.error.server": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Authentication service error (HTTP %d)." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "认证服务异常（HTTP %d）。" } }
+      }
+    },
+    "auth.error.service_not_configured": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Authentication service is not configured. Please contact an administrator." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "认证服务未配置，请联系管理员。" } }
+      }
+    },
+    "auth.error.session_expired": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Your session expired. Please sign in again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录状态已过期，请重新登录。" } }
+      }
+    },
+    "auth.error.session_unauthorized": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Your session is invalid. Please sign in again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录状态无效，请重新登录。" } }
+      }
+    },
+    "auth.error.unauthorized": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Your session expired. Please sign in again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录状态已失效，请重新登录。" } }
+      }
+    },
+    "auth.launch.subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Checking authentication configuration. Please wait." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在检查认证配置，请稍候。" } }
+      }
+    },
+    "auth.launch.title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Starting ClawdHome" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在启动 ClawdHome" } }
+      }
+    },
+    "auth.debug.display_name": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Debug Session" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开发模式账号" } }
+      }
+    },
+    "auth.login.card_subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter your mainland China phone number and password" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入中国大陆手机号和密码" } }
+      }
+    },
+    "auth.login.card_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sign In" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录" } }
+      }
+    },
+    "auth.login.debug_bypass": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter in Debug Mode" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开发模式进入" } }
+      }
+    },
+    "auth.login.debug_hint": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "When running a Debug build without an auth service configured, you can temporarily bypass server authentication and enter the app directly." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Debug 构建且未配置认证服务时，可临时跳过服务端认证直接进入 App。" } }
+      }
+    },
+    "auth.login.feature.phone_password": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Phone + Password" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "手机号 + 密码" } }
+      }
+    },
+    "auth.login.feature.window_guard": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Unified Window Guard" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "多窗口统一门禁" } }
+      }
+    },
+    "auth.login.hero_subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Complete phone and password verification before accessing the current app pages and all business windows." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "先完成手机号与密码验证，再进入现有 App 页面和所有业务窗口。" } }
+      }
+    },
+    "auth.login.hero_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sign in before entering your agent control console" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录后进入你的智能体控制台" } }
+      }
+    },
+    "auth.login.password_label": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Password" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "密码" } }
+      }
+    },
+    "auth.login.password_placeholder": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter your password" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请输入密码" } }
+      }
+    },
+    "auth.login.phone_hint": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "You can paste a number with spaces or hyphens. It will be normalized on submit." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "支持粘贴带空格或短横线的手机号，提交时会自动规范化。" } }
+      }
+    },
+    "auth.login.phone_label": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Phone Number" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "手机号" } }
+      }
+    },
+    "auth.login.phone_placeholder": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "13800138000" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "13800138000" } }
+      }
+    },
+    "auth.login.submit": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sign In" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录" } }
+      }
+    },
+    "auth.login.submitting": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Signing In..." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "登录中…" } }
+      }
+    },
+    "auth.scene.loading_subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Please wait while the window content is prepared." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请稍候，窗口内容准备中。" } }
+      }
+    },
+    "auth.scene.loading_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Verifying Sign-In State" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在验证登录状态" } }
+      }
+    },
+    "auth.scene.protected_subtitle": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Finish signing in from the main window, then reopen this window." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请先在主窗口完成登录，然后再打开此窗口。" } }
+      }
+    },
+    "auth.scene.protected_title": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This Window Requires Sign-In" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "该窗口需要先登录" } }
+      }
+    },
+    "auth.settings.display_name": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Display Name" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示名称" } }
+      }
+    },
+    "auth.settings.phone": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Current Phone Number" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前登录手机号" } }
+      }
+    },
+    "auth.settings.section": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Account" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "账户" } }
+      }
+    },
+    "auth.settings.sign_out": {
+      "comment": "",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sign Out" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "退出登录" } }
+      }
+    },
     "wizard.custom.suggested_models": {
       "comment": "",
       "extractionState": "stale",
