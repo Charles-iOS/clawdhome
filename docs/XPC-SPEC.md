@@ -1,4 +1,4 @@
-# ClawdHome XPC 通信规范
+# EZRWorker XPC 通信规范
 
 > 生成日期：2026-04-06 | 基于当前 main 分支代码分析
 
@@ -8,7 +8,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                  ClawdHome.app (用户态)                    │
+│                  EZRWorker.app (用户态)                    │
 │                                                         │
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐   │
 │  │ SwiftUI Views│  │ ShrimpPool   │  │ GatewayHub    │   │
@@ -35,7 +35,7 @@
 │          ▼           ▼           ▼                        │
 │  ┌──────────────────────────────────────────────┐        │
 │  │      NSXPCListener (Mach Service)             │        │
-│  │      ai.clawdhome.mac.helper                  │        │
+│  │      ai.ezrworker.mac.helper                  │        │
 │  │                                                │        │
 │  │  ┌─────────────┐   ┌────────────────────┐     │        │
 │  │  │ Listener    │──▶│ isCallerAuthorized │     │        │
@@ -43,7 +43,7 @@
 │  │  └─────────────┘   │ ② CodeSign (Release)│     │        │
 │  │                     └────────────────────┘     │        │
 │  │  ┌───────────────────────────────────────┐     │        │
-│  │  │    ClawdHomeHelperImpl (NSObject)      │     │        │
+│  │  │    EZRWorkerHelperImpl (NSObject)      │     │        │
 │  │  │    70 个 @objc XPC 方法               │     │        │
 │  │  └──────────┬────────────────────────────┘     │        │
 │  └─────────────┼────────────────────────────────┘        │
@@ -59,7 +59,7 @@
 │  │ └────────────┘ └──────────────┘ └──────────┘ │        │
 │  └──────────────────────────────────────────────┘        │
 │                                                           │
-│            ClawdHomeHelper (root LaunchDaemon)             │
+│            EZRWorkerHelper (root LaunchDaemon)             │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -108,8 +108,8 @@ connect()
 
 ## 3. XPC 协议方法清单
 
-> Mach Service: `ai.clawdhome.mac.helper`
-> Protocol: `ClawdHomeHelperProtocol` (@objc, NSObjectProtocol)
+> Mach Service: `ai.ezrworker.mac.helper`
+> Protocol: `EZRWorkerHelperProtocol` (@objc, NSObjectProtocol)
 
 ### 3.1 版本探测与生命周期
 
@@ -453,7 +453,7 @@ isAdminUID() ─── getgrouplist() ──→ 检查 UID ∈ gid 80 (admin)
 #if !DEBUG
     │
     ▼
-验证代码签名 ──→ auditToken 匹配 ClawdHome.app 签名
+验证代码签名 ──→ auditToken 匹配 EZRWorker.app 签名
     │
     ├── 签名不匹配 ──→ reject
     │
@@ -461,7 +461,7 @@ isAdminUID() ─── getgrouplist() ──→ 检查 UID ∈ gid 80 (admin)
 #endif
     │
     ▼
-accept ──→ 导出 ClawdHomeHelperImpl 实例
+accept ──→ 导出 EZRWorkerHelperImpl 实例
 ```
 
 ### 5.2 权限边界
@@ -622,7 +622,7 @@ enum ConnectionState {
 
 #### ~~P2: PTY 会话缺少自动清理~~ ✅ 已修复
 
-**修复内容**：`ClawdHomeHelperImpl` 新增 30 秒周期的 `sweepStaleSessions()` 定时器：
+**修复内容**：`EZRWorkerHelperImpl` 新增 30 秒周期的 `sweepStaleSessions()` 定时器：
 - 已退出进程的会话：60 秒无 poll 后自动清理
 - 活跃但空闲的会话：10 分钟无 poll 后自动 terminate + 清理
 - 每个 session 新增 `lastPollTime` 属性，`poll()` 调用时自动更新
@@ -678,7 +678,7 @@ struct XPCResult: Codable {
 
 **现状**：6 条连接，每条独立的 NSXPCConnection。
 
-**分析**：NSXPCConnection 底层共享 Mach port，6 条连接的实际开销不大。但 Helper 侧每条连接创建独立的 `ClawdHomeHelperImpl` 实例，意味着状态（如 maintenanceSessions）不共享。
+**分析**：NSXPCConnection 底层共享 Mach port，6 条连接的实际开销不大。但 Helper 侧每条连接创建独立的 `EZRWorkerHelperImpl` 实例，意味着状态（如 maintenanceSessions）不共享。
 
 **建议**：如果 PTY 会话需要跨连接访问（如 control 连接启动，file 连接 poll），应将 session store 提升为全局单例。
 

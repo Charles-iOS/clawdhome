@@ -1,4 +1,4 @@
-// ClawdHome/Models/HealthCheck.swift
+// EZRWorkerApp/Models/HealthCheck.swift
 // 体检结果数据模型
 
 import Foundation

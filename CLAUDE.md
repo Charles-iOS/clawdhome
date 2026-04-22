@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ClawdHome is a **macOS native app** (Swift 5.9 / SwiftUI / macOS 14+) that securely isolates and manages multiple OpenClaw gateway instances ("Shrimps") on a single Mac using native multi-user primitives. Each Shrimp maps to a standard macOS user account with its own runtime, data, and permissions.
+EZRWorker is a **macOS native app** (Swift 5.9 / SwiftUI / macOS 14+) that securely isolates and manages multiple OpenClaw gateway instances ("Shrimps") on a single Mac using native multi-user primitives. Each Shrimp maps to a standard macOS user account with its own runtime, data, and permissions.
 
 ## Build & Development Commands
 
@@ -34,7 +34,7 @@ make release
 make i18n-check
 
 # View helper logs
-make log-helper          # tail -f /tmp/clawdhome-helper.log
+make log-helper          # tail -f /tmp/ezrworker-helper.log
 
 # View app logs (os_log)
 make log-app
@@ -53,8 +53,8 @@ There are no unit tests configured in this project.
 ### Privilege Separation (Core Design)
 
 ```
-ClawdHome.app (user context, SwiftUI)
-    └── XPC (NSXPCConnection, Mach service) ──→ ClawdHomeHelper (root LaunchDaemon)
+EZRWorker.app (user context, SwiftUI)
+    └── XPC (NSXPCConnection, Mach service) ──→ EZRWorkerHelper (root LaunchDaemon)
                                                    └── per-user OpenClaw gateway instances
 ```
 
@@ -64,17 +64,17 @@ The app **never** performs privileged operations directly. All system-level acti
 
 | Target | Type | Bundle ID | Role |
 |--------|------|-----------|------|
-| `ClawdHome` | .app | `ai.clawdhome.mac` | Admin UI — SwiftUI frontend, state management, XPC client |
-| `ClawdHomeHelper` | tool | `ai.clawdhome.mac.helper` | Privileged daemon — user/process/file ops as root |
+| `EZRWorker` | .app | `ai.ezrworker.mac` | Admin UI — SwiftUI frontend, state management, XPC client |
+| `EZRWorkerHelper` | tool | `ai.ezrworker.mac.helper` | Privileged daemon — user/process/file ops as root |
 
 The helper binary is embedded into the app bundle at `Contents/Library/LaunchDaemons/` via a post-build script.
 
 ### Shared Code (`Shared/`)
 
-- `HelperProtocol.swift` — the **single XPC interface** (`ClawdHomeHelperProtocol`, `@objc` protocol). All app↔helper communication goes through this protocol. XPC methods must use ObjC-compatible types only.
+- `HelperProtocol.swift` — the **single XPC interface** (`EZRWorkerHelperProtocol`, `@objc` protocol). All app↔helper communication goes through this protocol. XPC methods must use ObjC-compatible types only.
 - `*Models.swift` — Codable model types shared between both targets (Dashboard, Process, File, Network, HealthCheck, CloneClaw, LocalAI).
 
-### App Layer (`ClawdHome/`)
+### App Layer (`EZRWorkerApp/`)
 
 - **Services/** — business logic and infrastructure:
   - `HelperClient` — XPC connection manager with **5 dedicated connections** (control, dashboard, install, file, process) to avoid blocking.
@@ -85,7 +85,7 @@ The helper binary is embedded into the app bundle at `Contents/Library/LaunchDae
 - **Models/** — app-side state objects (`ManagedUser`, `GlobalModelStore`, `GlobalSecretsStore`, `AccountKeychain`, `ProviderKeyConfig`).
 - **Views/** — SwiftUI views. Key screens: `DashboardView`, `UserDetailView`, `UserInitWizardView`, `ClawPoolView`, `ModelManagerView`, `UserFilesView`.
 
-### Helper Layer (`ClawdHomeHelper/`)
+### Helper Layer (`EZRWorkerHelper/`)
 
 - `main.swift` — daemon entry point, XPC listener setup, JSONL logging with rotation.
 - **Operations/** — privileged operations organized by domain:
@@ -101,7 +101,7 @@ The helper binary is embedded into the app bundle at `Contents/Library/LaunchDae
 
 ### State Management
 
-Uses Swift `@Observable` (Observation framework) throughout. Key observable objects are injected via SwiftUI `.environment()` from `ClawdHomeApp.swift`: `HelperClient`, `ShrimpPool`, `UpdateChecker`, `GlobalModelStore`, `ProviderKeychainStore`, `GatewayHub`, `AppLockStore`.
+Uses Swift `@Observable` (Observation framework) throughout. Key observable objects are injected via SwiftUI `.environment()` from `EZRWorkerApp.swift`: `HelperClient`, `ShrimpPool`, `UpdateChecker`, `GlobalModelStore`, `ProviderKeychainStore`, `GatewayHub`, `AppLockStore`.
 
 ### Versioning
 
@@ -121,8 +121,8 @@ Build numbers are **auto-derived** from git commit count (`git rev-list --count 
 
 | Path | Purpose |
 |------|---------|
-| `/tmp/clawdhome-helper.log` | Helper JSONL log (2MB max, 3 rotations) |
-| `/var/lib/clawdhome/` | Helper persistent state (init progress, debug flag, autostart config) |
+| `/tmp/ezrworker-helper.log` | Helper JSONL log (2MB max, 3 rotations) |
+| `/var/lib/ezrworker/` | Helper persistent state (init progress, debug flag, autostart config) |
 | `~<shrimp>/.openclaw/` | Per-Shrimp OpenClaw config and data |
 | `~<shrimp>/.npm-global/` | Per-Shrimp npm global install directory |
 
@@ -130,5 +130,5 @@ Build numbers are **auto-derived** from git commit count (`git rev-list --count 
 
 - Code comments and Makefile help text are in **Chinese**.
 - XPC protocol changes require updating `Shared/HelperProtocol.swift` — both targets compile this file.
-- The helper runs as a LaunchDaemon (`/Library/LaunchDaemons/ai.clawdhome.mac.helper.plist`). During development, use `make install-helper` to deploy it.
+- The helper runs as a LaunchDaemon (`/Library/LaunchDaemons/ai.ezrworker.mac.helper.plist`). During development, use `make install-helper` to deploy it.
 - JSON is the serialization format for complex data passed over XPC (encoded as String, decoded on both sides using shared Codable models).

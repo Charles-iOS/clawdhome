@@ -1,4 +1,4 @@
-name: ClawdHome
+name: EZRWorker
 
 packages:
   SwiftTerm:
@@ -16,15 +16,15 @@ configs:
   Release: release
 
 targets:
-  ClawdHome:
+  EZRWorker:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: ClawdHome
+      - path: EZRWorkerApp
       - path: Shared
     dependencies:
-      - target: ClawdHomeHelper
+      - target: EZRWorkerHelper
         embed: false
       - target: EZRWorkerSupervisor
         embed: false
@@ -38,9 +38,9 @@ targets:
         script: |
           BUILD_NUM=$(git -C "${SRCROOT}" rev-list --count HEAD 2>/dev/null || echo 0)
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUM}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
-          MARKETING_VER="${CLAWDHOME_MARKETING_VERSION_OVERRIDE:-${MARKETING_VERSION:-}}"
+          MARKETING_VER="${EZRWORKER_MARKETING_VERSION_OVERRIDE:-${CLAWDHOME_MARKETING_VERSION_OVERRIDE:-${MARKETING_VERSION:-}}}"
           if [ -z "$MARKETING_VER" ]; then
-            MARKETING_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${SRCROOT}/ClawdHome/Info.plist" 2>/dev/null || echo "1.6.0")
+            MARKETING_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${SRCROOT}/EZRWorkerApp/Info.plist" 2>/dev/null || echo "1.6.0")
           fi
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VER}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
         basedOnDependencyAnalysis: false
@@ -74,42 +74,42 @@ targets:
         PRODUCT_NAME: EZRWorker
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        CODE_SIGN_ENTITLEMENTS: ClawdHome/ClawdHome.entitlements
+        CODE_SIGN_ENTITLEMENTS: EZRWorkerApp/EZRWorker.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
-      path: ClawdHome/Info.plist
+      path: EZRWorkerApp/Info.plist
       properties:
         CFBundleName: $(PRODUCT_NAME)
         CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundleIconFile: AppIcon.icns
         AuthAPIBaseURL: "http://localhost:2222"
-        NSHumanReadableDescription: OpenClaw 家庭管理器
+        NSHumanReadableDescription: EZRWorker OpenClaw 管理器
         LSApplicationCategoryType: public.app-category.utilities
 
-  ClawdHomeHelper:
+  EZRWorkerHelper:
     type: tool
     platform: macOS
     deploymentTarget: "14.0"
     sources:
-      - path: ClawdHomeHelper
+      - path: EZRWorkerHelper
       - path: Shared
       - path: Shared/ProcessModels.swift
-      - path: ClawdHomeHelper/GeneratedVersion.swift
+      - path: EZRWorkerHelper/GeneratedVersion.swift
         optional: true
         type: file
     preBuildScripts:
       - name: "Generate Helper Version"
         script: |
-          BUILD_NUM="${CLAWDHOME_BUILD_NUMBER_OVERRIDE:-${CURRENT_PROJECT_VERSION:-}}"
+          BUILD_NUM="${EZRWORKER_BUILD_NUMBER_OVERRIDE:-${CLAWDHOME_BUILD_NUMBER_OVERRIDE:-${CURRENT_PROJECT_VERSION:-}}}"
           if [ -z "$BUILD_NUM" ]; then
             BUILD_NUM=$(git -C "${SRCROOT}" rev-list --count HEAD 2>/dev/null || echo 0)
           fi
-          MARKETING_VER="${CLAWDHOME_MARKETING_VERSION_OVERRIDE:-${MARKETING_VERSION:-}}"
+          MARKETING_VER="${EZRWORKER_MARKETING_VERSION_OVERRIDE:-${CLAWDHOME_MARKETING_VERSION_OVERRIDE:-${MARKETING_VERSION:-}}}"
           if [ -z "$MARKETING_VER" ]; then
-            MARKETING_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${SRCROOT}/ClawdHome/Info.plist" 2>/dev/null || true)
+            MARKETING_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${SRCROOT}/EZRWorkerApp/Info.plist" 2>/dev/null || true)
           fi
           if [ -n "$MARKETING_VER" ] && [ -n "$BUILD_NUM" ]; then
             HELPER_VER="${MARKETING_VER} (${BUILD_NUM})"
@@ -118,12 +118,12 @@ targets:
           else
             HELPER_VER="${BUILD_NUM}"
           fi
-          OUT="${SRCROOT}/ClawdHomeHelper/GeneratedVersion.swift"
+          OUT="${SRCROOT}/EZRWorkerHelper/GeneratedVersion.swift"
           echo "// Auto-generated — do not edit" > "$OUT"
           echo "let kHelperVersion = \"${HELPER_VER}\"" >> "$OUT"
         basedOnDependencyAnalysis: false
         outputFiles:
-          - $(SRCROOT)/ClawdHomeHelper/GeneratedVersion.swift
+          - $(SRCROOT)/EZRWorkerHelper/GeneratedVersion.swift
     dependencies:
       - framework: SystemConfiguration.framework
         embed: false
@@ -135,7 +135,7 @@ targets:
         PRODUCT_NAME: EZRWorkerHelper
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        CODE_SIGN_ENTITLEMENTS: ClawdHomeHelper/ClawdHomeHelper.entitlements
+        CODE_SIGN_ENTITLEMENTS: EZRWorkerHelper/EZRWorkerHelper.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES

@@ -8,7 +8,7 @@ import sys
 from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-APP_DIR = ROOT / "ClawdHome"
+APP_DIR = ROOT / "EZRWorkerApp"
 CATALOG_FILE = APP_DIR / "Stable.xcstrings"
 
 CJK_RE = re.compile(r"[\u3400-\u9fff]")

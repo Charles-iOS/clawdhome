@@ -24,8 +24,8 @@ enum ManagedUserFilter {
     }
 }
 
-/// Helper 对外暴露的操作接口（ClawdHome.app 调用）
-@objc protocol ClawdHomeHelperProtocol: NSObjectProtocol {
+/// Helper 对外暴露的操作接口（EZRWorker.app 调用）
+@objc protocol EZRWorkerHelperProtocol: NSObjectProtocol {
     /// 获取 Helper 版本号，用于连通性验证
     func getVersion(withReply reply: @escaping (String) -> Void)
 
@@ -209,7 +209,7 @@ enum ManagedUserFilter {
         withReply reply: @escaping (String?) -> Void
     )
 
-    /// 保存指定用户的向导初始化进度（JSON 字符串）到 /var/lib/clawdhome/<username>-init.json
+    /// 保存指定用户的向导初始化进度（JSON 字符串）到 /var/lib/ezrworker/<username>-init.json
     func saveInitState(
         username: String,
         json: String,
@@ -559,7 +559,7 @@ enum ManagedUserFilter {
         withReply reply: @escaping (Bool, String?) -> Void
     )
 
-    /// 读取 /var/log/clawdhome/ 下的系统审计日志（限 2MB）
+    /// 读取 /var/log/ezrworker/ 下的系统审计日志（限 2MB）
     /// name: "gateway"
     func readSystemLog(
         name: String,
@@ -568,7 +568,7 @@ enum ManagedUserFilter {
 
     // MARK: - Helper 日志设置
 
-    /// 设置 Helper 是否输出 DEBUG 级别日志（持久化到 /var/lib/clawdhome）
+    /// 设置 Helper 是否输出 DEBUG 级别日志（持久化到 /var/lib/ezrworker）
     func setHelperDebugLogging(
         enabled: Bool,
         withReply reply: @escaping (Bool, String?) -> Void

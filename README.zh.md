@@ -1,4 +1,4 @@
-# ClawdHome
+# EZRWorker
 
 [![macOS](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://clawdhome.app)
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://developer.apple.com/swift/)
@@ -9,7 +9,7 @@
 
 > 面向 macOS 的原生控制平面，用一台 Mac 安全地运行、隔离并管理多个 OpenClaw gateway 实例。
 
-ClawdHome 适合那些希望在一台机器上托管多只 OpenClaw “虾”，但又不希望身份、数据、权限和运维风险混在一起的人。它把 SwiftUI 管理应用、特权 XPC helper daemon 和 macOS 多用户隔离机制组合成一个完整工作流，用于初始化、监控、克隆、维护和恢复。
+EZRWorker 适合那些希望在一台机器上托管多只 OpenClaw “虾”，但又不希望身份、数据、权限和运维风险混在一起的人。它把 SwiftUI 管理应用、特权 XPC helper daemon 和 macOS 多用户隔离机制组合成一个完整工作流，用于初始化、监控、克隆、维护和恢复。
 
 官网：[clawdhome.app](https://clawdhome.app)  
 下载：[GitHub Releases](https://github.com/ThinkInAIXYZ/clawdhome/releases)  
@@ -45,7 +45,7 @@ ClawdHome 适合那些希望在一台机器上托管多只 OpenClaw “虾”，
   </tr>
 </table>
 
-## 为什么是 ClawdHome
+## 为什么是 EZRWorker
 
 - 真隔离：每只虾对应独立的 macOS 用户、运行时、数据目录和权限边界。
 - 更安全的特权模型：系统级操作全部走显式 XPC helper，而不是在 UI 里临时拼 shell。
@@ -67,13 +67,13 @@ ClawdHome 适合那些希望在一台机器上托管多只 OpenClaw “虾”，
 ## 架构概览
 
 ```text
-ClawdHome.app（SwiftUI 管理界面）
-  -> XPC -> ClawdHomeHelper（特权 LaunchDaemon）
+EZRWorker.app（SwiftUI 管理界面）
+  -> XPC -> EZRWorkerHelper（特权 LaunchDaemon）
       -> 按用户隔离的 OpenClaw gateway 实例
 ```
 
-- `ClawdHome.app` 是面向操作者的控制平面，负责状态展示、初始化和日常运维。
-- `ClawdHomeHelper` 是特权边界，负责用户管理、进程控制、文件操作、安装和系统级自动化。
+- `EZRWorker.app` 是面向操作者的控制平面，负责状态展示、初始化和日常运维。
+- `EZRWorkerHelper` 是特权边界，负责用户管理、进程控制、文件操作、安装和系统级自动化。
 - 每只虾都作为独立 macOS 用户运行，拥有各自的 OpenClaw 运行时与数据。
 
 ## 安全模型
@@ -94,14 +94,14 @@ ClawdHome.app（SwiftUI 管理界面）
 ### 从源码启动
 
 ```bash
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 如果你希望先重新生成工程：
 
 ```bash
 xcodegen generate
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 ### 本地开发安装 Helper
@@ -161,14 +161,14 @@ sudo xcodebuild -license accept
 
 ### 日志在哪里看
 
-- Helper 日志：`/tmp/clawdhome-helper.log`
+- Helper 日志：`/tmp/ezrworker-helper.log`
 - App 日志流：`make log-app`
 
 ## 仓库结构
 
 ```text
-ClawdHome/          SwiftUI 应用、视图、模型、服务
-ClawdHomeHelper/    特权 helper daemon 与运维操作
+EZRWorkerApp/          SwiftUI 应用、视图、模型、服务
+EZRWorkerHelper/    特权 helper daemon 与运维操作
 Shared/             App 与 Helper 共享协议和数据模型
 Resources/          LaunchDaemon plist 与打包资源
 scripts/            构建、安装、打包、发布与 i18n 工具

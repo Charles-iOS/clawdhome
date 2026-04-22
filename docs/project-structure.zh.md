@@ -1,34 +1,34 @@
-# ClawdHome 项目结构说明
+# EZRWorker 项目结构说明
 
 本文只保留当前开发和维护真正需要关注的目录与文件，用来帮助快速理解这个仓库。构建产物、发布草稿、截图资源和内部计划类内容不在这里展开。
 
 ## 1. 项目定位
 
-ClawdHome 现在的主要目标，是作为一个面向 macOS 的本地控制平面，管理当前用户正在运行的 OpenClaw gateway 实例，并围绕这个 gateway 创建、配置和维护多个 agent。它不是单一进程应用，而是由下面三部分共同组成：
+EZRWorker 现在的主要目标，是作为一个面向 macOS 的本地控制平面，管理当前用户正在运行的 OpenClaw gateway 实例，并围绕这个 gateway 创建、配置和维护多个 agent。它不是单一进程应用，而是由下面三部分共同组成：
 
-- `ClawdHome` target：SwiftUI 管理应用，`project.yml` 里定义的产品名是 `EZRWorker`
-- `ClawdHomeHelper` target：以 root 权限运行的特权 Helper / LaunchDaemon
+- `EZRWorker` target：SwiftUI 管理应用，`project.yml` 里定义的产品名是 `EZRWorker`
+- `EZRWorkerHelper` target：以 root 权限运行的特权 Helper / LaunchDaemon
 - `Shared`：App 与 Helper 共用的 XPC 协议、数据模型和状态对象
 
 运行时可以把它理解成：
 
 ```text
 操作员
-  -> ClawdHome.app / EZRWorker（SwiftUI）
+  -> EZRWorker.app / EZRWorker（SwiftUI）
       -> HelperClient（NSXPC）
-          -> ClawdHomeHelper（root LaunchDaemon）
+          -> EZRWorkerHelper（root LaunchDaemon）
               -> Gateway 管理 / 文件与进程操作 / 必要的系统级能力
                   -> 当前用户下运行的 OpenClaw gateway
                       -> 该 gateway 下的多个 agent
 ```
 
-当前主入口已经切到 `ClawdHome/EZRWorker/` 这套以单 gateway、多 agent 为中心的新结构，但 `ClawdHome/Views/` 里仍保留了一部分早期多用户管理时期的页面和辅助窗口，所以这个仓库目前属于“新主框架 + 存量旧模块并存”的状态。
+当前主入口已经切到 `EZRWorkerApp/EZRWorker/` 这套以单 gateway、多 agent 为中心的新结构，但 `EZRWorkerApp/Views/` 里仍保留了一部分早期多用户管理时期的页面和辅助窗口，所以这个仓库目前属于“新主框架 + 存量旧模块并存”的状态。
 
 ## 2. 启动链路
 
 如果你第一次接手这个项目，先理解启动链路会比先翻所有页面更有效：
 
-1. `ClawdHome/EZRWorker/App/ClawdHomeApp.swift`
+1. `EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`
 2. 环境检查与 Gateway 启动：`EnvironmentChecker`、`GatewayProcessManager`
 3. Gateway 连接：`GatewayService`
 4. Helper 连接：`HelperClient`
@@ -44,7 +44,7 @@ Makefile
 README.md
 README.zh.md
 
-ClawdHome/
+EZRWorkerApp/
   EZRWorker/
     App/
     Models/
@@ -56,7 +56,7 @@ ClawdHome/
   Stable.xcstrings
   Info.plist
 
-ClawdHomeHelper/
+EZRWorkerHelper/
   main.swift
   Operations/
 
@@ -73,28 +73,28 @@ docs/
 - [`../Makefile`](../Makefile)：本地开发、打包、安装 Helper、i18n 检查等常用命令入口
 - [`../README.zh.md`](../README.zh.md)：产品定位、快速开始、常用命令和基础架构说明
 
-### `ClawdHome/`
+### `EZRWorkerApp/`
 
 - `EZRWorker/App/`
   - 当前主应用入口与主导航壳层
   - 重点文件：
-    - [`../ClawdHome/EZRWorker/App/ClawdHomeApp.swift`](../ClawdHome/EZRWorker/App/ClawdHomeApp.swift)
-    - [`../ClawdHome/EZRWorker/App/MainView.swift`](../ClawdHome/EZRWorker/App/MainView.swift)
-    - [`../ClawdHome/EZRWorker/App/Sidebar/SidebarView.swift`](../ClawdHome/EZRWorker/App/Sidebar/SidebarView.swift)
+    - [`../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`](../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift)
+    - [`../EZRWorkerApp/EZRWorker/App/MainView.swift`](../EZRWorkerApp/EZRWorker/App/MainView.swift)
+    - [`../EZRWorkerApp/EZRWorker/App/Sidebar/SidebarView.swift`](../EZRWorkerApp/EZRWorker/App/Sidebar/SidebarView.swift)
 - `EZRWorker/Models/`
   - agent、绑定、渠道、模型状态、密钥配置等核心模型
   - 重点文件：
-    - [`../ClawdHome/EZRWorker/Models/Agent.swift`](../ClawdHome/EZRWorker/Models/Agent.swift)
-    - [`../ClawdHome/EZRWorker/Models/AgentBinding.swift`](../ClawdHome/EZRWorker/Models/AgentBinding.swift)
-    - [`../ClawdHome/EZRWorker/Models/ChannelType.swift`](../ClawdHome/EZRWorker/Models/ChannelType.swift)
+    - [`../EZRWorkerApp/EZRWorker/Models/Agent.swift`](../EZRWorkerApp/EZRWorker/Models/Agent.swift)
+    - [`../EZRWorkerApp/EZRWorker/Models/AgentBinding.swift`](../EZRWorkerApp/EZRWorker/Models/AgentBinding.swift)
+    - [`../EZRWorkerApp/EZRWorker/Models/ChannelType.swift`](../EZRWorkerApp/EZRWorker/Models/ChannelType.swift)
 - `EZRWorker/Services/`
   - 新架构的应用服务层，负责 Gateway、XPC、工作区、更新、环境检查、Provider Key 等
   - 重点文件：
-    - [`../ClawdHome/EZRWorker/Services/HelperClient.swift`](../ClawdHome/EZRWorker/Services/HelperClient.swift)
-    - [`../ClawdHome/EZRWorker/Services/Gateway/GatewayService.swift`](../ClawdHome/EZRWorker/Services/Gateway/GatewayService.swift)
-    - [`../ClawdHome/EZRWorker/Services/Gateway/GatewayProcessManager.swift`](../ClawdHome/EZRWorker/Services/Gateway/GatewayProcessManager.swift)
-    - [`../ClawdHome/EZRWorker/Services/Stores/AgentStore.swift`](../ClawdHome/EZRWorker/Services/Stores/AgentStore.swift)
-    - [`../ClawdHome/EZRWorker/Services/AgentWorkspaceManager.swift`](../ClawdHome/EZRWorker/Services/AgentWorkspaceManager.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayProcessManager.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayProcessManager.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift`](../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/AgentWorkspaceManager.swift`](../EZRWorkerApp/EZRWorker/Services/AgentWorkspaceManager.swift)
 - `EZRWorker/Views/`
   - 新主界面的页面实现
   - 子目录可以按业务理解：
@@ -107,34 +107,34 @@ docs/
   - 历史阶段留下的旧功能页与辅助窗口，部分仍被详情窗口、初始化向导、备份、克隆等流程复用
   - 这部分不是当前主导航壳层，且不少能力带有早期多用户管理背景，阅读时要和现有产品定位区分开
   - 重点文件：
-    - [`../ClawdHome/Views/UserDetailView.swift`](../ClawdHome/Views/UserDetailView.swift)
-    - [`../ClawdHome/Views/UserInitWizardView.swift`](../ClawdHome/Views/UserInitWizardView.swift)
-    - [`../ClawdHome/Views/CloneClawSheet.swift`](../ClawdHome/Views/CloneClawSheet.swift)
-    - [`../ClawdHome/Views/ModelManager/ModelManagerView.swift`](../ClawdHome/Views/ModelManager/ModelManagerView.swift)
+    - [`../EZRWorkerApp/Views/UserDetailView.swift`](../EZRWorkerApp/Views/UserDetailView.swift)
+    - [`../EZRWorkerApp/Views/UserInitWizardView.swift`](../EZRWorkerApp/Views/UserInitWizardView.swift)
+    - [`../EZRWorkerApp/Views/CloneClawSheet.swift`](../EZRWorkerApp/Views/CloneClawSheet.swift)
+    - [`../EZRWorkerApp/Views/ModelManager/ModelManagerView.swift`](../EZRWorkerApp/Views/ModelManager/ModelManagerView.swift)
 - `Localization/`
   - 语言切换与本地化访问封装
   - 重点文件：
-    - [`../ClawdHome/Localization/L10n.swift`](../ClawdHome/Localization/L10n.swift)
-    - [`../ClawdHome/Localization/AppLanguage.swift`](../ClawdHome/Localization/AppLanguage.swift)
+    - [`../EZRWorkerApp/Localization/L10n.swift`](../EZRWorkerApp/Localization/L10n.swift)
+    - [`../EZRWorkerApp/Localization/AppLanguage.swift`](../EZRWorkerApp/Localization/AppLanguage.swift)
 - `Stable.xcstrings`
   - 中英文字符串总表，整个仓库的 UI 文案应优先走这里
 - `Info.plist`
   - App 基础信息与版本号来源
 
-### `ClawdHomeHelper/`
+### `EZRWorkerHelper/`
 
-- [`../ClawdHomeHelper/main.swift`](../ClawdHomeHelper/main.swift)
+- [`../EZRWorkerHelper/main.swift`](../EZRWorkerHelper/main.swift)
   - Helper 主入口
   - 负责 XPC listener、调用方校验、日志、状态维护和协议实现
 - `Operations/`
   - 真正执行系统级操作的地方，基本都要求 root 权限
   - 重点文件：
-    - [`../ClawdHomeHelper/Operations/UserManager.swift`](../ClawdHomeHelper/Operations/UserManager.swift)：创建/删除 macOS 用户、目录和群组清理
-    - [`../ClawdHomeHelper/Operations/GatewayManager.swift`](../ClawdHomeHelper/Operations/GatewayManager.swift)：为每个用户安装、启动、停止 gateway
-    - [`../ClawdHomeHelper/Operations/UserFileManager.swift`](../ClawdHomeHelper/Operations/UserFileManager.swift)：文件读写、目录管理、归档解压
-    - [`../ClawdHomeHelper/Operations/ProcessManager.swift`](../ClawdHomeHelper/Operations/ProcessManager.swift)：进程列表、详情和 kill
-    - [`../ClawdHomeHelper/Operations/InstallManager.swift`](../ClawdHomeHelper/Operations/InstallManager.swift)：Node/OpenClaw 等安装能力
-    - [`../ClawdHomeHelper/Operations/DashboardCollector.swift`](../ClawdHomeHelper/Operations/DashboardCollector.swift)：仪表盘快照采集
+    - [`../EZRWorkerHelper/Operations/UserManager.swift`](../EZRWorkerHelper/Operations/UserManager.swift)：创建/删除 macOS 用户、目录和群组清理
+    - [`../EZRWorkerHelper/Operations/GatewayManager.swift`](../EZRWorkerHelper/Operations/GatewayManager.swift)：为每个用户安装、启动、停止 gateway
+    - [`../EZRWorkerHelper/Operations/UserFileManager.swift`](../EZRWorkerHelper/Operations/UserFileManager.swift)：文件读写、目录管理、归档解压
+    - [`../EZRWorkerHelper/Operations/ProcessManager.swift`](../EZRWorkerHelper/Operations/ProcessManager.swift)：进程列表、详情和 kill
+    - [`../EZRWorkerHelper/Operations/InstallManager.swift`](../EZRWorkerHelper/Operations/InstallManager.swift)：Node/OpenClaw 等安装能力
+    - [`../EZRWorkerHelper/Operations/DashboardCollector.swift`](../EZRWorkerHelper/Operations/DashboardCollector.swift)：仪表盘快照采集
 
 ### `Shared/`
 
@@ -151,7 +151,7 @@ docs/
 
 - 放 Helper 的 LaunchDaemon plist 这类运行时资源
 - 重点文件：
-  - [`../Resources/ai.clawdhome.mac.helper.plist`](../Resources/ai.clawdhome.mac.helper.plist)
+  - [`../Resources/ai.ezrworker.mac.helper.plist`](../Resources/ai.ezrworker.mac.helper.plist)
 
 ### `scripts/`
 
@@ -185,30 +185,30 @@ docs/
 | 文件 | 作用 |
 | --- | --- |
 | [`../project.yml`](../project.yml) | 定义两个 target、依赖、脚本和打包方式 |
-| [`../ClawdHome/EZRWorker/App/ClawdHomeApp.swift`](../ClawdHome/EZRWorker/App/ClawdHomeApp.swift) | App 真正启动入口，负责 bootstrap |
-| [`../ClawdHome/EZRWorker/App/MainView.swift`](../ClawdHome/EZRWorker/App/MainView.swift) | 当前主界面壳层 |
-| [`../ClawdHome/EZRWorker/Services/HelperClient.swift`](../ClawdHome/EZRWorker/Services/HelperClient.swift) | App 侧 XPC 客户端封装 |
-| [`../ClawdHome/EZRWorker/Services/Gateway/GatewayService.swift`](../ClawdHome/EZRWorker/Services/Gateway/GatewayService.swift) | App 侧 Gateway 连接与配置访问 |
-| [`../ClawdHome/EZRWorker/Services/Stores/AgentStore.swift`](../ClawdHome/EZRWorker/Services/Stores/AgentStore.swift) | agent 列表、绑定和工作区状态的主数据源 |
+| [`../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`](../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift) | App 真正启动入口，负责 bootstrap |
+| [`../EZRWorkerApp/EZRWorker/App/MainView.swift`](../EZRWorkerApp/EZRWorker/App/MainView.swift) | 当前主界面壳层 |
+| [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift) | App 侧 XPC 客户端封装 |
+| [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift) | App 侧 Gateway 连接与配置访问 |
+| [`../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift`](../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift) | agent 列表、绑定和工作区状态的主数据源 |
 | [`../Shared/HelperProtocol.swift`](../Shared/HelperProtocol.swift) | App/Helper 协议边界 |
-| [`../ClawdHomeHelper/main.swift`](../ClawdHomeHelper/main.swift) | Helper 主入口与 XPC 服务实现 |
-| [`../ClawdHomeHelper/Operations/UserManager.swift`](../ClawdHomeHelper/Operations/UserManager.swift) | macOS 用户生命周期管理 |
-| [`../ClawdHomeHelper/Operations/GatewayManager.swift`](../ClawdHomeHelper/Operations/GatewayManager.swift) | gateway 生命周期管理与启动收敛逻辑 |
+| [`../EZRWorkerHelper/main.swift`](../EZRWorkerHelper/main.swift) | Helper 主入口与 XPC 服务实现 |
+| [`../EZRWorkerHelper/Operations/UserManager.swift`](../EZRWorkerHelper/Operations/UserManager.swift) | macOS 用户生命周期管理 |
+| [`../EZRWorkerHelper/Operations/GatewayManager.swift`](../EZRWorkerHelper/Operations/GatewayManager.swift) | gateway 生命周期管理与启动收敛逻辑 |
 
 ## 5. 现在这套结构应该怎么理解
 
 这套代码目前可以按“4 层”理解：
 
-1. 界面层：`ClawdHome/EZRWorker/Views` 和部分 `ClawdHome/Views`
-2. 应用服务层：`ClawdHome/EZRWorker/Services`
+1. 界面层：`EZRWorkerApp/EZRWorker/Views` 和部分 `EZRWorkerApp/Views`
+2. 应用服务层：`EZRWorkerApp/EZRWorker/Services`
 3. 协议与共享模型层：`Shared`
-4. 系统操作层：`ClawdHomeHelper/Operations`
+4. 系统操作层：`EZRWorkerHelper/Operations`
 
 其中最容易混淆的一点是：
 
 - 当前主窗口导航在 `EZRWorker/App/MainView.swift`
-- 但用户详情、初始化向导、克隆等窗口仍会复用 `ClawdHome/Views/` 下的旧页面
-- 所以 `ClawdHome/Views/` 不能简单视为废弃目录，但也不能把它当成当前产品主模型的唯一依据
+- 但用户详情、初始化向导、克隆等窗口仍会复用 `EZRWorkerApp/Views/` 下的旧页面
+- 所以 `EZRWorkerApp/Views/` 不能简单视为废弃目录，但也不能把它当成当前产品主模型的唯一依据
 
 再直白一点说：
 
@@ -223,14 +223,14 @@ docs/
 如果已经有工程文件，直接：
 
 ```bash
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 如果你修改了 [`../project.yml`](../project.yml)，建议先重新生成工程：
 
 ```bash
 xcodegen generate
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 ### 常用命令
@@ -255,10 +255,10 @@ make clean
 
 1. [`../README.zh.md`](../README.zh.md)
 2. [`../project.yml`](../project.yml)
-3. [`../ClawdHome/EZRWorker/App/ClawdHomeApp.swift`](../ClawdHome/EZRWorker/App/ClawdHomeApp.swift)
-4. [`../ClawdHome/EZRWorker/Services/HelperClient.swift`](../ClawdHome/EZRWorker/Services/HelperClient.swift)
+3. [`../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`](../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift)
+4. [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift)
 5. [`../Shared/HelperProtocol.swift`](../Shared/HelperProtocol.swift)
-6. [`../ClawdHomeHelper/main.swift`](../ClawdHomeHelper/main.swift)
+6. [`../EZRWorkerHelper/main.swift`](../EZRWorkerHelper/main.swift)
 7. `AgentStore` / `GatewayService` / `GatewayManager` 这三条主线
 
 ## 7. 相关说明文档索引

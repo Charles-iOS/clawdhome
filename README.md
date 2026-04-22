@@ -1,4 +1,4 @@
-# ClawdHome
+# EZRWorker
 
 [![macOS](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://clawdhome.app)
 [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white)](https://developer.apple.com/swift/)
@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 > Native macOS control plane for securely running and managing multiple isolated OpenClaw gateway instances on a single Mac.
 
-ClawdHome is built for people who want one machine to host multiple OpenClaw "Shrimps" without mixing identities, data, permissions, or operational risk. It combines a SwiftUI admin app, a privileged XPC helper daemon, and macOS multi-user isolation into a single workflow for setup, monitoring, cloning, maintenance, and recovery.
+EZRWorker is built for people who want one machine to host multiple OpenClaw "Shrimps" without mixing identities, data, permissions, or operational risk. It combines a SwiftUI admin app, a privileged XPC helper daemon, and macOS multi-user isolation into a single workflow for setup, monitoring, cloning, maintenance, and recovery.
 
 Website: [clawdhome.app](https://clawdhome.app)  
 Downloads: [GitHub Releases](https://github.com/ThinkInAIXYZ/clawdhome/releases)  
@@ -45,7 +45,7 @@ Changelog: [English](CHANGELOG.en.md) | [中文](CHANGELOG.zh.md)
   </tr>
 </table>
 
-## Why ClawdHome
+## Why EZRWorker
 
 - Real isolation: each Shrimp maps to its own macOS user account, runtime context, data, and permission boundary.
 - Safer privilege model: system-level actions are routed through an explicit XPC helper instead of ad-hoc shell flows inside the UI app.
@@ -67,13 +67,13 @@ Changelog: [English](CHANGELOG.en.md) | [中文](CHANGELOG.zh.md)
 ## Architecture
 
 ```text
-ClawdHome.app (SwiftUI admin UI)
-  -> XPC -> ClawdHomeHelper (privileged LaunchDaemon)
+EZRWorker.app (SwiftUI admin UI)
+  -> XPC -> EZRWorkerHelper (privileged LaunchDaemon)
       -> per-user OpenClaw gateway instances
 ```
 
-- `ClawdHome.app` is the operator-facing control plane for status, setup, and day-to-day maintenance.
-- `ClawdHomeHelper` is the privileged boundary for user management, process control, file operations, installs, and system automation.
+- `EZRWorker.app` is the operator-facing control plane for status, setup, and day-to-day maintenance.
+- `EZRWorkerHelper` is the privileged boundary for user management, process control, file operations, installs, and system automation.
 - Each Shrimp runs as a separate macOS user with its own OpenClaw runtime and data.
 
 ## Security Model
@@ -94,14 +94,14 @@ ClawdHome.app (SwiftUI admin UI)
 ### Build From Source
 
 ```bash
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 If you prefer to regenerate the Xcode project first:
 
 ```bash
 xcodegen generate
-open ClawdHome.xcodeproj
+open EZRWorker.xcodeproj
 ```
 
 ### Install Helper For Local Development
@@ -161,14 +161,14 @@ sudo xcodebuild -license accept
 
 ### Where to look for logs
 
-- Helper log: `/tmp/clawdhome-helper.log`
+- Helper log: `/tmp/ezrworker-helper.log`
 - App log stream: `make log-app`
 
 ## Repository Layout
 
 ```text
-ClawdHome/          SwiftUI app, views, models, services
-ClawdHomeHelper/    privileged helper daemon and operations
+EZRWorkerApp/          SwiftUI app, views, models, services
+EZRWorkerHelper/    privileged helper daemon and operations
 Shared/             protocols and shared models for app/helper
 Resources/          launch daemon plist and packaging resources
 scripts/            build, install, packaging, release, and i18n utilities

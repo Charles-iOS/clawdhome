@@ -45,7 +45,7 @@ ZH_FILE="$NOTES_DIR/v${VERSION}.zh.md"
 EN_FILE="$NOTES_DIR/v${VERSION}.en.md"
 
 PROMPT=$(cat <<EOF
-You are writing public-facing software release notes for a macOS app called ClawdHome.
+You are writing public-facing software release notes for a macOS app called EZRWorker.
 
 Write concise, user-friendly release notes for version ${VERSION} in BOTH Simplified Chinese and English.
 

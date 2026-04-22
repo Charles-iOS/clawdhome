@@ -6,7 +6,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-APP_DIR = ROOT / "ClawdHome"
+APP_DIR = ROOT / "EZRWorkerApp"
 PATTERN = re.compile(r"L10n\.t\(")
 
 

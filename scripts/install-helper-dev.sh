@@ -4,8 +4,8 @@
 # 用途：在真机上测试，绕过 SMAppService 签名要求
 #
 # 用法：
-#   sudo bash apps/ClawdHome/scripts/install-helper-dev.sh           # 安装
-#   sudo bash apps/ClawdHome/scripts/install-helper-dev.sh uninstall # 卸载
+#   sudo bash apps/EZRWorker/scripts/install-helper-dev.sh           # 安装
+#   sudo bash apps/EZRWorker/scripts/install-helper-dev.sh uninstall # 卸载
 
 set -euo pipefail
 
@@ -34,7 +34,7 @@ install)
     BUILT_BINARY=$(find_built_binary)
     if [ -z "$BUILT_BINARY" ]; then
         echo "❌ 未在 DerivedData 中找到 EZRWorkerHelper"
-        echo "   请先在 Xcode 中 Build ClawdHome scheme（⌘B）"
+        echo "   请先在 Xcode 中 Build EZRWorker / EZRWorkerHelper（⌘B）"
         exit 1
     fi
     echo "📦 安装来源：$BUILT_BINARY"
@@ -69,9 +69,9 @@ install)
     <key>KeepAlive</key>
     <true/>
     <key>StandardErrorPath</key>
-    <string>/tmp/clawdhome-helper.log</string>
+    <string>/tmp/ezrworker-helper.log</string>
     <key>StandardOutPath</key>
-    <string>/tmp/clawdhome-helper.log</string>
+    <string>/tmp/ezrworker-helper.log</string>
 </dict>
 </plist>
 EOF
@@ -81,7 +81,7 @@ EOF
     launchctl bootstrap system "$PLIST_PATH"
 
     echo "✅ EZRWorkerHelper 已安装并启动"
-    echo "   日志：tail -f /tmp/clawdhome-helper.log"
+    echo "   日志：tail -f /tmp/ezrworker-helper.log"
     echo "   现在可以运行 EZRWorker.app 进行测试"
     ;;
 

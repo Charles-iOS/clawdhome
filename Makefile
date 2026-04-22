@@ -1,11 +1,11 @@
-# Makefile — ClawdHome 开发工具
+# Makefile — EZRWorker 开发工具
 # 用法：make <target>
 
-PROJECT    := ClawdHome.xcodeproj
-SCHEME_APP := ClawdHome
-SCHEME_HLP := ClawdHomeHelper
+PROJECT    := EZRWorker.xcodeproj
+SCHEME_APP := EZRWorker
+SCHEME_HLP := EZRWorkerHelper
 APP_NAME   := EZRWorker
-INFO_PLIST := ClawdHome/Info.plist
+INFO_PLIST := EZRWorkerApp/Info.plist
 PLIST      := /usr/libexec/PlistBuddy
 BUILD_COUNTER_FILE := .build-version
 INITIAL_BUILD_NUMBER := 500
@@ -43,7 +43,7 @@ help:
 	@echo "  pkg-all          连续打包 arm64 + x86_64（分开两个 pkg）"
 	@echo "  pkg-skip-build   跳过构建直接打开发包"
 	@echo "  pkg-signed       生成已签名未公证安装包（发布前本地验收推荐）"
-	@echo "  notarize-pkg     生成已签名且已公证安装包（读取 NOTARY_PROFILE / CLAWDHOME_NOTARY_PROFILE）"
+	@echo "  notarize-pkg     生成已签名且已公证安装包（读取 NOTARY_PROFILE）"
 	@echo "  QUIET_XCODE=false 可显示完整 xcodebuild 输出（默认静默并写入 build/logs/）"
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
@@ -51,7 +51,7 @@ help:
 	@echo "  install-hooks    安装 git commit-msg / pre-commit hooks"
 	@echo "  run-release      直接运行 build/export 里的 Release 包（无需安装）"
 	@echo "  install-pkg      安装最新 pkg 到 /Applications（需要 sudo）"
-	@echo "  log-helper       实时跟踪 Helper 日志（/tmp/clawdhome-helper.log）"
+	@echo "  log-helper       实时跟踪 Helper 日志（/tmp/ezrworker-helper.log）"
 	@echo "  log-app          实时跟踪 App 系统日志（os_log）"
 	@echo "  i18n             运行 Stable.xcstrings 本地化检查"
 	@echo "  i18n-check       本地化 CI 检查（未本地化/缺失翻译/占位符一致性）"
@@ -102,6 +102,8 @@ build: bump-build
 		-scheme $(SCHEME_APP) \
 		-destination "platform=macOS" \
 		-configuration Debug \
+		EZRWORKER_MARKETING_VERSION_OVERRIDE="$$MARKETING_VERSION" \
+		EZRWORKER_BUILD_NUMBER_OVERRIDE="$$BUILD_NO" \
 		CLAWDHOME_MARKETING_VERSION_OVERRIDE="$$MARKETING_VERSION" \
 		CLAWDHOME_BUILD_NUMBER_OVERRIDE="$$BUILD_NO" \
 		MARKETING_VERSION="$$MARKETING_VERSION" \
@@ -126,7 +128,9 @@ build-release: bump-build
 		-scheme $(SCHEME_APP) \
 		-configuration Release \
 		-destination "generic/platform=macOS" \
-		-archivePath build/ClawdHome.xcarchive \
+		-archivePath build/EZRWorker.xcarchive \
+		EZRWORKER_MARKETING_VERSION_OVERRIDE="$$MARKETING_VERSION" \
+		EZRWORKER_BUILD_NUMBER_OVERRIDE="$$BUILD_NO" \
 		CLAWDHOME_MARKETING_VERSION_OVERRIDE="$$MARKETING_VERSION" \
 		CLAWDHOME_BUILD_NUMBER_OVERRIDE="$$BUILD_NO" \
 		MARKETING_VERSION="$$MARKETING_VERSION" \
@@ -238,10 +242,10 @@ install-pkg:
 # ── 日志 ──────────────────────────────────────────────────────────────────────
 
 log-helper:
-	tail -f /tmp/clawdhome-helper.log
+	tail -f /tmp/ezrworker-helper.log
 
 log-app:
-	log stream --predicate 'subsystem == "ai.clawdhome.mac"' --level debug
+	log stream --predicate 'subsystem == "ai.ezrworker.mac"' --level debug
 
 # ── 清理 ──────────────────────────────────────────────────────────────────────
 
@@ -286,14 +290,14 @@ TEST_SNAPSHOT_VM  := test-snapshot-ready        # 预配置好的快照
 TEST_RUN_VM       := test-active-instance       # 真正跑测试的临时实例
 
 # TEST_PKG_PATH: 默认自动取 dist/ 下最新的 pkg（make pkg 产物）
-# 也可以手动指定：make test-deploy TEST_PKG_PATH=dist/ClawdHome-1.2.0.pkg
-TEST_PKG_PATH     ?= $(shell ls -t dist/ClawdHome-*.pkg 2>/dev/null | head -1)
+# 也可以手动指定：make test-deploy TEST_PKG_PATH=dist/EZRWorker-1.2.0.pkg
+TEST_PKG_PATH     ?= $(shell ls -t dist/EZRWorker-*.pkg 2>/dev/null | head -1)
 
 TEST_CPU          ?= 4
 TEST_MEM          ?= 8
 
-APP_NAME_FOR_TEST := ClawdHome
-HELPER_LABEL      := ai.clawdhome.mac.helper
+APP_NAME_FOR_TEST := EZRWorker
+HELPER_LABEL      := ai.ezrworker.mac.helper
 
 # --- 核心指令 ---
 

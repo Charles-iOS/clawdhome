@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh — ClawdHome 一键发布脚本
+# release.sh — EZRWorker 一键发布脚本
 #
 # 用法：
 #   bash scripts/release.sh              # 完整发布流程
@@ -29,7 +29,7 @@ cd "$REPO_ROOT"
 WEBSITE_DIR="${WEBSITE_DIR:-$REPO_ROOT/../clawdhome_website}"
 API_VERSION_JSON="$WEBSITE_DIR/api/version.json"
 NOTES_DIR="${NOTES_DIR:-$REPO_ROOT/release-notes}"
-INFO_PLIST="$REPO_ROOT/ClawdHome/Info.plist"
+INFO_PLIST="$REPO_ROOT/EZRWorkerApp/Info.plist"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
 
 DRY_RUN=false
@@ -136,18 +136,18 @@ if [ "$DRY_RUN" = true ]; then
   render_changelog_preview en "$EN_NOTES_FILE"
   echo ""
   log "将执行的操作："
-  echo "  1. 更新 ClawdHome/Info.plist -> ${NEXT_VERSION}"
+  echo "  1. 更新 EZRWorkerApp/Info.plist -> ${NEXT_VERSION}"
   echo "  2. 更新 CHANGELOG.zh.md / CHANGELOG.en.md"
   echo "  3. git commit -m \"chore(release): v${NEXT_VERSION}\""
   echo "  4. git tag -a v${NEXT_VERSION}"
   if [ "${NOTARIZE:-false}" = "true" ]; then
     echo "  5. xcodebuild + pkgbuild/productsign + notarize →"
-    echo "     dist/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-    echo "     dist/ClawdHome-${NEXT_VERSION}-x64.pkg"
+    echo "     dist/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+    echo "     dist/EZRWorker-${NEXT_VERSION}-x64.pkg"
   else
     echo "  5. xcodebuild + pkgbuild/productsign →"
-    echo "     dist/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-    echo "     dist/ClawdHome-${NEXT_VERSION}-x64.pkg"
+    echo "     dist/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+    echo "     dist/EZRWorker-${NEXT_VERSION}-x64.pkg"
   fi
   echo "  6. 同步 version.json（含中英文 release notes）"
   echo "  7. git push && git push --tags"
@@ -209,8 +209,8 @@ build_release_pkg() {
 build_release_pkg "arm64"
 build_release_pkg "x86_64"
 
-PKG_ARM64="$REPO_ROOT/dist/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-PKG_X64="$REPO_ROOT/dist/ClawdHome-${NEXT_VERSION}-x64.pkg"
+PKG_ARM64="$REPO_ROOT/dist/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+PKG_X64="$REPO_ROOT/dist/EZRWorker-${NEXT_VERSION}-x64.pkg"
 [ -f "$PKG_ARM64" ] || fail "未找到 $PKG_ARM64"
 [ -f "$PKG_X64" ] || fail "未找到 $PKG_X64"
 
@@ -222,8 +222,8 @@ ok "打包完成：$PKG_X64"
 if [ -f "$API_VERSION_JSON" ]; then
   log "同步 version.json..."
 
-  DOWNLOAD_URL="https://clawdhome.app/download/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-  DOWNLOAD_URL_X64="https://clawdhome.app/download/ClawdHome-${NEXT_VERSION}-x64.pkg"
+  DOWNLOAD_URL="https://clawdhome.app/download/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+  DOWNLOAD_URL_X64="https://clawdhome.app/download/EZRWorker-${NEXT_VERSION}-x64.pkg"
 
   TMP_JSON=$(mktemp)
   /usr/bin/python3 - "$API_VERSION_JSON" "$TMP_JSON" "$NEXT_VERSION" "$DOWNLOAD_URL" "$DOWNLOAD_URL_X64" "$API_RELEASE_NOTES_ZH" "$API_RELEASE_NOTES_EN" <<'PY'
@@ -251,17 +251,17 @@ PY
   WEBSITE_DOWNLOAD_DIR="$WEBSITE_DIR/download"
   if [ -d "$WEBSITE_DIR" ]; then
     mkdir -p "$WEBSITE_DOWNLOAD_DIR"
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}-x64.pkg"
+    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg"
     # 向后兼容：保留无架构后缀的历史命名，默认指向 arm64 包。
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}.pkg"
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/ClawdHome-latest.pkg"
-    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/ClawdHome-latest-x64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}-arm64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}-x64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/ClawdHome-${NEXT_VERSION}.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/ClawdHome-latest.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/ClawdHome-latest-x64.pkg"
+    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}.pkg"
+    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest.pkg"
+    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest-x64.pkg"
+    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg"
+    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}.pkg"
+    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest.pkg"
+    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest-x64.pkg"
     ok "已复制 pkg 到网站 download 目录"
   fi
 
@@ -282,7 +282,7 @@ if [ "$SKIP_PUSH" = false ]; then
   echo "$GITHUB_RELEASE_NOTES" > "$RELEASE_NOTES_FILE"
 
   gh release create "v${NEXT_VERSION}" "$PKG_ARM64" "$PKG_X64" \
-    --title "ClawdHome ${NEXT_VERSION}" \
+    --title "EZRWorker ${NEXT_VERSION}" \
     --notes-file "$RELEASE_NOTES_FILE"
 
   rm -f "$RELEASE_NOTES_FILE"

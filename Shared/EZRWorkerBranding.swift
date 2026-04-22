@@ -10,30 +10,17 @@ enum EZRWorkerBranding {
     static let userAgentPrefix = "EZRWorker"
 
     static let providerKeychainService = "ai.ezrworker.mac"
-    static let legacyProviderKeychainService = "ai.clawdhome.mac"
 
     static let accountKeychainService = "ai.ezrworker.mac.accounts"
-    static let legacyAccountKeychainService = "ai.clawdhome.mac.accounts"
 
     static let userPasswordKeychainService = "ai.ezrworker.mac.user-pw"
-    static let legacyUserPasswordKeychainService = "ai.clawdhome.mac.user-pw"
 
     static let appLockKeychainService = "ai.ezrworker.mac.applock"
-    static let legacyAppLockKeychainService = "ai.clawdhome.mac.applock"
     static let appLockEnabledDefaultsKey = "ai.ezrworker.mac.applock.enabled"
-    static let legacyAppLockEnabledDefaultsKey = "ai.clawdhome.mac.applock.enabled"
 
     static let lastSelectedProfileDefaultsKey = "ai.ezrworker.mac.lastSelectedProfileID"
 
     static let applicationSupportDirectoryName = "EZRWorker"
-    static let legacyApplicationSupportDirectoryName = "ClawdHome"
-
-    static let appStateFilesToMigrate = [
-        "secrets.json",
-        "global-models.json",
-        "device-identity-v1.json",
-        "lark.secrets.json",
-    ]
 }
 
 enum EZRWorkerPaths {
@@ -44,11 +31,6 @@ enum EZRWorkerPaths {
     static var applicationSupportDirectory: URL {
         userApplicationSupportDirectory
             .appendingPathComponent(EZRWorkerBranding.applicationSupportDirectoryName, isDirectory: true)
-    }
-
-    static var legacyApplicationSupportDirectory: URL {
-        userApplicationSupportDirectory
-            .appendingPathComponent(EZRWorkerBranding.legacyApplicationSupportDirectoryName, isDirectory: true)
     }
 
     static var profilesDirectory: URL {
