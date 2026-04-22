@@ -1,11 +1,8 @@
-// ClawdHome/Services/Gateway/GatewayProcessManager.swift
-// 管理本地 OpenClaw Gateway 进程的生命周期
-
-import Darwin
 import Foundation
 import Observation
 
-@MainActor @Observable
+@MainActor
+@Observable
 final class GatewayProcessManager {
 
     enum State: Equatable {
@@ -24,467 +21,192 @@ final class GatewayProcessManager {
 
     private(set) var state: State = .stopped
     private(set) var ownership: Ownership = .none
-    private(set) var gatewayPort: Int = 18789
+    private(set) var gatewayPort: Int = GatewayProfileResolver.defaultGatewayPort
+
+    @ObservationIgnored
+    private var supervisorClient: SupervisorClient?
+    @ObservationIgnored
+    private var profileStore: GatewayProfileStore?
+    @ObservationIgnored
+    private var monitorTask: Task<Void, Never>?
 
     var isRunning: Bool { state == .running }
 
-    private var process: Process?
-    private var monitorTask: Task<Void, Never>?
-    private var stopTask: Task<Void, Never>?
-    private var restartCount = 0
-    private let maxAutoRestarts = 5
-
-    // MARK: - 生命周期
+    func bind(profileStore: GatewayProfileStore, supervisorClient: SupervisorClient) {
+        self.profileStore = profileStore
+        self.supervisorClient = supervisorClient
+        gatewayPort = profileStore.selectedResolution?.resolvedPort ?? GatewayProfileResolver.defaultGatewayPort
+        startMonitoring()
+    }
 
     func start() {
-        guard state != .starting, state != .stopping, process == nil, stopTask == nil else { return }
-        state = .starting
-        restartCount = 0
-
-        // 先检测是否已有 gateway 实例在运行（如 LaunchAgent 拉起的）
         Task {
-            let (_, ready) = await GatewayClient.httpProbe(port: gatewayPort)
-            if ready {
-                appLog("GatewayProcessManager: existing gateway detected on port \(gatewayPort), reusing")
-                ownership = .reused
-                state = .running
-                startHealthMonitor()
-            } else {
-                launchProcess()
-            }
+            await performLifecycleOperation(start: true, stop: false)
         }
     }
 
     func stop() {
-        requestStop(startAfterStop: false)
+        Task {
+            await performLifecycleOperation(start: false, stop: true)
+        }
     }
 
     func restart() {
-        requestStop(startAfterStop: true)
+        Task {
+            await performRestart()
+        }
+    }
+
+    func refreshRuntimeState() async {
+        guard let supervisorClient, let profileStore else { return }
+        if !supervisorClient.isConnected {
+            supervisorClient.connect()
+            _ = await supervisorClient.waitUntilConnected()
+        }
+
+        let runtimes = await supervisorClient.refreshRuntimes()
+        guard let selectedProfile = profileStore.selectedProfile else {
+            applyRuntime(nil, fallbackPort: profileStore.selectedResolution?.resolvedPort)
+            return
+        }
+        let runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
+        applyRuntime(runtime, fallbackPort: GatewayProfileResolver.resolve(selectedProfile).resolvedPort)
     }
 
     func prepareForAppTermination() {
         monitorTask?.cancel()
         monitorTask = nil
-        stopTask?.cancel()
-        stopTask = nil
     }
 
-    private func requestStop(startAfterStop: Bool) {
-        monitorTask?.cancel()
-        monitorTask = nil
-        stopTask?.cancel()
+    private func performLifecycleOperation(start: Bool, stop: Bool) async {
+        guard let supervisorClient, let profileStore, let profileID = profileStore.selectedProfile?.id else { return }
 
-        let stopOwnership = ownership
-        let managedProcess = process
-
-        state = .stopping
-        ownership = .none
-        restartCount = 0
-        process = nil
-
-        if let managedProcess, managedProcess.isRunning {
-            managedProcess.terminationHandler = nil
-            managedProcess.terminate()
-            appLog("GatewayProcessManager: requested terminate for managed pid=\(managedProcess.processIdentifier)")
+        if start {
+            state = .starting
+            do {
+                try await supervisorClient.startProfile(profileID: profileID)
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
         }
 
-        stopTask = Task { [gatewayPort] in
-            let (stopped, message) = await Self.stopGateway(
-                onPort: gatewayPort,
-                ownership: stopOwnership,
-                managedPID: managedProcess?.processIdentifier
-            )
-            await MainActor.run {
-                self.stopTask = nil
-                guard !Task.isCancelled else { return }
-                if stopped {
-                    if startAfterStop {
-                        self.start()
-                    } else {
-                        self.state = .stopped
-                    }
-                    return
-                }
-                self.state = .failed(message ?? "Gateway 停止失败")
+        if stop {
+            state = .stopping
+            do {
+                try await supervisorClient.stopProfile(profileID: profileID)
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+        }
+
+        await refreshRuntimeState()
+    }
+
+    private func performRestart() async {
+        guard let supervisorClient, let profileStore, let profileID = profileStore.selectedProfile?.id else { return }
+        state = .starting
+        do {
+            try await supervisorClient.restartProfile(profileID: profileID)
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+        await refreshRuntimeState()
+    }
+
+    private func startMonitoring() {
+        monitorTask?.cancel()
+        monitorTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                await self.refreshRuntimeState()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
     }
 
-    // MARK: - 内部
+    private func applyRuntime(_ runtime: SupervisorProfileRuntime?, fallbackPort: Int?) {
+        gatewayPort = runtime?.resolvedPort ?? fallbackPort ?? GatewayProfileResolver.defaultGatewayPort
 
-    private func launchProcess() {
-        let nodeURL = Self.bundledNodeURL
-        let openclawEntry = Self.bundledOpenClawEntry
-
-        guard FileManager.default.fileExists(atPath: nodeURL.path),
-              FileManager.default.fileExists(atPath: openclawEntry.path) else {
-            state = .failed("Bundled Node.js 或 OpenClaw 不存在")
-            appLog("GatewayProcessManager: bundled binaries not found", level: .error)
+        guard let runtime else {
+            ownership = .none
+            state = .stopped
             return
         }
 
-        let proc = Process()
-        proc.executableURL = nodeURL
-        proc.arguments = [openclawEntry.path, "gateway"]
-        proc.environment = Self.buildEnvironment()
-        proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-
-        proc.terminationHandler = { [weak self] p in
-            Task { @MainActor [weak self] in
-                self?.handleTermination(exitCode: p.terminationStatus)
-            }
+        ownership = switch runtime.ownership {
+        case .supervised:
+            .managed
+        case .adopted:
+            .reused
+        case .none:
+            .none
         }
 
-        do {
-            try proc.run()
-            self.process = proc
-            self.ownership = .managed
-            appLog("GatewayProcessManager: launched pid=\(proc.processIdentifier)")
-            startHealthMonitor()
-        } catch {
-            state = .failed(error.localizedDescription)
-            ownership = .none
-            appLog("GatewayProcessManager: launch failed: \(error.localizedDescription)", level: .error)
+        state = switch runtime.readyState {
+        case .ready:
+            runtime.isRunning ? .running : .stopped
+        case .preparing, .starting:
+            .starting
+        case .failed:
+            .failed(runtime.lastError ?? "Gateway 运行失败")
+        case .stopped, .unknown:
+            runtime.isRunning ? .running : .stopped
         }
     }
 
-    private func handleTermination(exitCode: Int32) {
-        process = nil
-        guard state != .stopped else { return }
+    static var bundledNodeURL: URL { OpenClawRuntime.bundledNodeURL }
+    static var bundledOpenClawEntry: URL { OpenClawRuntime.bundledOpenClawEntry }
+    static var bundledNpxURL: URL { OpenClawRuntime.bundledNpxURL }
+    static var openClawConfigDir: URL { EZRWorkerPaths.legacyOpenClawDirectory }
 
-        if restartCount < maxAutoRestarts {
-            restartCount += 1
-            let delay = min(Double(restartCount) * 2, 10)
-            appLog("GatewayProcessManager: exited(\(exitCode)), auto-restart #\(restartCount) in \(delay)s")
-            state = .starting
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                guard state == .starting else { return }
-                launchProcess()
-            }
-        } else {
-            ownership = .none
-            state = .failed("进程多次异常退出 (exit \(exitCode))")
-            appLog("GatewayProcessManager: max restarts reached", level: .error)
-        }
+    static func buildEnvironment(profile: GatewayProfileResolution? = nil) -> [String: String] {
+        OpenClawRuntime.buildEnvironment(profile: profile)
     }
 
-    private func startHealthMonitor() {
-        monitorTask?.cancel()
-        monitorTask = Task { [weak self, port = gatewayPort] in
-            // 启动后等待 gateway 就绪
-            var didBecomeReady = false
-            for _ in 0..<30 {
-                guard !Task.isCancelled else { return }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                let (_, ready) = await GatewayClient.httpProbe(port: port)
-                if ready {
-                    didBecomeReady = true
-                    await MainActor.run { self?.state = .running }
-                    break
-                }
-            }
-            if !didBecomeReady {
-                await MainActor.run {
-                    guard let self else { return }
-                    if self.state == .starting {
-                        self.state = .failed("Gateway 启动超时")
-                        self.ownership = .none
-                        if let proc = self.process, proc.isRunning {
-                            proc.terminationHandler = nil
-                            proc.terminate()
-                            self.process = nil
-                        }
-                    }
-                }
-                return
-            }
-            // 持续探活
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
-                guard !Task.isCancelled else { return }
-                let (alive, ready) = await GatewayClient.httpProbe(port: port)
-                await MainActor.run {
-                    guard let self else { return }
-                    if ready {
-                        if self.state != .running {
-                            appLog("GatewayProcessManager: health probe recovered on port \(port)")
-                            self.state = .running
-                        }
-                    } else if !alive {
-                        if self.state == .running {
-                            appLog("GatewayProcessManager: health probe lost on port \(port), marking starting", level: .warn)
-                            self.state = .starting
-                        }
-                    } else if self.state == .running {
-                        // 服务仍在监听，但 readyz 尚未恢复，通常是重启中的短暂过渡态。
-                        self.state = .starting
-                    }
-                }
-            }
-        }
+    static func runOpenclawLocally(
+        args: [String],
+        profile: GatewayProfileResolution? = nil
+    ) async -> (Bool, String) {
+        await OpenClawRuntime.runOpenClaw(arguments: args, profile: profile)
     }
 
-    private static func stopGateway(
-        onPort port: Int,
-        ownership: Ownership,
-        managedPID: Int32?
-    ) async -> (Bool, String?) {
-        let initialStopWindow: UInt64 = ownership == .managed ? 4_000_000_000 : 2_000_000_000
-        if await waitForGatewayStopped(onPort: port, timeoutNanoseconds: initialStopWindow) {
-            return (true, nil)
+    static func addAgentLocally(
+        agentId: String,
+        profile: GatewayProfileResolution
+    ) async -> (Bool, String) {
+        let trimmedID = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
+            return (false, "agentId 不能为空")
         }
 
-        guard let pid = gatewayPIDListening(onPort: port) else {
-            return (true, nil)
-        }
-
-        guard let cmdline = processCommandLine(pid: pid), looksLikeGatewayProcess(cmdline: cmdline) else {
-            let message = "端口 \(port) 当前由非 OpenClaw Gateway 进程占用，已拒绝停止"
-            appLog("GatewayProcessManager: refuse stopping pid=\(pid) on port \(port)", level: .error)
-            return (false, message)
-        }
-
-        if kill(pid, SIGTERM) != 0 {
-            let message = "向 Gateway 进程发送 SIGTERM 失败 (pid \(pid))"
-            appLog("GatewayProcessManager: SIGTERM failed pid=\(pid) errno=\(errno)", level: .error)
-            return (false, message)
-        }
-        let managedPIDText = managedPID.map { String($0) } ?? "nil"
-        appLog("GatewayProcessManager: sent SIGTERM to pid=\(pid) ownership=\(String(describing: ownership)) managedPID=\(managedPIDText)")
-
-        if await waitForGatewayStopped(onPort: port, timeoutNanoseconds: 4_000_000_000) {
-            return (true, nil)
-        }
-
-        if kill(pid, SIGKILL) != 0 {
-            let message = "Gateway 进程未响应 SIGTERM，且 SIGKILL 失败 (pid \(pid))"
-            appLog("GatewayProcessManager: SIGKILL failed pid=\(pid) errno=\(errno)", level: .error)
-            return (false, message)
-        }
-        appLog("GatewayProcessManager: escalated to SIGKILL for pid=\(pid)")
-
-        if await waitForGatewayStopped(onPort: port, timeoutNanoseconds: 2_000_000_000) {
-            return (true, nil)
-        }
-
-        return (false, "Gateway 停止后端口 \(port) 仍然存活")
-    }
-
-    private static func waitForGatewayStopped(
-        onPort port: Int,
-        timeoutNanoseconds: UInt64
-    ) async -> Bool {
-        let interval: UInt64 = 250_000_000
-        let attempts = max(1, Int(timeoutNanoseconds / interval))
-        for _ in 0..<attempts {
-            let (alive, _) = await GatewayClient.httpProbe(port: port)
-            if !alive, gatewayPIDListening(onPort: port) == nil {
-                return true
-            }
-            try? await Task.sleep(nanoseconds: interval)
-        }
-        return false
-    }
-
-    private static func gatewayPIDListening(onPort port: Int) -> Int32? {
-        let output = runLocalCommand(
-            "/usr/sbin/lsof",
-            arguments: ["-tiTCP:\(port)", "-sTCP:LISTEN", "-nP"]
+        return await runOpenclawLocally(
+            args: [
+                "agents", "add", trimmedID,
+                "--non-interactive",
+                "--workspace", profile.workspacePath(for: trimmedID),
+                "--agent-dir", profile.agentDirPath(for: trimmedID),
+                "--json",
+            ],
+            profile: profile
         )
-        return output?
-            .split(whereSeparator: \.isNewline)
-            .compactMap { Int32($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-            .first(where: { $0 > 0 })
     }
 
-    private static func processCommandLine(pid: Int32) -> String? {
-        runLocalCommand("/bin/ps", arguments: ["-o", "command=", "-p", "\(pid)"])?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func looksLikeGatewayProcess(cmdline: String) -> Bool {
-        if GatewayProcessCommandMatcher.isGatewayCommand(cmdline) {
-            return true
-        }
-
-        let normalized = cmdline.lowercased()
-        return normalized.contains("openclaw") && normalized.contains("gateway")
-    }
-
-    private static func runLocalCommand(_ executable: String, arguments: [String]) -> String? {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: executable)
-        proc.arguments = arguments
-
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = Pipe()
-
-        do {
-            try proc.run()
-        } catch {
-            appLog("GatewayProcessManager: command failed \(executable) \(arguments.joined(separator: " ")): \(error.localizedDescription)", level: .error)
-            return nil
-        }
-
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
-    }
-
-    // MARK: - 路径
-
-    /// Node.js 可执行路径（Debug 优先开发目录，回退 App Resources）
-    static var bundledNodeURL: URL {
-        runtimeRootURL
-            .appendingPathComponent("node/bin/node")
-    }
-
-    /// OpenClaw 入口（Debug 优先开发目录，回退 App Resources）
-    static var bundledOpenClawEntry: URL {
-        runtimeRootURL
-            .appendingPathComponent("openclaw/lib/node_modules/openclaw/openclaw.mjs")
-    }
-
-    /// npx 路径（用于渠道绑定等）
-    static var bundledNpxURL: URL {
-        runtimeRootURL
-            .appendingPathComponent("node/bin/npx")
-    }
-
-    /// OpenClaw 用户配置目录
-    static var openClawConfigDir: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".openclaw")
-    }
-
-    static func buildEnvironment() -> [String: String] {
-        let home = NSHomeDirectory()
-        let nodeBin = bundledNodeURL.deletingLastPathComponent().path
-        let openclawBin = runtimeRootURL
-            .appendingPathComponent("openclaw/bin").path
-        let npmGlobalBin = "\(home)/.npm-global/bin"
-        let existingPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-        return [
-            "HOME": home,
-            "PATH": "\(nodeBin):\(openclawBin):\(npmGlobalBin):\(existingPath)",
-            "NODE_ENV": "production",
-        ]
-    }
-
-    /// 运行时根目录：
-    /// - Debug: 优先 `CLAWDHOME_DEV_RUNTIME_DIR`，其次 `<repo>/build/dev-runtime`
-    /// - 其它构建：使用 App bundle Resources
-    private static var runtimeRootURL: URL {
-        #if DEBUG
-        if let custom = ProcessInfo.processInfo.environment["CLAWDHOME_DEV_RUNTIME_DIR"],
-           !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return URL(fileURLWithPath: custom, isDirectory: true)
-        }
-        if let repoRoot = debugRepoRootURL {
-            return repoRoot.appendingPathComponent("build/dev-runtime", isDirectory: true)
-        }
-        #endif
-        return Bundle.main.resourceURL!
-    }
-
-    // MARK: - 本地命令执行
-
-    /// 在 app 进程内直接执行 openclaw 子命令（如 pairing approve），
-    /// 避免走 helper daemon 的 sudo -u 导致 TCC EPERM。
-    /// 返回 (success, output)
-    static func runOpenclawLocally(args: [String]) async -> (Bool, String) {
-        let nodeURL = bundledNodeURL
-        let entry = bundledOpenClawEntry
-
-        guard FileManager.default.fileExists(atPath: nodeURL.path),
-              FileManager.default.fileExists(atPath: entry.path) else {
-            return (false, "Bundled Node.js 或 OpenClaw 不存在")
-        }
-
-        let proc = Process()
-        proc.executableURL = nodeURL
-        proc.arguments = [entry.path] + args
-        proc.environment = buildEnvironment()
-        proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-
-        do {
-            try proc.run()
-        } catch {
-            return (false, error.localizedDescription)
-        }
-
-        return await withCheckedContinuation { continuation in
-            proc.terminationHandler = { p in
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                continuation.resume(returning: (p.terminationStatus == 0, output))
-            }
-        }
-    }
-
-    /// 创建智能体（CLI 主路径）：`openclaw agents add <id>`
-    /// - Returns: (success, output)
-    static func addAgentLocally(agentId: String) async -> (Bool, String) {
-        let trimmedId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedId.isEmpty else {
+    static func deleteAgentLocally(
+        agentId: String,
+        profile: GatewayProfileResolution
+    ) async -> (Bool, String) {
+        let trimmedID = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedID.isEmpty else {
             return (false, "agentId 不能为空")
         }
-        let workspace = ".openclaw/workspace-\(trimmedId)"
-        let agentDir = ".openclaw/agents/\(trimmedId)/agent"
-        return await runOpenclawLocally(args: [
-            "agents", "add", trimmedId,
-            "--non-interactive",
-            "--workspace", workspace,
-            "--agent-dir", agentDir,
-            "--json"
-        ])
+
+        return await runOpenclawLocally(
+            args: [
+                "agents", "delete", trimmedID,
+                "--force",
+                "--json",
+            ],
+            profile: profile
+        )
     }
-
-    /// 删除智能体（CLI 主路径）：`openclaw agents delete <id>`
-    /// - Returns: (success, output)
-    static func deleteAgentLocally(agentId: String) async -> (Bool, String) {
-        let trimmedId = agentId.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedId.isEmpty else {
-            return (false, "agentId 不能为空")
-        }
-        return await runOpenclawLocally(args: [
-            "agents", "delete", trimmedId,
-            "--force",
-            "--json"
-        ])
-    }
-
-    #if DEBUG
-    /// 通过源码绝对路径推导仓库根目录（.../clawdhome）
-    private static var debugRepoRootURL: URL? {
-        let fm = FileManager.default
-        var current = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-
-        while true {
-            let projectPath = current.appendingPathComponent("ClawdHome.xcodeproj").path
-            let runtimeScriptPath = current.appendingPathComponent("scripts/bundle-runtime.sh").path
-            if fm.fileExists(atPath: projectPath), fm.fileExists(atPath: runtimeScriptPath) {
-                return current
-            }
-
-            let parent = current.deletingLastPathComponent()
-            if parent == current { return nil }
-            current = parent
-        }
-    }
-    #endif
 }

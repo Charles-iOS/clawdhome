@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # install-helper-dev.sh
-# 开发模式手动安装 ClawdHomeHelper LaunchDaemon（无需 Apple Developer ID）
+# 开发模式手动安装 EZRWorkerHelper LaunchDaemon（无需 Apple Developer ID）
 # 用途：在真机上测试，绕过 SMAppService 签名要求
 #
 # 用法：
@@ -9,17 +9,17 @@
 
 set -euo pipefail
 
-LABEL="ai.clawdhome.mac.helper"
+LABEL="ai.ezrworker.mac.helper"
 DEST_DIR="/Library/PrivilegedHelperTools"
 DEST_BINARY="$DEST_DIR/$LABEL"
 PLIST_PATH="/Library/LaunchDaemons/$LABEL.plist"
 
 ACTION="${1:-install}"
 
-# ── 查找 DerivedData 中最新构建的 ClawdHomeHelper ─────────────────────────────
+# ── 查找 DerivedData 中最新构建的 EZRWorkerHelper ─────────────────────────────
 find_built_binary() {
     find "$HOME/Library/Developer/Xcode/DerivedData" \
-        -name "ClawdHomeHelper" -type f \
+        -name "EZRWorkerHelper" -type f \
         ! -path "*.dSYM/*" \
         2>/dev/null \
     | xargs -I{} stat -f "%m %N" {} 2>/dev/null \
@@ -33,7 +33,7 @@ case "$ACTION" in
 install)
     BUILT_BINARY=$(find_built_binary)
     if [ -z "$BUILT_BINARY" ]; then
-        echo "❌ 未在 DerivedData 中找到 ClawdHomeHelper"
+        echo "❌ 未在 DerivedData 中找到 EZRWorkerHelper"
         echo "   请先在 Xcode 中 Build ClawdHome scheme（⌘B）"
         exit 1
     fi
@@ -80,7 +80,7 @@ EOF
 
     launchctl bootstrap system "$PLIST_PATH"
 
-    echo "✅ ClawdHomeHelper 已安装并启动"
+    echo "✅ EZRWorkerHelper 已安装并启动"
     echo "   日志：tail -f /tmp/clawdhome-helper.log"
     echo "   现在可以运行 EZRWorker.app 进行测试"
     ;;
@@ -89,16 +89,16 @@ EOF
 uninstall)
     launchctl bootout system "$PLIST_PATH" 2>/dev/null || true
     rm -f "$DEST_BINARY" "$PLIST_PATH"
-    echo "✅ ClawdHomeHelper 已卸载"
+    echo "✅ EZRWorkerHelper 已卸载"
     ;;
 
 # ── 状态 ──────────────────────────────────────────────────────────────────────
 status)
     if launchctl print "system/$LABEL" 2>/dev/null | grep -q "pid ="; then
-        echo "🟢 ClawdHomeHelper 正在运行"
+        echo "🟢 EZRWorkerHelper 正在运行"
         launchctl print "system/$LABEL" | grep -E "pid|state"
     else
-        echo "🔴 ClawdHomeHelper 未运行"
+        echo "🔴 EZRWorkerHelper 未运行"
     fi
     ;;
 

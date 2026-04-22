@@ -28,6 +28,16 @@ struct DeviceIdentity {
                 return DeviceIdentity(privateKey: privKey)
             }
         }
+        let legacyPath = Self.legacyStoragePath()
+        if let data = try? Data(contentsOf: legacyPath),
+           let stored = try? JSONDecoder().decode(StoredIdentity.self, from: data),
+           stored.version == 1,
+           let rawKey = Data(base64Encoded: stored.privateKeyBase64),
+           let privKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: rawKey) {
+            let identity = DeviceIdentity(privateKey: privKey)
+            identity.save()
+            return identity
+        }
         // 创建新密钥对
         let identity = DeviceIdentity(privateKey: Curve25519.Signing.PrivateKey())
         identity.save()
@@ -112,9 +122,13 @@ struct DeviceIdentity {
     }
 
     private static func storagePath() -> URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport
-            .appendingPathComponent("ClawdHome", isDirectory: true)
+        EZRWorkerPaths.ensureApplicationSupportDirectories()
+        return EZRWorkerPaths.applicationSupportDirectory
+            .appendingPathComponent("device-identity-v1.json")
+    }
+
+    private static func legacyStoragePath() -> URL {
+        EZRWorkerPaths.legacyApplicationSupportDirectory
             .appendingPathComponent("device-identity-v1.json")
     }
 

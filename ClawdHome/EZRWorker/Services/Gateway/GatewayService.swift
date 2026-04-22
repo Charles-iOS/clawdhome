@@ -14,7 +14,7 @@ final class GatewayService {
     private(set) var cronStore = GatewayCronStore()
     private(set) var skillsStore = GatewaySkillsStore()
 
-    private let port: Int
+    private(set) var port: Int
     private var token: String
 
     init(port: Int = 18789, token: String = "") {
@@ -73,6 +73,18 @@ final class GatewayService {
 
     func updateToken(_ newToken: String) {
         token = newToken
+    }
+
+    func reconfigure(port newPort: Int, token newToken: String) async {
+        let didChangePort = newPort != port
+        let didChangeToken = newToken != token
+
+        port = newPort
+        token = newToken
+
+        guard didChangePort || didChangeToken else { return }
+
+        await disconnect()
     }
 
     // MARK: - 配置操作

@@ -35,7 +35,7 @@ enum KnownProvider: String, CaseIterable {
 
 @Observable
 final class ProviderKeychainStore {
-    private let service = "ai.clawdhome.mac"
+    private let service = EZRWorkerBranding.providerKeychainService
     // Incrementing this counter inside save/delete causes @Observable to
     // invalidate any computed property (providerStatuses) that reads it.
     private var _keychainVersion: Int = 0
@@ -59,20 +59,8 @@ final class ProviderKeychainStore {
     }
 
     func read(forProvider id: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account(for: id),
-            kSecReturnData as String:  true,
-            kSecMatchLimit as String:  kSecMatchLimitOne
-        ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let key = String(data: data, encoding: .utf8)
-        else { return nil }
-        return key
+        read(forProvider: id, service: service)
+            ?? read(forProvider: id, service: EZRWorkerBranding.legacyProviderKeychainService)
     }
 
     func delete(forProvider id: String) {
@@ -112,5 +100,22 @@ final class ProviderKeychainStore {
     var providerStatuses: [(provider: KnownProvider, hasKey: Bool)] {
         _ = _keychainVersion
         return KnownProvider.allCases.map { ($0, hasKey(for: $0)) }
+    }
+
+    private func read(forProvider id: String, service: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account(for: id),
+            kSecReturnData as String:  true,
+            kSecMatchLimit as String:  kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let key = String(data: data, encoding: .utf8)
+        else { return nil }
+        return key
     }
 }

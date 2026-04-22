@@ -25,7 +25,7 @@ enum UserPasswordStoreError: LocalizedError {
 }
 
 enum UserPasswordStore {
-    private static let service = "ai.clawdhome.mac.user-pw"
+    private static let service = EZRWorkerBranding.userPasswordKeychainService
 
     struct TestHooks {
         var randomPassword: () -> String
@@ -63,19 +63,10 @@ enum UserPasswordStore {
 
     /// 读取已存储的密码（未存储时返回 nil）
     static func load(for username: String) throws -> String? {
-        let query: [String: Any] = [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: username,
-            kSecReturnData as String:  true,
-            kSecMatchLimit as String:  kSecMatchLimitOne
-        ]
-        var result: CFTypeRef?
-        let status = secItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        try throwIfKeychainFailure(status, operation: L10n.k("services.user_password_store.userpassword", fallback: "读取用户密码"))
-        guard let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        if let password = try load(for: username, service: service) {
+            return password
+        }
+        return try load(for: username, service: EZRWorkerBranding.legacyUserPasswordKeychainService)
     }
 
     /// 删除指定用户的密码（删除用户时调用）
@@ -126,6 +117,22 @@ enum UserPasswordStore {
 
     private static func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus {
         testHooks?.secItemCopyMatching(query, result) ?? SecItemCopyMatching(query, result)
+    }
+
+    private static func load(for username: String, service: String) throws -> String? {
+        let query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: username,
+            kSecReturnData as String:  true,
+            kSecMatchLimit as String:  kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = secItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        try throwIfKeychainFailure(status, operation: L10n.k("services.user_password_store.userpassword", fallback: "读取用户密码"))
+        guard let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
     }
 
     /// 生成 20 位随机密码（大小写字母 + 数字，不含易混淆字符）

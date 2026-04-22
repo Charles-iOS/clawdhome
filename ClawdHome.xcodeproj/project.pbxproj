@@ -15,8 +15,11 @@
 		05DA444C9B6FAF8B2300D908 /* CronTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BEDBBEAA15D7F52216A1CE2 /* CronTaskView.swift */; };
 		07B6092C2C29BC1A19385B32 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0E63E7FA11917EE0F610A /* UserAdoptionFlow.swift */; };
 		0950A6AF299B75D630F18D4C /* TelegramChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0161AF18D1E9A815F23E6DDC /* TelegramChannelConfigSheet.swift */; };
+		0CCAA681CDCE3DF9397D494C /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE120DDE4D844BEE2B6B27CB /* LocalAIModels.swift */; };
+		0CE3FA2580537838861B1C0A /* EZRWorkerBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29058A179967DACDB2529520 /* EZRWorkerBranding.swift */; };
 		0E07E58A241BA58310F6443A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 38A912F0A5514717350027B5 /* Assets.xcassets */; };
 		0E9D058F70E41C9D8D9E2FBB /* FileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71156CAD7673A87034AF0D8 /* FileModels.swift */; };
+		1251477199376DC9948F4461 /* ClawdHome 手机号登录门禁方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 5833CCBBBF1FA45A03C34C93 /* ClawdHome 手机号登录门禁方案.md */; };
 		128DCAA688B24902AC319BB4 /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F2D77C8262C551CBD26BA2 /* AppUpdateState.swift */; };
 		13E72438B5B5A0997D964566 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 467287AC8BE705E07CE3C366 /* HelperProtocol.swift */; };
 		14F81C6AACC151937FD46137 /* Stable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = F15483BD5BB3DE26EC5C82BB /* Stable.xcstrings */; };
@@ -24,6 +27,7 @@
 		16191A5EF1B96BF892361EB0 /* FormatUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46E6DA094A71954E82C0BD0 /* FormatUtils.swift */; };
 		161CF0DA6073064097C48EB7 /* GatewayProviderKeySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DDA04FF248DF6DFABA79529 /* GatewayProviderKeySheet.swift */; };
 		16C806CD97F4A5FB8DD95D1C /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7E5FF24A0246F866BFF996 /* DashboardModels.swift */; };
+		177A4C7E55F25609823146D7 /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6801374EC68907CEFF3D91 /* OpenClawRuntime.swift */; };
 		18FA68B8079FE5EE60D4FE35 /* ChannelPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69F93DCDC51244C954C21581 /* ChannelPairingSheet.swift */; };
 		1A84AA6DDEF46FC1963A6CEB /* UpdateCheckPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E8B22899B273B82C13A9974 /* UpdateCheckPolicy.swift */; };
 		1A9602934F0304C7AA1905A6 /* FileInputAcceptFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC4D03808505276353A3AD2 /* FileInputAcceptFilter.swift */; };
@@ -44,21 +48,29 @@
 		2891D4FDE36F8F9702AB71D3 /* WizardAgentPreviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A98FD197E6B5B596A0605D8 /* WizardAgentPreviewCard.swift */; };
 		28D9C2317FA71AFE77FA1536 /* FeishuChannelOnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840FDD2C039CC211B8960950 /* FeishuChannelOnboardingSheet.swift */; };
 		2966E60E53F238921C9D526E /* SkillListItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCEAB0AC0E06E6D7BAC8D279 /* SkillListItemRow.swift */; };
+		296C108A6166B54AD57E8B63 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 467287AC8BE705E07CE3C366 /* HelperProtocol.swift */; };
 		29D11ABF07EE6786E11F7F2D /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F0E2B7F91B5C217D366E4C0 /* UpdateChecker.swift */; };
+		2A317027BED0390956442DBE /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D22B33EDD87E4F4A317859C /* GatewayHealthProbe.swift */; };
 		2B1093226D863509319B4639 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F7679868CCF750BCB1AB2C /* AppLogger.swift */; };
 		2B9BC8730AB3B78B208861BD /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76A73EBA6C37473C494E20D /* ProcessModels.swift */; };
 		2DAB369FEE34FA652D14638A /* AgentStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDFEF5EF27AFACCDD6ED9DFB /* AgentStyle.swift */; };
 		2FA8A230E50CC758096EDF58 /* ClawdHome 架构重设计：单实例智能体配置管理面板.md in Resources */ = {isa = PBXBuildFile; fileRef = 0E9940ADBB19874CF69F54DA /* ClawdHome 架构重设计：单实例智能体配置管理面板.md */; };
 		315C6CEC2A97C5D4E9AB211A /* LogViewerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F9AD8700941AFBF1F34673 /* LogViewerSheet.swift */; };
 		33377A070BA5CD38AF3D570D /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C6946296FDE26A0A2A7A8EC /* ProcessManager.swift */; };
+		33CF93BCA923CB8AB8E88E99 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76A73EBA6C37473C494E20D /* ProcessModels.swift */; };
+		33E12F72C9FD3848E83EC0FF /* FileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F71156CAD7673A87034AF0D8 /* FileModels.swift */; };
 		35293BE0C7E82BADEFB540F7 /* HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB22903A652976B892FA384 /* HealthCheck.swift */; };
 		372F9047B27AB90A2CF66AF5 /* RoleMarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0511A43DA0C20592D7181ABD /* RoleMarketView.swift */; };
 		375886C605097C9B41854068 /* WizardStep1IdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB166882A7F577EFFA23DB7E /* WizardStep1IdentityView.swift */; };
+		38916626074F7187D01BA591 /* FileInputAcceptFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFC4D03808505276353A3AD2 /* FileInputAcceptFilter.swift */; };
 		392339F9B252B192CBBD687E /* AppLockStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D91530ADB29E6F0428AD9EF /* AppLockStore.swift */; };
+		39FDA95C3B545AC30EBF945C /* HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB22903A652976B892FA384 /* HealthCheck.swift */; };
 		3A44B109A24A77C16BDBA42C /* ModelPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00406F9336060D44A3331114 /* ModelPickerSheet.swift */; };
 		3B5E95B51DE262D04BC56FBA /* ConfigWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE86644B5FC4578CCB9C6FF /* ConfigWriter.swift */; };
 		3D7B3D66E56E6D32CFC39D1F /* NodeDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB4BFDC6320B7C035E22C884 /* NodeDownloader.swift */; };
+		3E0123F3C3FB1721E3368BEA /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = CA6F6DA1E456996A37FE0108 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */; };
 		3EAB17FB3B0018ACB9CD64A0 /* ProviderKeyRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73520228463A166928DF0FAA /* ProviderKeyRow.swift */; };
+		3F03F1571E5982AA9FA8C174 /* ProfileMigrationChoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2EBD21B0C333B2A270971C /* ProfileMigrationChoiceView.swift */; };
 		40D425C2A002C5FF5CFD79E8 /* AuthAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEDB3631BA9B1D72ACEB6E69 /* AuthAPIClient.swift */; };
 		41B0259B5FC9A1381D8F840C /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54777C27B432E10D49786DE9 /* UserDetailWindowLayout.swift */; };
 		42784EA2B3A334AF6AF8E881 /* LLMManagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 155680EF2A850BB4215754A8 /* LLMManagerTab.swift */; };
@@ -67,6 +79,8 @@
 		466F335DDA385FC3B5AF3669 /* AppRootGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584F60789C196DBC2E9C9B1C /* AppRootGateView.swift */; };
 		46AE452761C8D472CAEA4D2D /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE120DDE4D844BEE2B6B27CB /* LocalAIModels.swift */; };
 		4778AE0C4B31EA10463042FE /* GatewayHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE17FA856C40AB029642D900 /* GatewayHub.swift */; };
+		47DA1A1BCB9134E980EFD7B9 /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A035075C24DB7978AF065A5 /* SupervisorProtocol.swift */; };
+		481FF22D8AB0E9A6BDE1DD05 /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D22B33EDD87E4F4A317859C /* GatewayHealthProbe.swift */; };
 		49798BDB24E761579D2C4A27 /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4DE175252002E6FCD7F1BD0 /* HomeDashboardView.swift */; };
 		4983179D8FF13E438DED0FEE /* OpenDirectory.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05980B1012E839BAA33AD8CE /* OpenDirectory.framework */; };
 		4AAE47E3DA8F3182D778544C /* Agent.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E332DE6DFCCA0C0624898D /* Agent.swift */; };
@@ -74,6 +88,7 @@
 		4D961DB5D7F9C1179E54CED8 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D5E4ECA02402D10DBD99473 /* DeviceIdentity.swift */; };
 		4D9977D09130B0CC18E9FEAF /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 467287AC8BE705E07CE3C366 /* HelperProtocol.swift */; };
 		4DE2FC3164BCD10CC858F055 /* ClawdHomeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8759E61AA964E69CFBDD228 /* ClawdHomeApp.swift */; };
+		4E213F852DA206B8997AC910 /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D22B33EDD87E4F4A317859C /* GatewayHealthProbe.swift */; };
 		4FCD2C3BFF60D4569A0E7DD0 /* AddUserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4D0168443D77B00A4092E7 /* AddUserSheet.swift */; };
 		508DBEDAF0C5804D9E21CCD9 /* GatewayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAA3C56D1FE192B7799A3FDC /* GatewayManager.swift */; };
 		50C10BD17D9C9C63EDB034A1 /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54777C27B432E10D49786DE9 /* UserDetailWindowLayout.swift */; };
@@ -85,23 +100,32 @@
 		56CA15B2D47372D5F6B3D3F9 /* AgentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B84E061B34F08536E066AC0 /* AgentStatus.swift */; };
 		576FDE4D5559538082983195 /* 模型配置自动同步 + 智能体独立选模型.md in Resources */ = {isa = PBXBuildFile; fileRef = 5AF56FD3BA5D6A17C352036A /* 模型配置自动同步 + 智能体独立选模型.md */; };
 		5ABCA1F5E8534493FECD5E56 /* PresetAgents.json in Resources */ = {isa = PBXBuildFile; fileRef = 3101AF1FF666167DD15220B7 /* PresetAgents.json */; };
+		5AC56C299FF91EFB7757A577 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062C7BEAC6BE261C3A7D5414 /* main.swift */; };
 		5AE2A7E5C2BDF08FCAC2DBE4 /* AppUpdateHeartbeatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335F70B73CF355F93B436AFA /* AppUpdateHeartbeatService.swift */; };
+		5B93C01A12617F6BD09DCDAE /* CreateProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 697CE59D501899A14D897314 /* CreateProfileSheet.swift */; };
 		5BE5F00FA7D3D529644B4DE9 /* ConfigEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12744180A6A4B34813335274 /* ConfigEditorSheet.swift */; };
 		5C4286A2BA6C2A17C2E8D16A /* ApplyCredentialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50BF8C6365FBBA9CA2C07D90 /* ApplyCredentialSheet.swift */; };
 		5D95D16A3F5F3C9AD5BF2048 /* UserPasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9417C7BB8C444FFC6BB4AE39 /* UserPasswordStore.swift */; };
 		5E6520D3564F17DAD6F5E6AF /* ModelsStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35867AAFBA21C235B42D5B08 /* ModelsStatus.swift */; };
 		5FF1FC550784127BA01FA09D /* LocalLLMManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9DBC78DA4D1FFD0EB50D466 /* LocalLLMManager.swift */; };
 		602168A75F0E12FF0A6BADB1 /* AccountKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE0769CD7259E283CDAA5E4 /* AccountKeychain.swift */; };
+		60C6180250248DB1EC06A5D3 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5940BE904FBEE956B3FF3B00 /* GatewayProfiles.swift */; };
 		647F82D1797FC9D80FF86C16 /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6474BB5EEF5B87B65666E978 /* NetworkModels.swift */; };
 		66F1D36FD3A7DB51237BFABB /* 智能体 Workspace 重设计方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 7D4E0DF6EA691F912FD22BFF /* 智能体 Workspace 重设计方案.md */; };
+		677D2CEE333DB010ABE1A3D3 /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD164A79948DC42E5941EAD5 /* AppNotifications.swift */; };
+		692E79F92888B0EC5550FDBF /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8CA7E043030EBA6AECA81CC /* SystemConfiguration.framework */; };
 		6B6B8E332776101B198630AC /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 806D35D06FA4AFEDDAA912AD /* L10n.swift */; };
+		6B8681EE571EF62B3F7A7992 /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD164A79948DC42E5941EAD5 /* AppNotifications.swift */; };
 		6C68BD646AC2A5CC6AB440A7 /* CommandOutputPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7074DD08C154E243DF77FF59 /* CommandOutputPanel.swift */; };
 		6E8E862B9D09268ABD86C619 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7E5FF24A0246F866BFF996 /* DashboardModels.swift */; };
+		6EC3C5BBE8C39F4AE21F6630 /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F2D77C8262C551CBD26BA2 /* AppUpdateState.swift */; };
 		6F9101485DF1A9C40CE39C65 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F76A73EBA6C37473C494E20D /* ProcessModels.swift */; };
 		70203238972D227FB530FA05 /* VoiceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29EE3917E4DC28331CDD9AEA /* VoiceProfile.swift */; };
 		7038876B62DAABF3E0D5672A /* InstallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9091EC70CE63EDC745444F7 /* InstallManager.swift */; };
+		70816B0DA73AB9B92D40EE21 /* AppSecondaryWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = B91A987E996ED0CB40573F05 /* AppSecondaryWindows.swift */; };
 		72B7670B1BF9C9021A69742C /* GlobalModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D23DC2DCDDAD6562DF785B9 /* GlobalModelStore.swift */; };
 		73146C98A9E572A351B48209 /* AgentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77B6F3367C890058D3F4AC7D /* AgentStore.swift */; };
+		738DC67B6683D60D2ED4EF8E /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6474BB5EEF5B87B65666E978 /* NetworkModels.swift */; };
 		7517A153E52D130E75FCC8D5 /* ChannelType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813A51D3EB928F6208342AF2 /* ChannelType.swift */; };
 		7739AA049BBAE2AB3F3D52E7 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 093C7E90CEE1F33F3A432A90 /* AppSettingsView.swift */; };
 		7746561EBA09D0939394D630 /* openclaw 和 node 打包在 app bundle 内.md in Resources */ = {isa = PBXBuildFile; fileRef = 450E8E52A7D273EAC9FAF054 /* openclaw 和 node 打包在 app bundle 内.md */; };
@@ -109,8 +133,10 @@
 		7A19BA1D08E439220F09D5CD /* CloneClawSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A692ECF0806042C37B632CB /* CloneClawSheet.swift */; };
 		7B0708726B3B30778CE86DB4 /* DaemonInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 578483F688C48CBE72C0A53E /* DaemonInstaller.swift */; };
 		7D0B2DAB8F9133C3EDAEA400 /* SessionsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB940018E9820EB6455FA34C /* SessionsTabView.swift */; };
+		7DF7166E51EBAB2D9B2661A1 /* BrandMigrationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB6E6A29CF3E5111FE780E5 /* BrandMigrationManager.swift */; };
 		7F1931508A7DA6D48319500F /* ShellRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C76557D6C46315D058A794 /* ShellRunner.swift */; };
 		80169343D7B48000985C8D06 /* AgentBinding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89582B96C506C6995BA78E8E /* AgentBinding.swift */; };
+		8190E5D8355696B465856823 /* EZRWorkerBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29058A179967DACDB2529520 /* EZRWorkerBranding.swift */; };
 		844ED367CC5266A513A5FADE /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5775BE93F05639CCBFCC06 /* UserInitPresentationRouting.swift */; };
 		84EE8ABA47536FEBAD8C7E53 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13F07CE9D25F72DDB11AB739 /* ContentView.swift */; };
 		860FBA28D675AEC1A5540B90 /* ChannelBindSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFEAAC0FB0C624527A3A6779 /* ChannelBindSheet.swift */; };
@@ -125,6 +151,8 @@
 		8DA5C8174C08A39388CA8388 /* PersonaDefView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77787365CF9FCFC1BABE9B81 /* PersonaDefView.swift */; };
 		8DF359DE93EFFFFA2E49695F /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2BD15AFBF24DE05D57194904 /* Charts.framework */; };
 		8E9250B96F709346BC0A1158 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0E63E7FA11917EE0F610A /* UserAdoptionFlow.swift */; };
+		8F0EC1E32F4613219B06FFAF /* SupervisorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289BB3B57A65980DEEE8E226 /* SupervisorController.swift */; };
+		8F93EA3BF7B4D0095F052A7E /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7E5FF24A0246F866BFF996 /* DashboardModels.swift */; };
 		92728BA550CCA04B4291F62F /* GatewayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E675F242B829BC46BCE6D9C /* GatewayService.swift */; };
 		9539BE1755F8AB9B1344DFB8 /* UpgradeConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FFA80FC98753A23F96D8C57 /* UpgradeConfirmSheet.swift */; };
 		9685174F8F965C6D07F8FBCB /* LocalAITab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 956F579AD39B5454F51944DB /* LocalAITab.swift */; };
@@ -140,10 +168,13 @@
 		A40645431E00AD9069F11425 /* GatewayCronModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE94A21ED1426DA8C0D71665 /* GatewayCronModels.swift */; };
 		A60807B10D5770AA97408E52 /* WizardStep0TemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F0A184904C70C46586C6F23 /* WizardStep0TemplateView.swift */; };
 		A6188B820368B96D0C17F1F6 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C8CA7E043030EBA6AECA81CC /* SystemConfiguration.framework */; };
+		A660801B852626BA66D91F92 /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A035075C24DB7978AF065A5 /* SupervisorProtocol.swift */; };
 		A74D7C244C8DC0ECFAE9A55B /* HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB22903A652976B892FA384 /* HealthCheck.swift */; };
 		A78B8054BE8C76489EEBCA77 /* AppUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D002A8E22C08FDDD74BE18 /* AppUpdateBanner.swift */; };
+		A8E72C9BC64E0F039FC5F2F7 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5940BE904FBEE956B3FF3B00 /* GatewayProfiles.swift */; };
 		AA1E3AB3359CC5503337836E /* PortAllocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C814EC41E8DBC93C785066 /* PortAllocator.swift */; };
 		AD10462C12CA5897DF153F2E /* UserDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23BC20C3DEBCD64147708A11 /* UserDirectoryService.swift */; };
+		AD635DB241A9EC8E8CD338BD /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5775BE93F05639CCBFCC06 /* UserInitPresentationRouting.swift */; };
 		AE586E39D7DF5FCFF9BBB905 /* WizardConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F1BEF251910D01D23FBE869 /* WizardConnection.swift */; };
 		AE76A7264C741C2A508B1E1B /* OpenClawProviderKeySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3FB30B2598A311EF94A822 /* OpenClawProviderKeySync.swift */; };
 		B0639D8991AB20D7C5689CC7 /* AgentWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0E8FBEC8FD68E467532DCE /* AgentWorkspaceView.swift */; };
@@ -156,11 +187,13 @@
 		B7A2061739EDAAAA3275A480 /* HelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1A0EF08346F0064F692E46 /* HelperClient.swift */; };
 		B86C06FFCFAF8F7887D31E1F /* ChannelBotConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C31B3217680B271EC53F9A25 /* ChannelBotConfigSheet.swift */; };
 		BD0432723571AEC02E2938BF /* AddProviderModelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F559F8DF4F4C0D9025810C7 /* AddProviderModelSheet.swift */; };
+		BE8616034D09DAB005A8F1B7 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5940BE904FBEE956B3FF3B00 /* GatewayProfiles.swift */; };
 		BFA850F5345A3EF6510D6EF6 /* SkillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 252FF2019F1112FB0B100A78 /* SkillsView.swift */; };
 		C0C9033226A9380987F603A2 /* GatewaySkillsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD750D6A1014E5F6F69C039 /* GatewaySkillsStore.swift */; };
 		C11B2113E212A1BBC279EC49 /* UserFileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFAD293FACB59B2F45FF9D4A /* UserFileManager.swift */; };
 		C1586C97440ECE6F5D98CC45 /* ShrimpPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4780B5569AB2AD040C2115E1 /* ShrimpPool.swift */; };
 		C407BEE1C9FE61AB4F10A667 /* PageHeroHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA30B272F4DD23ECD1DD07F7 /* PageHeroHeader.swift */; };
+		C4BECC0EE29A6DE6B2BF23E0 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48C0E63E7FA11917EE0F610A /* UserAdoptionFlow.swift */; };
 		C72DF5FEB4906D0AA459139E /* UserDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46E3226FB170F1C35BB73B5 /* UserDetailView.swift */; };
 		C745EB73F505520BE75D6E88 /* GeneratedVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBA67BDCB519CC9C77AD83CC /* GeneratedVersion.swift */; };
 		C793138C446945CBB344323C /* EnvironmentChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB548B8A7041F4C24A63EA94 /* EnvironmentChecker.swift */; };
@@ -169,6 +202,9 @@
 		CD84306869E17F9C6B5D5718 /* 定时任务页改版与创建弹窗重做.md in Resources */ = {isa = PBXBuildFile; fileRef = 811F6FB3C399553811CB7BFD /* 定时任务页改版与创建弹窗重做.md */; };
 		CED801B582F1FF2D7E9BF7FE /* AgentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D863076F0AE55FA86E0B66CC /* AgentCardView.swift */; };
 		CF7382CBC9959C1D07911D7D /* DashboardCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442171CEA410BEA9920973CC /* DashboardCollector.swift */; };
+		D0733768903CCD9727B8DFB3 /* CloneClawModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F14549EBE1DD1B11C0005938 /* CloneClawModels.swift */; };
+		D237BDF75F47D27E3CF6E658 /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD164A79948DC42E5941EAD5 /* AppNotifications.swift */; };
+		D2AC28E88033FFB48E8391BC /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A035075C24DB7978AF065A5 /* SupervisorProtocol.swift */; };
 		D52DD786FA8DF4AF93FB00ED /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43A99B25B70AE3C7A8C23AB /* SettingsView.swift */; };
 		D53CB1F3E94D9A56F97653A9 /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5775BE93F05639CCBFCC06 /* UserInitPresentationRouting.swift */; };
 		D625CB019FB92184E67054F8 /* Channels.md in Resources */ = {isa = PBXBuildFile; fileRef = 774A2BFBCEF010D8B24D4E16 /* Channels.md */; };
@@ -176,6 +212,7 @@
 		D70C9279F930D35A75C85E24 /* ManagedUserDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D6A0A3A03533CF7E7AC045 /* ManagedUserDisplayName.swift */; };
 		D83F81D8FAD36A20E709E23F /* ProviderKeyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD0F0150281257093B3D1C0 /* ProviderKeyConfig.swift */; };
 		DAA3ACED4CF378D4DE27AA1B /* ProviderKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A45D60FB1293755A20CD4217 /* ProviderKeychainStore.swift */; };
+		DBB89892B3F6DD541BCB4D40 /* GatewayProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0416D1DFF5322338CF4CDB5 /* GatewayProfileStore.swift */; };
 		DCE2C8C6147052102BB81D08 /* PersonaGitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C2B17425B19E3FD55EC7AF /* PersonaGitManager.swift */; };
 		DDC38ED579B3E862A571B156 /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE120DDE4D844BEE2B6B27CB /* LocalAIModels.swift */; };
 		DF39197699129270AE614AD4 /* CreateAgentWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B65C83D810E6F642489CFFC /* CreateAgentWizardView.swift */; };
@@ -187,19 +224,25 @@
 		E0ED6F92E9AE39B2FEDD39E7 /* TTSManagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3E609AB9C9441B29AE88E3 /* TTSManagerTab.swift */; };
 		E2AF48EFF2D8470BF06BF3CA /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D52045A2822C8DE4579737 /* AppLanguage.swift */; };
 		E375A2F0A71AB42F28BDAA48 /* ModelPrioritySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA5755658C665B5D6759E337 /* ModelPrioritySheet.swift */; };
+		E3764C5E4A58DB459754742F /* SupervisorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19288931E81F0F9F9BC0312E /* SupervisorClient.swift */; };
 		E577C9CDEB98C107BB12317F /* Agent 渠道绑定功能完善方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 49234B64CC874EB07BD07FA5 /* Agent 渠道绑定功能完善方案.md */; };
 		E8A1779CFBA0E701AA0F35BD /* CreateAgentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F18AF3DCAB0F7DB9D2CE727F /* CreateAgentSheet.swift */; };
 		E9D865724B3EF7467BF7F67D /* GatewaySkillModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C1730844E0D5E4CC4EBA4FE /* GatewaySkillModels.swift */; };
+		EC8D64FDCE1AB79E0C86CAC3 /* EZRWorkerBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29058A179967DACDB2529520 /* EZRWorkerBranding.swift */; };
 		ECB2AAD59F4F2192F40A326C /* AgentGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CCE53B842C1252F4E06F44B /* AgentGridView.swift */; };
 		EFB354F72C60BB435A62D4B4 /* NetworkPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54673332FA3CBD020381CD20 /* NetworkPolicyView.swift */; };
 		F14D3E4A257CB7DA0955729D /* AgentToolCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742363C7303AD32FA67BDFBF /* AgentToolCategory.swift */; };
+		F38A78A8C8ED4EA89F6EB3C6 /* ManagedUserDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D6A0A3A03533CF7E7AC045 /* ManagedUserDisplayName.swift */; };
+		F4519A35BC80DE1C08C816AD /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6801374EC68907CEFF3D91 /* OpenClawRuntime.swift */; };
 		F69793B6903E1A1C560F7A9E /* Agent Creation CLI Fallback.md in Resources */ = {isa = PBXBuildFile; fileRef = A5B036ED5BDDFC96BDD72C21 /* Agent Creation CLI Fallback.md */; };
+		F6A4C8C645FE81609535BBEE /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54777C27B432E10D49786DE9 /* UserDetailWindowLayout.swift */; };
 		F7E5A9A08C640A5E7684F7B1 /* UserListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF539DBE2E88C7DD0784E8F6 /* UserListView.swift */; };
 		FA4AA7F683A3E8C096CFCCC8 /* UserInitWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE6965A7DA630D46B4F1B50 /* UserInitWizardView.swift */; };
 		FB35463F40D9D7B9C7166E4E /* OpenDirectory.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 05980B1012E839BAA33AD8CE /* OpenDirectory.framework */; };
 		FBA67AE354F6BFB5F6927559 /* roles.html in Resources */ = {isa = PBXBuildFile; fileRef = B0F473B89669C1F1324AB4B8 /* roles.html */; };
 		FBCAA5C027073F120856AC08 /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6474BB5EEF5B87B65666E978 /* NetworkModels.swift */; };
 		FD7FF04B316FD5DFE140F7E4 /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41E6E607472BCCB5C61A50EA /* BackupView.swift */; };
+		FD837D225E01A0CC3EA35A3A /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA6801374EC68907CEFF3D91 /* OpenClawRuntime.swift */; };
 		FEEE2C606A086D0D191F1200 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 5D7D1F12DB908202E9E91105 /* AppIcon.icns */; };
 		FF98FF0C9B7C274F99BB711E /* FeishuChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F722756738B997D9F70833A /* FeishuChannelConfigSheet.swift */; };
 		FFDE65CCDE8F074595D08793 /* GatewayCronStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3138D81E181634DCAC7B1080 /* GatewayCronStore.swift */; };
@@ -213,6 +256,13 @@
 			remoteGlobalIDString = 28071483B3C812F008318E5F;
 			remoteInfo = ClawdHomeHelper;
 		};
+		FBF88FB4B618663B0B38FA3C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 025A14E364EF7CA0B9809AE1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CB896C80A9C762721FED8D2E;
+			remoteInfo = EZRWorkerSupervisor;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -221,6 +271,7 @@
 		042B9C278F78690F80F46410 /* WizardStep4UserInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep4UserInfoView.swift; sourceTree = "<group>"; };
 		0511A43DA0C20592D7181ABD /* RoleMarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleMarketView.swift; sourceTree = "<group>"; };
 		05980B1012E839BAA33AD8CE /* OpenDirectory.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenDirectory.framework; sourceTree = "<group>"; };
+		062C7BEAC6BE261C3A7D5414 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		093C7E90CEE1F33F3A432A90 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
 		099E491688518D04CD24C160 /* onboard.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = onboard.html; sourceTree = "<group>"; };
 		0A5775BE93F05639CCBFCC06 /* UserInitPresentationRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserInitPresentationRouting.swift; sourceTree = "<group>"; };
@@ -236,20 +287,25 @@
 		14984A3D87B04508056F24CF /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
 		155680EF2A850BB4215754A8 /* LLMManagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMManagerTab.swift; sourceTree = "<group>"; };
 		1608EB0D60E1312D9BABB865 /* CreateAgentWizardState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAgentWizardState.swift; sourceTree = "<group>"; };
+		19288931E81F0F9F9BC0312E /* SupervisorClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorClient.swift; sourceTree = "<group>"; };
 		1936AA347B3957C607B88773 /* AILabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILabView.swift; sourceTree = "<group>"; };
 		1B84E061B34F08536E066AC0 /* AgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatus.swift; sourceTree = "<group>"; };
 		1C3E609AB9C9441B29AE88E3 /* TTSManagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManagerTab.swift; sourceTree = "<group>"; };
+		1D22B33EDD87E4F4A317859C /* GatewayHealthProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayHealthProbe.swift; sourceTree = "<group>"; };
 		1D6343B44B60145773E849D1 /* ModelConfigWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelConfigWizard.swift; sourceTree = "<group>"; };
 		1DDA04FF248DF6DFABA79529 /* GatewayProviderKeySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProviderKeySheet.swift; sourceTree = "<group>"; };
 		1F0E2B7F91B5C217D366E4C0 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		21010714E9E3C485F8F95B10 /* ModelDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDetailView.swift; sourceTree = "<group>"; };
 		23BC20C3DEBCD64147708A11 /* UserDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDirectoryService.swift; sourceTree = "<group>"; };
 		252FF2019F1112FB0B100A78 /* SkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsView.swift; sourceTree = "<group>"; };
+		289BB3B57A65980DEEE8E226 /* SupervisorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorController.swift; sourceTree = "<group>"; };
+		29058A179967DACDB2529520 /* EZRWorkerBranding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerBranding.swift; sourceTree = "<group>"; };
 		29EE3917E4DC28331CDD9AEA /* VoiceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfile.swift; sourceTree = "<group>"; };
 		2BD15AFBF24DE05D57194904 /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		2C1730844E0D5E4CC4EBA4FE /* GatewaySkillModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySkillModels.swift; sourceTree = "<group>"; };
 		2CCE53B842C1252F4E06F44B /* AgentGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentGridView.swift; sourceTree = "<group>"; };
 		2D91530ADB29E6F0428AD9EF /* AppLockStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockStore.swift; sourceTree = "<group>"; };
+		2E2EBD21B0C333B2A270971C /* ProfileMigrationChoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileMigrationChoiceView.swift; sourceTree = "<group>"; };
 		2E8B22899B273B82C13A9974 /* UpdateCheckPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckPolicy.swift; sourceTree = "<group>"; };
 		2F837F1CD97FBADD4A87A567 /* ClawdHomeHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ClawdHomeHelper.entitlements; sourceTree = "<group>"; };
 		30189BCD73D54C77D104B72B /* AuthSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionStore.swift; sourceTree = "<group>"; };
@@ -277,9 +333,11 @@
 		54777C27B432E10D49786DE9 /* UserDetailWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailWindowLayout.swift; sourceTree = "<group>"; };
 		571F81E7A59ECC27F4571A91 /* CronJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronJobDetailView.swift; sourceTree = "<group>"; };
 		578483F688C48CBE72C0A53E /* DaemonInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonInstaller.swift; sourceTree = "<group>"; };
+		5833CCBBBF1FA45A03C34C93 /* ClawdHome 手机号登录门禁方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "ClawdHome 手机号登录门禁方案.md"; sourceTree = "<group>"; };
 		584F60789C196DBC2E9C9B1C /* AppRootGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootGateView.swift; sourceTree = "<group>"; };
 		58D6A0A3A03533CF7E7AC045 /* ManagedUserDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedUserDisplayName.swift; sourceTree = "<group>"; };
 		58F8C0779173D59CE8564CEE /* GatewayProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProcessManager.swift; sourceTree = "<group>"; };
+		5940BE904FBEE956B3FF3B00 /* GatewayProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProfiles.swift; sourceTree = "<group>"; };
 		59C814EC41E8DBC93C785066 /* PortAllocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortAllocator.swift; sourceTree = "<group>"; };
 		5AF56FD3BA5D6A17C352036A /* 模型配置自动同步 + 智能体独立选模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "模型配置自动同步 + 智能体独立选模型.md"; sourceTree = "<group>"; };
 		5B65C83D810E6F642489CFFC /* CreateAgentWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAgentWizardView.swift; sourceTree = "<group>"; };
@@ -295,7 +353,9 @@
 		67AB0A69D9F15FA551CD2FFE /* ClawPoolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClawPoolView.swift; sourceTree = "<group>"; };
 		6805588FE98C2E1FE665C5F1 /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
 		68A3BEAD7A0849CF85E34C5F /* AgentCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCategory.swift; sourceTree = "<group>"; };
+		697CE59D501899A14D897314 /* CreateProfileSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateProfileSheet.swift; sourceTree = "<group>"; };
 		69F93DCDC51244C954C21581 /* ChannelPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPairingSheet.swift; sourceTree = "<group>"; };
+		6A5D0DC0673410A567DA7C8A /* EZRWorkerSupervisor */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A934A75317261A84D10914D /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		6DA480BEC10679854AF856C1 /* AgentBindingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBindingsView.swift; sourceTree = "<group>"; };
 		6F1BEF251910D01D23FBE869 /* WizardConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardConnection.swift; sourceTree = "<group>"; };
@@ -319,6 +379,7 @@
 		81B47FD58BA6519F937D3A52 /* GatewayLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayLog.swift; sourceTree = "<group>"; };
 		840FDD2C039CC211B8960950 /* FeishuChannelOnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelOnboardingSheet.swift; sourceTree = "<group>"; };
 		89582B96C506C6995BA78E8E /* AgentBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBinding.swift; sourceTree = "<group>"; };
+		8A035075C24DB7978AF065A5 /* SupervisorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorProtocol.swift; sourceTree = "<group>"; };
 		8BEDBBEAA15D7F52216A1CE2 /* CronTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronTaskView.swift; sourceTree = "<group>"; };
 		8E37D8B7B0C66ACFBDB383D1 /* MemoryTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTabView.swift; sourceTree = "<group>"; };
 		8F0A184904C70C46586C6F23 /* WizardStep0TemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep0TemplateView.swift; sourceTree = "<group>"; };
@@ -343,22 +404,28 @@
 		AB7E5FF24A0246F866BFF996 /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModels.swift; sourceTree = "<group>"; };
 		AB940018E9820EB6455FA34C /* SessionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsTabView.swift; sourceTree = "<group>"; };
 		ABE86644B5FC4578CCB9C6FF /* ConfigWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigWriter.swift; sourceTree = "<group>"; };
+		AD164A79948DC42E5941EAD5 /* AppNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotifications.swift; sourceTree = "<group>"; };
 		B0C17363344B936997067010 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		B0F473B89669C1F1324AB4B8 /* roles.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = roles.html; sourceTree = "<group>"; };
 		B4A9CC40AD31B2AE22A55D79 /* ModelConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelConfigView.swift; sourceTree = "<group>"; };
 		B4DD1864A7BE89F1D00FD12B /* AppBootstrapCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapCoordinator.swift; sourceTree = "<group>"; };
 		B6EB851639E58FAB6456AC11 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
+		B91A987E996ED0CB40573F05 /* AppSecondaryWindows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSecondaryWindows.swift; sourceTree = "<group>"; };
 		B9DBC78DA4D1FFD0EB50D466 /* LocalLLMManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMManager.swift; sourceTree = "<group>"; };
 		BCEAB0AC0E06E6D7BAC8D279 /* SkillListItemRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillListItemRow.swift; sourceTree = "<group>"; };
 		BD7D77647990268437A60AA1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BDB6E6A29CF3E5111FE780E5 /* BrandMigrationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandMigrationManager.swift; sourceTree = "<group>"; };
 		BE94A21ED1426DA8C0D71665 /* GatewayCronModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronModels.swift; sourceTree = "<group>"; };
 		BFAD293FACB59B2F45FF9D4A /* UserFileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFileManager.swift; sourceTree = "<group>"; };
+		C0416D1DFF5322338CF4CDB5 /* GatewayProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProfileStore.swift; sourceTree = "<group>"; };
 		C1EAFFDC5338D0ACC3A06CDD /* CloneClawManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneClawManager.swift; sourceTree = "<group>"; };
 		C31B3217680B271EC53F9A25 /* ChannelBotConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelBotConfigSheet.swift; sourceTree = "<group>"; };
 		C5A39CB77EAD5FD2A03768D4 /* ClawdHomeHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = ClawdHomeHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6C00E3156A82A0D372FA1B6 /* WizardStep3SkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep3SkillsView.swift; sourceTree = "<group>"; };
 		C8CA7E043030EBA6AECA81CC /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SystemConfiguration.framework; sourceTree = "<group>"; };
 		CA1A0EF08346F0064F692E46 /* HelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperClient.swift; sourceTree = "<group>"; };
+		CA6801374EC68907CEFF3D91 /* OpenClawRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawRuntime.swift; sourceTree = "<group>"; };
+		CA6F6DA1E456996A37FE0108 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md"; sourceTree = "<group>"; };
 		CAA3C56D1FE192B7799A3FDC /* GatewayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayManager.swift; sourceTree = "<group>"; };
 		CBA67BDCB519CC9C77AD83CC /* GeneratedVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedVersion.swift; sourceTree = "<group>"; };
 		CDFEF5EF27AFACCDD6ED9DFB /* AgentStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStyle.swift; sourceTree = "<group>"; };
@@ -410,6 +477,14 @@
 			files = (
 				A6188B820368B96D0C17F1F6 /* SystemConfiguration.framework in Frameworks */,
 				4983179D8FF13E438DED0FEE /* OpenDirectory.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		538B011B598A33717DF47E90 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				692E79F92888B0EC5550FDBF /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -471,6 +546,7 @@
 				00406F9336060D44A3331114 /* ModelPickerSheet.swift */,
 				EA5755658C665B5D6759E337 /* ModelPrioritySheet.swift */,
 				DA30B272F4DD23ECD1DD07F7 /* PageHeroHeader.swift */,
+				2E2EBD21B0C333B2A270971C /* ProfileMigrationChoiceView.swift */,
 				5FFA80FC98753A23F96D8C57 /* UpgradeConfirmSheet.swift */,
 				15F2BC6F08B3D9133C10ABAE /* Agent */,
 				091C71BB640BB6D277A00239 /* Auth */,
@@ -494,6 +570,7 @@
 			isa = PBXGroup;
 			children = (
 				093C7E90CEE1F33F3A432A90 /* AppSettingsView.swift */,
+				697CE59D501899A14D897314 /* CreateProfileSheet.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -557,6 +634,7 @@
 			children = (
 				DD78AF08CF47E52FD656EA06 /* ClawdHome */,
 				864DE3DC7E2E0D8EEDDCE311 /* ClawdHomeHelper */,
+				AA858490463ADD53509A1439 /* EZRWorkerSupervisor */,
 				CEF5FBE683C099D4AEA01D41 /* Shared */,
 				565FBE4A1A0F9F0B10D1E2CA /* Frameworks */,
 				849301842B00AAF8E21D222B /* Products */,
@@ -600,6 +678,7 @@
 			children = (
 				F7D8BDF74255B3A14CF069B0 /* ClawdHome.app */,
 				C5A39CB77EAD5FD2A03768D4 /* ClawdHomeHelper */,
+				6A5D0DC0673410A567DA7C8A /* EZRWorkerSupervisor */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -626,6 +705,8 @@
 				49234B64CC874EB07BD07FA5 /* Agent 渠道绑定功能完善方案.md */,
 				A5B036ED5BDDFC96BDD72C21 /* Agent Creation CLI Fallback.md */,
 				0E9940ADBB19874CF69F54DA /* ClawdHome 架构重设计：单实例智能体配置管理面板.md */,
+				5833CCBBBF1FA45A03C34C93 /* ClawdHome 手机号登录门禁方案.md */,
+				CA6F6DA1E456996A37FE0108 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */,
 				3B8C13BAC40902A48F51B636 /* EZRWorker 目录重组方案.md */,
 				450E8E52A7D273EAC9FAF054 /* openclaw 和 node 打包在 app bundle 内.md */,
 			);
@@ -656,6 +737,15 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		AA858490463ADD53509A1439 /* EZRWorkerSupervisor */ = {
+			isa = PBXGroup;
+			children = (
+				062C7BEAC6BE261C3A7D5414 /* main.swift */,
+				289BB3B57A65980DEEE8E226 /* SupervisorController.swift */,
+			);
+			path = EZRWorkerSupervisor;
+			sourceTree = "<group>";
+		};
 		C190B321AAAC152D20213EC6 /* Gateway */ = {
 			isa = PBXGroup;
 			children = (
@@ -668,17 +758,23 @@
 		CEF5FBE683C099D4AEA01D41 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				AD164A79948DC42E5941EAD5 /* AppNotifications.swift */,
 				98F2D77C8262C551CBD26BA2 /* AppUpdateState.swift */,
 				F14549EBE1DD1B11C0005938 /* CloneClawModels.swift */,
 				AB7E5FF24A0246F866BFF996 /* DashboardModels.swift */,
+				29058A179967DACDB2529520 /* EZRWorkerBranding.swift */,
 				EFC4D03808505276353A3AD2 /* FileInputAcceptFilter.swift */,
 				F71156CAD7673A87034AF0D8 /* FileModels.swift */,
+				1D22B33EDD87E4F4A317859C /* GatewayHealthProbe.swift */,
+				5940BE904FBEE956B3FF3B00 /* GatewayProfiles.swift */,
 				9CB22903A652976B892FA384 /* HealthCheck.swift */,
 				467287AC8BE705E07CE3C366 /* HelperProtocol.swift */,
 				EE120DDE4D844BEE2B6B27CB /* LocalAIModels.swift */,
 				58D6A0A3A03533CF7E7AC045 /* ManagedUserDisplayName.swift */,
 				6474BB5EEF5B87B65666E978 /* NetworkModels.swift */,
+				CA6801374EC68907CEFF3D91 /* OpenClawRuntime.swift */,
 				F76A73EBA6C37473C494E20D /* ProcessModels.swift */,
+				8A035075C24DB7978AF065A5 /* SupervisorProtocol.swift */,
 				48C0E63E7FA11917EE0F610A /* UserAdoptionFlow.swift */,
 				54777C27B432E10D49786DE9 /* UserDetailWindowLayout.swift */,
 				0A5775BE93F05639CCBFCC06 /* UserInitPresentationRouting.swift */,
@@ -695,18 +791,21 @@
 				46F7679868CCF750BCB1AB2C /* AppLogger.swift */,
 				EEDB3631BA9B1D72ACEB6E69 /* AuthAPIClient.swift */,
 				30189BCD73D54C77D104B72B /* AuthSessionStore.swift */,
+				BDB6E6A29CF3E5111FE780E5 /* BrandMigrationManager.swift */,
 				578483F688C48CBE72C0A53E /* DaemonInstaller.swift */,
 				7D5E4ECA02402D10DBD99473 /* DeviceIdentity.swift */,
 				EB548B8A7041F4C24A63EA94 /* EnvironmentChecker.swift */,
 				7196387EF7669EA0B32A339C /* GatewayClient.swift */,
 				3138D81E181634DCAC7B1080 /* GatewayCronStore.swift */,
 				CE17FA856C40AB029642D900 /* GatewayHub.swift */,
+				C0416D1DFF5322338CF4CDB5 /* GatewayProfileStore.swift */,
 				EDD750D6A1014E5F6F69C039 /* GatewaySkillsStore.swift */,
 				CA1A0EF08346F0064F692E46 /* HelperClient.swift */,
 				F21D5CADB0555DA241C70C95 /* ModelPingService.swift */,
 				DC3FB30B2598A311EF94A822 /* OpenClawProviderKeySync.swift */,
 				A45D60FB1293755A20CD4217 /* ProviderKeychainStore.swift */,
 				4780B5569AB2AD040C2115E1 /* ShrimpPool.swift */,
+				19288931E81F0F9F9BC0312E /* SupervisorClient.swift */,
 				1F0E2B7F91B5C217D366E4C0 /* UpdateChecker.swift */,
 				2E8B22899B273B82C13A9974 /* UpdateCheckPolicy.swift */,
 				23BC20C3DEBCD64147708A11 /* UserDirectoryService.swift */,
@@ -784,6 +883,7 @@
 			isa = PBXGroup;
 			children = (
 				584F60789C196DBC2E9C9B1C /* AppRootGateView.swift */,
+				B91A987E996ED0CB40573F05 /* AppSecondaryWindows.swift */,
 				D8759E61AA964E69CFBDD228 /* ClawdHomeApp.swift */,
 				D527E149D214140B04134933 /* MainView.swift */,
 				F0B6979E68DA177BD714B76A /* Sidebar */,
@@ -856,11 +956,13 @@
 				CBDE9FD33BA5CFBDA763506A /* Frameworks */,
 				1E11B3E365C4A88CB25B517A /* Inject Git Build Number */,
 				217CF341688DD108EF049819 /* Embed Helper into App Bundle */,
+				040D87C5F52F49EBF3EE3BD1 /* Embed Supervisor into App Bundle */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				88B2826E6BD04CCEA8D54B9C /* PBXTargetDependency */,
+				95CD6D4814BABAD3D783E3D2 /* PBXTargetDependency */,
 			);
 			name = ClawdHome;
 			packageProductDependencies = (
@@ -869,6 +971,24 @@
 			productName = ClawdHome;
 			productReference = F7D8BDF74255B3A14CF069B0 /* ClawdHome.app */;
 			productType = "com.apple.product-type.application";
+		};
+		CB896C80A9C762721FED8D2E /* EZRWorkerSupervisor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4BB3F9DA223D6682A01C392B /* Build configuration list for PBXNativeTarget "EZRWorkerSupervisor" */;
+			buildPhases = (
+				F668F4325CB8211BA2F0106A /* Sources */,
+				538B011B598A33717DF47E90 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EZRWorkerSupervisor;
+			packageProductDependencies = (
+			);
+			productName = EZRWorkerSupervisor;
+			productReference = 6A5D0DC0673410A567DA7C8A /* EZRWorkerSupervisor */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -884,6 +1004,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					B7B2F454B4C6A7D06DC5FB21 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					CB896C80A9C762721FED8D2E = {
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
@@ -909,6 +1033,7 @@
 			targets = (
 				B7B2F454B4C6A7D06DC5FB21 /* ClawdHome */,
 				28071483B3C812F008318E5F /* ClawdHomeHelper */,
+				CB896C80A9C762721FED8D2E /* EZRWorkerSupervisor */,
 			);
 		};
 /* End PBXProject section */
@@ -924,7 +1049,9 @@
 				FEEE2C606A086D0D191F1200 /* AppIcon.icns in Resources */,
 				0E07E58A241BA58310F6443A /* Assets.xcassets in Resources */,
 				D625CB019FB92184E67054F8 /* Channels.md in Resources */,
+				1251477199376DC9948F4461 /* ClawdHome 手机号登录门禁方案.md in Resources */,
 				2FA8A230E50CC758096EDF58 /* ClawdHome 架构重设计：单实例智能体配置管理面板.md in Resources */,
+				3E0123F3C3FB1721E3368BEA /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md in Resources */,
 				97878F9B06C39AAD1C08FEF3 /* EZRWorker 目录重组方案.md in Resources */,
 				5ABCA1F5E8534493FECD5E56 /* PresetAgents.json in Resources */,
 				14F81C6AACC151937FD46137 /* Stable.xcstrings in Resources */,
@@ -941,6 +1068,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		040D87C5F52F49EBF3EE3BD1 /* Embed Supervisor into App Bundle */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Supervisor into App Bundle";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "DEST_BIN=\"${CODESIGNING_FOLDER_PATH}/Contents/MacOS\"\nDEST_AGENT=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchAgents\"\nmkdir -p \"$DEST_BIN\" \"$DEST_AGENT\"\ncp \"${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor\" \"$DEST_BIN/EZRWorkerSupervisor\"\nchmod +x \"$DEST_BIN/EZRWorkerSupervisor\"\ncp \"${SRCROOT}/Resources/ai.ezrworker.mac.supervisor.plist\" \"$DEST_AGENT/\"\n";
+		};
 		1E11B3E365C4A88CB25B517A /* Inject Git Build Number */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -977,7 +1123,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# DEBUG 模式下跳过嵌入 helper，避免 SMAppService 检测到 app bundle 中的\n# helper 变化后自动替换正在运行的 /Library/PrivilegedHelperTools/ 二进制。\n# 开发阶段使用 make install-helper 手动管理 helper。\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  echo \"⏭ DEBUG: skip embedding helper (use 'make install-helper' instead)\"\n  exit 0\nfi\nDEST=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchDaemons\"\nmkdir -p \"$DEST\"\ncp \"${BUILT_PRODUCTS_DIR}/ClawdHomeHelper\" \"$DEST/ClawdHomeHelper\"\nchmod +x \"$DEST/ClawdHomeHelper\"\ncp \"${SRCROOT}/Resources/ai.clawdhome.mac.helper.plist\" \"$DEST/\"\n";
+			shellScript = "# DEBUG 模式下跳过嵌入 helper，避免 SMAppService 检测到 app bundle 中的\n# helper 变化后自动替换正在运行的 /Library/PrivilegedHelperTools/ 二进制。\n# 开发阶段使用 make install-helper 手动管理 helper。\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  echo \"⏭ DEBUG: skip embedding helper (use 'make install-helper' instead)\"\n  exit 0\nfi\nDEST=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchDaemons\"\nmkdir -p \"$DEST\"\ncp \"${BUILT_PRODUCTS_DIR}/EZRWorkerHelper\" \"$DEST/EZRWorkerHelper\"\nchmod +x \"$DEST/EZRWorkerHelper\"\ncp \"${SRCROOT}/Resources/ai.ezrworker.mac.helper.plist\" \"$DEST/\"\n";
 		};
 		A99DCFF1121F876C8AFAB831 /* Generate Helper Version */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1029,7 +1175,9 @@
 				8782D0C95C1470BAA40F3CB3 /* AppLockScreen.swift in Sources */,
 				392339F9B252B192CBBD687E /* AppLockStore.swift in Sources */,
 				2B1093226D863509319B4639 /* AppLogger.swift in Sources */,
+				D237BDF75F47D27E3CF6E658 /* AppNotifications.swift in Sources */,
 				466F335DDA385FC3B5AF3669 /* AppRootGateView.swift in Sources */,
+				70816B0DA73AB9B92D40EE21 /* AppSecondaryWindows.swift in Sources */,
 				7739AA049BBAE2AB3F3D52E7 /* AppSettingsView.swift in Sources */,
 				A78B8054BE8C76489EEBCA77 /* AppUpdateBanner.swift in Sources */,
 				128DCAA688B24902AC319BB4 /* AppUpdateState.swift in Sources */,
@@ -1040,6 +1188,7 @@
 				01E2EB52392A730451E7F61D /* AwakeningWizardView.swift in Sources */,
 				55CB96D5B61D248282E612F1 /* BackupManagerSheet.swift in Sources */,
 				FD7FF04B316FD5DFE140F7E4 /* BackupView.swift in Sources */,
+				7DF7166E51EBAB2D9B2661A1 /* BrandMigrationManager.swift in Sources */,
 				52932A1CFF2BBA01CDDD6948 /* CLIConfigStep.swift in Sources */,
 				860FBA28D675AEC1A5540B90 /* ChannelBindSheet.swift in Sources */,
 				B86C06FFCFAF8F7887D31E1F /* ChannelBotConfigSheet.swift in Sources */,
@@ -1056,6 +1205,7 @@
 				E8A1779CFBA0E701AA0F35BD /* CreateAgentSheet.swift in Sources */,
 				E04E4C54CFB338FB0422767F /* CreateAgentWizardState.swift in Sources */,
 				DF39197699129270AE614AD4 /* CreateAgentWizardView.swift in Sources */,
+				5B93C01A12617F6BD09DCDAE /* CreateProfileSheet.swift in Sources */,
 				9E916A98F61E4AC796A9C8E7 /* CronAddSheet.swift in Sources */,
 				03C99BB8898B379F5869BD7D /* CronJobDetailView.swift in Sources */,
 				05DA444C9B6FAF8B2300D908 /* CronTaskView.swift in Sources */,
@@ -1064,6 +1214,7 @@
 				6E8E862B9D09268ABD86C619 /* DashboardModels.swift in Sources */,
 				E0CEA96A5FE7483DCDA6DC57 /* DashboardView.swift in Sources */,
 				4D961DB5D7F9C1179E54CED8 /* DeviceIdentity.swift in Sources */,
+				8190E5D8355696B465856823 /* EZRWorkerBranding.swift in Sources */,
 				C793138C446945CBB344323C /* EnvironmentChecker.swift in Sources */,
 				2112503D806035FFD7ADE54D /* FallbackManagerSheet.swift in Sources */,
 				FF98FF0C9B7C274F99BB711E /* FeishuChannelConfigSheet.swift in Sources */,
@@ -1074,8 +1225,11 @@
 				4C1A04B98992EC3A0E96F287 /* GatewayClient.swift in Sources */,
 				A40645431E00AD9069F11425 /* GatewayCronModels.swift in Sources */,
 				FFDE65CCDE8F074595D08793 /* GatewayCronStore.swift in Sources */,
+				481FF22D8AB0E9A6BDE1DD05 /* GatewayHealthProbe.swift in Sources */,
 				4778AE0C4B31EA10463042FE /* GatewayHub.swift in Sources */,
 				B29F7CA21091D1B1A1876E59 /* GatewayProcessManager.swift in Sources */,
+				DBB89892B3F6DD541BCB4D40 /* GatewayProfileStore.swift in Sources */,
+				BE8616034D09DAB005A8F1B7 /* GatewayProfiles.swift in Sources */,
 				161CF0DA6073064097C48EB7 /* GatewayProviderKeySheet.swift in Sources */,
 				92728BA550CCA04B4291F62F /* GatewayService.swift in Sources */,
 				E9D865724B3EF7467BF7F67D /* GatewaySkillModels.swift in Sources */,
@@ -1108,10 +1262,12 @@
 				FBCAA5C027073F120856AC08 /* NetworkModels.swift in Sources */,
 				EFB354F72C60BB435A62D4B4 /* NetworkPolicyView.swift in Sources */,
 				AE76A7264C741C2A508B1E1B /* OpenClawProviderKeySync.swift in Sources */,
+				F4519A35BC80DE1C08C816AD /* OpenClawRuntime.swift in Sources */,
 				C407BEE1C9FE61AB4F10A667 /* PageHeroHeader.swift in Sources */,
 				8DA5C8174C08A39388CA8388 /* PersonaDefView.swift in Sources */,
 				AA1E3AB3359CC5503337836E /* PortAllocator.swift in Sources */,
 				2B9BC8730AB3B78B208861BD /* ProcessModels.swift in Sources */,
+				3F03F1571E5982AA9FA8C174 /* ProfileMigrationChoiceView.swift in Sources */,
 				D83F81D8FAD36A20E709E23F /* ProviderKeyConfig.swift in Sources */,
 				3EAB17FB3B0018ACB9CD64A0 /* ProviderKeyRow.swift in Sources */,
 				8846B8802FACD8C78C40CEAB /* ProviderKeySheet.swift in Sources */,
@@ -1124,6 +1280,8 @@
 				218B9112E56C5BC8B1A158D3 /* SidebarView.swift in Sources */,
 				2966E60E53F238921C9D526E /* SkillListItemRow.swift in Sources */,
 				BFA850F5345A3EF6510D6EF6 /* SkillsView.swift in Sources */,
+				E3764C5E4A58DB459754742F /* SupervisorClient.swift in Sources */,
+				47DA1A1BCB9134E980EFD7B9 /* SupervisorProtocol.swift in Sources */,
 				E0ED6F92E9AE39B2FEDD39E7 /* TTSManagerTab.swift in Sources */,
 				0950A6AF299B75D630F18D4C /* TelegramChannelConfigSheet.swift in Sources */,
 				2372A09285FD2D12851D0C62 /* TerminalLogView.swift in Sources */,
@@ -1155,6 +1313,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6B8681EE571EF62B3F7A7992 /* AppNotifications.swift in Sources */,
 				5AE2A7E5C2BDF08FCAC2DBE4 /* AppUpdateHeartbeatService.swift in Sources */,
 				8ABC91BB2196F6C05E6647C9 /* AppUpdateState.swift in Sources */,
 				1549B24326311C26E1701BA8 /* CloneClawManager.swift in Sources */,
@@ -1163,10 +1322,13 @@
 				27EAFF1F05E455130B72B22C /* ConnectionCollector.swift in Sources */,
 				CF7382CBC9959C1D07911D7D /* DashboardCollector.swift in Sources */,
 				16C806CD97F4A5FB8DD95D1C /* DashboardModels.swift in Sources */,
+				EC8D64FDCE1AB79E0C86CAC3 /* EZRWorkerBranding.swift in Sources */,
 				2097CA2F620A1F864C858033 /* FileInputAcceptFilter.swift in Sources */,
 				B33BF87630AE1CBD7D47F438 /* FileModels.swift in Sources */,
+				4E213F852DA206B8997AC910 /* GatewayHealthProbe.swift in Sources */,
 				87442F9B989A859F1BCF6FC2 /* GatewayLog.swift in Sources */,
 				508DBEDAF0C5804D9E21CCD9 /* GatewayManager.swift in Sources */,
+				A8E72C9BC64E0F039FC5F2F7 /* GatewayProfiles.swift in Sources */,
 				C745EB73F505520BE75D6E88 /* GeneratedVersion.swift in Sources */,
 				A74D7C244C8DC0ECFAE9A55B /* HealthCheck.swift in Sources */,
 				4D9977D09130B0CC18E9FEAF /* HelperProtocol.swift in Sources */,
@@ -1177,16 +1339,47 @@
 				236B40A5073B4CF61B88CB83 /* NStatCollector.swift in Sources */,
 				647F82D1797FC9D80FF86C16 /* NetworkModels.swift in Sources */,
 				3D7B3D66E56E6D32CFC39D1F /* NodeDownloader.swift in Sources */,
+				FD837D225E01A0CC3EA35A3A /* OpenClawRuntime.swift in Sources */,
 				DCE2C8C6147052102BB81D08 /* PersonaGitManager.swift in Sources */,
 				33377A070BA5CD38AF3D570D /* ProcessManager.swift in Sources */,
 				6F9101485DF1A9C40CE39C65 /* ProcessModels.swift in Sources */,
 				7F1931508A7DA6D48319500F /* ShellRunner.swift in Sources */,
+				D2AC28E88033FFB48E8391BC /* SupervisorProtocol.swift in Sources */,
 				07B6092C2C29BC1A19385B32 /* UserAdoptionFlow.swift in Sources */,
 				41B0259B5FC9A1381D8F840C /* UserDetailWindowLayout.swift in Sources */,
 				C11B2113E212A1BBC279EC49 /* UserFileManager.swift in Sources */,
 				844ED367CC5266A513A5FADE /* UserInitPresentationRouting.swift in Sources */,
 				52DC4DCC5F6553B9DA7AE563 /* UserManager.swift in Sources */,
 				8880D4FA5302740F6CD8F7B2 /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F668F4325CB8211BA2F0106A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				677D2CEE333DB010ABE1A3D3 /* AppNotifications.swift in Sources */,
+				6EC3C5BBE8C39F4AE21F6630 /* AppUpdateState.swift in Sources */,
+				D0733768903CCD9727B8DFB3 /* CloneClawModels.swift in Sources */,
+				8F93EA3BF7B4D0095F052A7E /* DashboardModels.swift in Sources */,
+				0CE3FA2580537838861B1C0A /* EZRWorkerBranding.swift in Sources */,
+				38916626074F7187D01BA591 /* FileInputAcceptFilter.swift in Sources */,
+				33E12F72C9FD3848E83EC0FF /* FileModels.swift in Sources */,
+				2A317027BED0390956442DBE /* GatewayHealthProbe.swift in Sources */,
+				60C6180250248DB1EC06A5D3 /* GatewayProfiles.swift in Sources */,
+				39FDA95C3B545AC30EBF945C /* HealthCheck.swift in Sources */,
+				296C108A6166B54AD57E8B63 /* HelperProtocol.swift in Sources */,
+				0CCAA681CDCE3DF9397D494C /* LocalAIModels.swift in Sources */,
+				F38A78A8C8ED4EA89F6EB3C6 /* ManagedUserDisplayName.swift in Sources */,
+				738DC67B6683D60D2ED4EF8E /* NetworkModels.swift in Sources */,
+				177A4C7E55F25609823146D7 /* OpenClawRuntime.swift in Sources */,
+				33CF93BCA923CB8AB8E88E99 /* ProcessModels.swift in Sources */,
+				8F0EC1E32F4613219B06FFAF /* SupervisorController.swift in Sources */,
+				A660801B852626BA66D91F92 /* SupervisorProtocol.swift in Sources */,
+				C4BECC0EE29A6DE6B2BF23E0 /* UserAdoptionFlow.swift in Sources */,
+				F6A4C8C645FE81609535BBEE /* UserDetailWindowLayout.swift in Sources */,
+				AD635DB241A9EC8E8CD338BD /* UserInitPresentationRouting.swift in Sources */,
+				5AC56C299FF91EFB7757A577 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1197,6 +1390,11 @@
 			isa = PBXTargetDependency;
 			target = 28071483B3C812F008318E5F /* ClawdHomeHelper */;
 			targetProxy = AFF17C87071F0C6916331330 /* PBXContainerItemProxy */;
+		};
+		95CD6D4814BABAD3D783E3D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CB896C80A9C762721FED8D2E /* EZRWorkerSupervisor */;
+			targetProxy = FBF88FB4B618663B0B38FA3C /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1218,7 +1416,32 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.clawdhome.mac.helper;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.helper;
+				PRODUCT_NAME = EZRWorkerHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		4E70013EBAF0B2CA0698C4E6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.supervisor;
+				PRODUCT_NAME = EZRWorkerSupervisor;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.9;
@@ -1242,7 +1465,32 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.clawdhome.mac.helper;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.helper;
+				PRODUCT_NAME = EZRWorkerHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		8CC61A8E65240190C48FBEB0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.supervisor;
+				PRODUCT_NAME = EZRWorkerSupervisor;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.9;
@@ -1268,7 +1516,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.clawdhome.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac;
 				PRODUCT_NAME = EZRWorker;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -1350,7 +1598,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.clawdhome.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac;
 				PRODUCT_NAME = EZRWorker;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -1428,6 +1676,15 @@
 			buildConfigurations = (
 				F07310F0911BE81A896AEC90 /* Debug */,
 				C5337D0F3A75CCEE99557194 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4BB3F9DA223D6682A01C392B /* Build configuration list for PBXNativeTarget "EZRWorkerSupervisor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E70013EBAF0B2CA0698C4E6 /* Debug */,
+				8CC61A8E65240190C48FBEB0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

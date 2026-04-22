@@ -247,9 +247,15 @@ final class AgentStore {
     }
 
     private func tryAddAgentViaCLI(id: String) async throws {
+        guard let profile = workspaceManager?.currentProfileResolution else {
+            throw GatewayClientError.requestFailed(
+                code: "profile_runtime_missing",
+                message: "当前 profile 未就绪，无法执行 agents add"
+            )
+        }
         let (ok, output) = try await withThrowingTaskGroup(of: (Bool, String).self) { group in
             group.addTask {
-                await GatewayProcessManager.addAgentLocally(agentId: id)
+                await GatewayProcessManager.addAgentLocally(agentId: id, profile: profile)
             }
             group.addTask {
                 try await Task.sleep(nanoseconds: 30_000_000_000)
@@ -409,9 +415,15 @@ final class AgentStore {
     }
 
     private func tryDeleteAgentViaCLI(id: String) async throws {
+        guard let profile = workspaceManager?.currentProfileResolution else {
+            throw GatewayClientError.requestFailed(
+                code: "profile_runtime_missing",
+                message: "当前 profile 未就绪，无法执行 agents delete"
+            )
+        }
         let (ok, output) = try await withThrowingTaskGroup(of: (Bool, String).self) { group in
             group.addTask {
-                await GatewayProcessManager.deleteAgentLocally(agentId: id)
+                await GatewayProcessManager.deleteAgentLocally(agentId: id, profile: profile)
             }
             group.addTask {
                 try await Task.sleep(nanoseconds: 30_000_000_000)
@@ -781,8 +793,9 @@ final class AgentStore {
 
     /// 检查并执行一次性迁移
     func migrateIfNeeded() async {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let oldPath = home.appendingPathComponent(".openclaw/agents.json")
+        guard let resolution = workspaceManager?.currentProfileResolution else { return }
+        let oldPath = URL(fileURLWithPath: resolution.resolvedStateDir, isDirectory: true)
+            .appendingPathComponent("agents.json")
 
         guard FileManager.default.fileExists(atPath: oldPath.path),
               let data = try? Data(contentsOf: oldPath) else { return }
@@ -816,7 +829,7 @@ final class AgentStore {
         }
 
         // 备份旧文件
-        let backupPath = home.appendingPathComponent(".openclaw/agents.json.migrated")
+        let backupPath = oldPath.deletingPathExtension().appendingPathExtension("json.migrated")
         try? FileManager.default.moveItem(at: oldPath, to: backupPath)
         appLog("AgentStore: 迁移完成，旧文件已备份")
     }

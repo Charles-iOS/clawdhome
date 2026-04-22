@@ -1,8 +1,5 @@
-import AppKit
 import Foundation
 import Observation
-
-private let bootstrapMiniMaxAPIKeyCoordinator = "sk-cp-fpa22Na3FtFB33pyJq99D5vpTrGDxsX6PwA2HXp2Ro1p3HycWv-oXl5kb0tIq6xVWq5xQgI3QmIySPU4gWTtNSb7-wrXg6tjgNhP-gMM182Dz0K4kiXeko4"
 
 @MainActor
 @Observable
@@ -16,35 +13,23 @@ final class AppBootstrapCoordinator {
 
     private(set) var state: State = .idle
 
-    @ObservationIgnored
-    private let startWork: @MainActor () async throws -> Void
-    @ObservationIgnored
-    private let resetWork: @MainActor () async -> Void
-    @ObservationIgnored
-    private let terminationWork: @MainActor () -> Void
-    @ObservationIgnored
-    private let reconnectShouldRun: @MainActor () -> Bool
-    @ObservationIgnored
-    private let reconnectWork: @MainActor () async -> Void
+    @ObservationIgnored private let processManager: GatewayProcessManager
+    @ObservationIgnored private let envChecker: EnvironmentChecker
+    @ObservationIgnored private let gatewayService: GatewayService
+    @ObservationIgnored private let agentStore: AgentStore
+    @ObservationIgnored private let workspaceManager: AgentWorkspaceManager
+    @ObservationIgnored private let keychainStore: ProviderKeychainStore
+    @ObservationIgnored private let helperClient: HelperClient
+    @ObservationIgnored private let shrimpPool: ShrimpPool
+    @ObservationIgnored private let modelStore: GlobalModelStore
+    @ObservationIgnored private let profileStore: GatewayProfileStore
+    @ObservationIgnored private let supervisorClient: SupervisorClient
+    @ObservationIgnored private let migrationManager: BrandMigrationManager
 
     @ObservationIgnored
     private var reconnectTask: Task<Void, Never>?
 
     init(
-        startWork: @escaping @MainActor () async throws -> Void,
-        resetWork: @escaping @MainActor () async -> Void,
-        terminationWork: @escaping @MainActor () -> Void,
-        reconnectShouldRun: @escaping @MainActor () -> Bool = { false },
-        reconnectWork: @escaping @MainActor () async -> Void = {}
-    ) {
-        self.startWork = startWork
-        self.resetWork = resetWork
-        self.terminationWork = terminationWork
-        self.reconnectShouldRun = reconnectShouldRun
-        self.reconnectWork = reconnectWork
-    }
-
-    convenience init(
         processManager: GatewayProcessManager,
         envChecker: EnvironmentChecker,
         gatewayService: GatewayService,
@@ -53,46 +38,23 @@ final class AppBootstrapCoordinator {
         keychainStore: ProviderKeychainStore,
         helperClient: HelperClient,
         shrimpPool: ShrimpPool,
-        modelStore: GlobalModelStore
+        modelStore: GlobalModelStore,
+        profileStore: GatewayProfileStore,
+        supervisorClient: SupervisorClient,
+        migrationManager: BrandMigrationManager
     ) {
-        self.init(
-            startWork: {
-                try await Self.performBootstrap(
-                    processManager: processManager,
-                    envChecker: envChecker,
-                    gatewayService: gatewayService,
-                    agentStore: agentStore,
-                    workspaceManager: workspaceManager,
-                    keychainStore: keychainStore,
-                    helperClient: helperClient,
-                    shrimpPool: shrimpPool,
-                    modelStore: modelStore
-                )
-            },
-            resetWork: {
-                await gatewayService.disconnect()
-                helperClient.disconnect()
-                processManager.prepareForAppTermination()
-                shrimpPool.stop()
-                agentStore.markGatewayDisconnected()
-            },
-            terminationWork: {
-                processManager.prepareForAppTermination()
-                helperClient.disconnect()
-                gatewayService.prepareForAppTermination()
-                shrimpPool.stop()
-                agentStore.markGatewayDisconnected()
-            },
-            reconnectShouldRun: {
-                processManager.isRunning && !gatewayService.isConnected
-            },
-            reconnectWork: {
-                await Self.connectGatewayService(
-                    gatewayService: gatewayService,
-                    configURL: GatewayProcessManager.openClawConfigDir.appendingPathComponent("openclaw.json")
-                )
-            }
-        )
+        self.processManager = processManager
+        self.envChecker = envChecker
+        self.gatewayService = gatewayService
+        self.agentStore = agentStore
+        self.workspaceManager = workspaceManager
+        self.keychainStore = keychainStore
+        self.helperClient = helperClient
+        self.shrimpPool = shrimpPool
+        self.modelStore = modelStore
+        self.profileStore = profileStore
+        self.supervisorClient = supervisorClient
+        self.migrationManager = migrationManager
     }
 
     func startIfNeeded() async {
@@ -105,7 +67,7 @@ final class AppBootstrapCoordinator {
 
         state = .starting
         do {
-            try await startWork()
+            try await performBootstrap()
             state = .started
             startReconnectLoop()
         } catch {
@@ -113,92 +75,113 @@ final class AppBootstrapCoordinator {
         }
     }
 
+    func restartForProfileSwitch() async {
+        stopReconnectLoop()
+        await resetRuntimeState()
+        state = .idle
+        await startIfNeeded()
+    }
+
     func resetForUnauthenticated() async {
         stopReconnectLoop()
-        await resetWork()
+        await resetRuntimeState()
         state = .idle
     }
 
     func prepareForAppTermination() {
         stopReconnectLoop()
-        terminationWork()
+        processManager.prepareForAppTermination()
+        helperClient.disconnect()
+        gatewayService.prepareForAppTermination()
+        shrimpPool.stop()
+        agentStore.markGatewayDisconnected()
         state = .idle
     }
 
-    private func startReconnectLoop() {
-        stopReconnectLoop()
-        reconnectTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                guard !Task.isCancelled else { return }
-                if self.reconnectShouldRun() {
-                    appLog("bootstrap: reconnect loop detected disconnected gateway, retrying...")
-                    await self.reconnectWork()
-                }
-            }
+    private func performBootstrap() async throws {
+        migrationManager.migrateIfNeeded()
+        await profileStore.loadIfNeeded()
+
+        switch profileStore.status {
+        case .ready:
+            break
+        case .needsLegacyMigration:
+            throw NSError(domain: "AppBootstrapCoordinator", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "请先完成旧单实例迁移选择"
+            ])
+        case .loading:
+            throw NSError(domain: "AppBootstrapCoordinator", code: 2, userInfo: [
+                NSLocalizedDescriptionKey: "Profile 正在加载中"
+            ])
+        case .failed(let message):
+            throw NSError(domain: "AppBootstrapCoordinator", code: 3, userInfo: [
+                NSLocalizedDescriptionKey: message
+            ])
         }
-    }
 
-    private func stopReconnectLoop() {
-        reconnectTask?.cancel()
-        reconnectTask = nil
-    }
-
-    private static func performBootstrap(
-        processManager: GatewayProcessManager,
-        envChecker: EnvironmentChecker,
-        gatewayService: GatewayService,
-        agentStore: AgentStore,
-        workspaceManager: AgentWorkspaceManager,
-        keychainStore: ProviderKeychainStore,
-        helperClient: HelperClient,
-        shrimpPool: ShrimpPool,
-        modelStore: GlobalModelStore
-    ) async throws {
-        let currentUsername = NSUserName()
-        workspaceManager.configure(helperClient: helperClient, username: currentUsername)
+        guard let selectedProfile = profileStore.selectedProfile,
+              let selectedResolution = profileStore.selectedResolution else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "未找到当前 profile"
+            ])
+        }
 
         await envChecker.check()
-
-        if envChecker.isReady {
-            processManager.start()
-
-            for _ in 0..<30 {
-                if processManager.isRunning { break }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
+        if case .missing(let reason) = envChecker.status {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: reason
+            ])
         }
 
-        let gatewayReady: Bool
-        if processManager.isRunning {
-            appLog("bootstrap: processManager already running")
-            gatewayReady = true
-        } else {
-            appLog("bootstrap: processManager not running, probing port \(processManager.gatewayPort)...")
-            let (alive, ready) = await GatewayClient.httpProbe(port: processManager.gatewayPort)
-            appLog("bootstrap: probe result alive=\(alive) ready=\(ready)")
-            gatewayReady = ready
+        supervisorClient.connect()
+        guard await supervisorClient.waitUntilConnected() else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 6, userInfo: [
+                NSLocalizedDescriptionKey: "EZRWorkerSupervisor 未就绪"
+            ])
         }
 
-        if gatewayReady {
-            await connectGatewayService(
-                gatewayService: gatewayService,
-                configURL: GatewayProcessManager.openClawConfigDir.appendingPathComponent("openclaw.json")
-            )
-            await provisionDefaultMiniMaxModelIfNeeded(
-                gatewayService: gatewayService,
-                keychainStore: keychainStore
-            )
-        } else {
-            appLog("bootstrap: gateway not ready, skipping WebSocket connect", level: .warn)
+        processManager.bind(profileStore: profileStore, supervisorClient: supervisorClient)
+
+        _ = await supervisorClient.reloadProfiles()
+
+        var runtimes = try await supervisorClient.listProfilesRuntime()
+        var runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
+
+        if runtime?.readyState != .ready {
+            try await supervisorClient.startProfile(profileID: selectedProfile.id)
+            runtimes = try await supervisorClient.listProfilesRuntime()
+            runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
         }
+
+        guard let runtime else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "Supervisor 未返回当前 profile 运行态"
+            ])
+        }
+
+        let currentUsername = NSUserName()
+        workspaceManager.configure(profile: selectedResolution, helperClient: helperClient, username: currentUsername)
+
+        let configURL = URL(fileURLWithPath: runtime.resolvedConfigPath)
+        guard let token = await Self.waitForGatewayToken(configURL: configURL) else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 8, userInfo: [
+                NSLocalizedDescriptionKey: "Gateway 已启动，但当前 profile 的 gateway token 尚未写入配置"
+            ])
+        }
+
+        await gatewayService.reconfigure(port: runtime.resolvedPort, token: token)
+        guard await Self.connectGatewayService(gatewayService: gatewayService) else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 9, userInfo: [
+                NSLocalizedDescriptionKey: "Gateway 已启动，但当前 profile 的控制连接建立失败"
+            ])
+        }
+        await Self.provisionDefaultMiniMaxModelIfNeeded(
+            gatewayService: gatewayService,
+            keychainStore: keychainStore
+        )
 
         helperClient.connect()
-        let helperReady = await helperClient.waitUntilConnected()
-        if !helperReady {
-            appLog("bootstrap: helper 连接未在预期时间内就绪，后续 workspace 探测将采用保守模式", level: .warn)
-        }
+        _ = await helperClient.waitUntilConnected()
 
         await agentStore.load(
             gateway: gatewayService,
@@ -209,30 +192,52 @@ final class AppBootstrapCoordinator {
 
         shrimpPool.start()
         modelStore.load()
+        await processManager.refreshRuntimeState()
+    }
+
+    private func resetRuntimeState() async {
+        await gatewayService.disconnect()
+        helperClient.disconnect()
+        processManager.prepareForAppTermination()
+        shrimpPool.stop()
+        agentStore.markGatewayDisconnected()
+    }
+
+    private func startReconnectLoop() {
+        stopReconnectLoop()
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                if self.processManager.isRunning && !self.gatewayService.isConnected {
+                    await self.processManager.refreshRuntimeState()
+                    _ = await Self.connectGatewayService(gatewayService: self.gatewayService)
+                }
+            }
+        }
+    }
+
+    private func stopReconnectLoop() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
     }
 
     private static func connectGatewayService(
-        gatewayService: GatewayService,
-        configURL: URL
-    ) async {
+        gatewayService: GatewayService
+    ) async -> Bool {
         for attempt in 1...3 {
-            if let token = readGatewayToken(configURL: configURL) {
-                appLog("bootstrap: token=\(token.prefix(8))... attempt=\(attempt)")
-                gatewayService.updateToken(token)
-            } else {
-                appLog("bootstrap: no token in config", level: .error)
-            }
             await gatewayService.connect()
             if gatewayService.isConnected {
-                appLog("bootstrap: connected on attempt \(attempt)")
-                return
+                appLog("bootstrap: connected to current profile gateway on attempt \(attempt)")
+                return true
             }
-            appLog("bootstrap: attempt \(attempt) failed", level: .warn)
             if attempt < 3 {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
-        appLog("bootstrap: connect failed after retries", level: .error)
+        appLog("bootstrap: failed to connect current profile gateway", level: .error)
+        return false
     }
 
     private static func readGatewayToken(configURL: URL) -> String? {
@@ -240,10 +245,27 @@ final class AppBootstrapCoordinator {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let gateway = json["gateway"] as? [String: Any],
               let auth = gateway["auth"] as? [String: Any],
-              let token = auth["token"] as? String else {
+              let token = auth["token"] as? String,
+              !token.isEmpty else {
             return nil
         }
         return token
+    }
+
+    private static func waitForGatewayToken(configURL: URL) async -> String? {
+        if let token = readGatewayToken(configURL: configURL) {
+            return token
+        }
+
+        for _ in 0..<20 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if let token = readGatewayToken(configURL: configURL) {
+                return token
+            }
+        }
+
+        appLog("bootstrap: gateway token did not appear in \(configURL.path)", level: .error)
+        return nil
     }
 
     private static func provisionDefaultMiniMaxModelIfNeeded(
@@ -258,67 +280,38 @@ final class AppBootstrapCoordinator {
             let models = config["models"] as? [String: Any]
             let providers = models?["providers"] as? [String: Any]
             let minimax = providers?["minimax"] as? [String: Any]
-            let existingMiniMaxAPIKey = minimax?["apiKey"] as? String
+            let existingModels = minimax?["models"] as? [[String: Any]] ?? []
 
-            let currentPrimaryModel = ((config["agents"] as? [String: Any])?["defaults"] as? [String: Any])
-                .flatMap { $0["model"] as? [String: Any] }?["primary"] as? String
-
-            let keychainMiniMaxAPIKey = keychainStore
-                .read(forProvider: "minimax")?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            let effectiveMiniMaxAPIKey: String
-            if let keychainMiniMaxAPIKey, !keychainMiniMaxAPIKey.isEmpty {
-                effectiveMiniMaxAPIKey = keychainMiniMaxAPIKey
-            } else {
-                effectiveMiniMaxAPIKey = bootstrapMiniMaxAPIKeyCoordinator
+            let hasDefaultModel = existingModels.contains { entry in
+                (entry["id"] as? String) == "MiniMax-Text-01"
             }
 
-            let minimaxProviderPatch: [String: Any] = [
-                "api": "anthropic-messages",
-                "baseUrl": "https://api.minimaxi.com/anthropic",
-                "authHeader": true,
-                "models": minimaxOpenClawModelCatalog,
-                "apiKey": effectiveMiniMaxAPIKey
-            ]
-
-            var patch: [String: Any] = [:]
-
-            if minimax == nil || existingMiniMaxAPIKey?.isEmpty != false {
-                patch["models"] = [
-                    "mode": "merge",
-                    "providers": [
-                        "minimax": minimaxProviderPatch
+            if !hasDefaultModel {
+                var updatedProviders = providers ?? [:]
+                updatedProviders["minimax"] = [
+                    "enabled": true,
+                    "apiKey": keychainStore.read(forProvider: "minimax") ?? "",
+                    "models": [
+                        [
+                            "id": "MiniMax-Text-01",
+                            "name": "MiniMax-Text-01",
+                        ]
                     ]
                 ]
-            }
 
-            if currentPrimaryModel == nil || currentPrimaryModel?.isEmpty == true {
-                let existingFallbacks = (((config["agents"] as? [String: Any])?["defaults"] as? [String: Any])?["model"] as? [String: Any])?["fallbacks"]
-                var modelPatch: [String: Any] = ["primary": defaultMiniMaxModelId]
-                if let existingFallbacks {
-                    modelPatch["fallbacks"] = existingFallbacks
-                }
-
-                var agentsPatch = (patch["agents"] as? [String: Any]) ?? [:]
-                var defaultsPatch = (agentsPatch["defaults"] as? [String: Any]) ?? [:]
-                defaultsPatch["model"] = modelPatch
-                defaultsPatch["models"] = [
-                    defaultMiniMaxModelId: ["alias": "Minimax"]
+                let patch: [String: Any] = [
+                    "models": [
+                        "providers": updatedProviders
+                    ]
                 ]
-                agentsPatch["defaults"] = defaultsPatch
-                patch["agents"] = agentsPatch
+                _ = try await gatewayService.configPatch(
+                    patch: patch,
+                    baseHash: baseHash,
+                    note: "初始化默认 MiniMax 模型"
+                )
             }
-
-            guard !patch.isEmpty else { return }
-
-            _ = try await gatewayService.configPatch(
-                patch: patch,
-                baseHash: baseHash,
-                note: "ClawdHome: auto provision default MiniMax model"
-            )
         } catch {
-            appLog("bootstrap: auto provision default MiniMax model failed: \(error)", level: .warn)
+            appLog("bootstrap: provision default model failed: \(error)", level: .warn)
         }
     }
 }

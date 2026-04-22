@@ -1,6 +1,6 @@
 // ClawdHome/Models/GlobalSecretsStore.swift
 // 全局 secrets 存储（替代 Keychain，存为 JSON 文件）
-// 存储路径：~/Library/Application Support/ClawdHome/secrets.json
+// 存储路径：~/Library/Application Support/EZRWorker/secrets.json
 // 权限说明：secrets.json 只有管理员用户可读；虾的 secrets 由 Helper 以 root 权限写入
 
 import Foundation
@@ -28,15 +28,12 @@ final class GlobalSecretsStore {
     private init() {}
 
     private static var storeURL: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("ClawdHome")
-        try? FileManager.default.createDirectory(
-            at: dir,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        return dir.appendingPathComponent("secrets.json")
+        EZRWorkerPaths.ensureApplicationSupportDirectories()
+        return EZRWorkerPaths.applicationSupportDirectory.appendingPathComponent("secrets.json")
+    }
+
+    private static var legacyStoreURL: URL {
+        EZRWorkerPaths.legacyApplicationSupportDirectory.appendingPathComponent("secrets.json")
     }
 
     // MARK: - 读写
@@ -98,10 +95,15 @@ final class GlobalSecretsStore {
     // MARK: - 私有
 
     private func load() -> SecretsFile {
-        guard let data = try? Data(contentsOf: Self.storeURL),
-              let file = try? JSONDecoder().decode(SecretsFile.self, from: data)
-        else { return SecretsFile() }
-        return file
+        if let data = try? Data(contentsOf: Self.storeURL),
+           let file = try? JSONDecoder().decode(SecretsFile.self, from: data) {
+            return file
+        }
+        if let data = try? Data(contentsOf: Self.legacyStoreURL),
+           let file = try? JSONDecoder().decode(SecretsFile.self, from: data) {
+            return file
+        }
+        return SecretsFile()
     }
 
     private func write(_ file: SecretsFile) {

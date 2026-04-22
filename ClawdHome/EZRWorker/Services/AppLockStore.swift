@@ -40,11 +40,11 @@ final class AppLockStore {
 
     // MARK: - 持久化 Key
 
-    private static let service           = "ai.clawdhome.mac.applock"
+    private static let service           = EZRWorkerBranding.appLockKeychainService
     private static let hashAccount       = "password-hash"
     private static let bioAccount        = "biometric-enabled"
     /// UserDefaults key — 启动时判断 enabled，不触发 Keychain 弹窗
-    private static let enabledDefaultsKey = "ai.clawdhome.mac.applock.enabled"
+    private static let enabledDefaultsKey = EZRWorkerBranding.appLockEnabledDefaultsKey
 
     // MARK: - Init
 
@@ -56,13 +56,14 @@ final class AppLockStore {
 
         // 启动时只读 UserDefaults，不触发 Keychain 弹窗
         // Keychain 仅在用户实际输入密码时访问
-        let enabled = UserDefaults.standard.bool(forKey: Self.enabledDefaultsKey)
+        let enabled = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey) as? Bool
+            ?? UserDefaults.standard.bool(forKey: EZRWorkerBranding.legacyAppLockEnabledDefaultsKey)
         isEnabled   = enabled
         isLocked    = enabled
 
         // biometric 设置存在 UserDefaults（也不触发弹窗）
-        isBiometricEnabled = UserDefaults.standard.bool(
-            forKey: Self.enabledDefaultsKey + ".biometric")
+        isBiometricEnabled = (UserDefaults.standard.object(forKey: Self.enabledDefaultsKey + ".biometric") as? Bool)
+            ?? UserDefaults.standard.bool(forKey: EZRWorkerBranding.legacyAppLockEnabledDefaultsKey + ".biometric")
     }
 
     // MARK: - 密码管理
@@ -142,7 +143,7 @@ final class AppLockStore {
 
     /// 区分L10n.k("services.app_lock_store.password_incorrect", fallback: "密码错误")和L10n.k("services.app_lock_store.keychain", fallback: "Keychain 被拒绝")
     private func verifyFull(_ password: String) -> UnlockResult {
-        guard let stored = loadHash() else {
+        guard let stored = loadHash() ?? loadHash(service: EZRWorkerBranding.legacyAppLockKeychainService) else {
             // loadHash 返回 nil：可能是 Keychain 被拒绝，也可能条目不存在
             // 通过尝试一次空查询区分（被拒绝时 errSecAuthFailed / errSecInteractionNotAllowed）
             return keychainIsDenied() ? .keychainDenied : .wrongPassword
@@ -195,9 +196,13 @@ final class AppLockStore {
     }
 
     private func keychainLoad(account: String) -> String? {
+        keychainLoad(account: account, service: Self.service)
+    }
+
+    private func keychainLoad(account: String, service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String:  true,
             kSecMatchLimit as String:  kSecMatchLimitOne
@@ -206,6 +211,10 @@ final class AppLockStore {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    private func loadHash(service: String) -> String? {
+        keychainLoad(account: Self.hashAccount, service: service)
     }
 
     private func keychainDelete(account: String) {

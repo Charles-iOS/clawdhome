@@ -26,6 +26,8 @@ targets:
     dependencies:
       - target: ClawdHomeHelper
         embed: false
+      - target: EZRWorkerSupervisor
+        embed: false
       - framework: OpenDirectory.framework
         embed: false
       - sdk: Charts.framework
@@ -53,13 +55,22 @@ targets:
           fi
           DEST="${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchDaemons"
           mkdir -p "$DEST"
-          cp "${BUILT_PRODUCTS_DIR}/ClawdHomeHelper" "$DEST/ClawdHomeHelper"
-          chmod +x "$DEST/ClawdHomeHelper"
-          cp "${SRCROOT}/Resources/ai.clawdhome.mac.helper.plist" "$DEST/"
+          cp "${BUILT_PRODUCTS_DIR}/EZRWorkerHelper" "$DEST/EZRWorkerHelper"
+          chmod +x "$DEST/EZRWorkerHelper"
+          cp "${SRCROOT}/Resources/ai.ezrworker.mac.helper.plist" "$DEST/"
+        basedOnDependencyAnalysis: false
+      - name: "Embed Supervisor into App Bundle"
+        script: |
+          DEST_BIN="${CODESIGNING_FOLDER_PATH}/Contents/MacOS"
+          DEST_AGENT="${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchAgents"
+          mkdir -p "$DEST_BIN" "$DEST_AGENT"
+          cp "${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor" "$DEST_BIN/EZRWorkerSupervisor"
+          chmod +x "$DEST_BIN/EZRWorkerSupervisor"
+          cp "${SRCROOT}/Resources/ai.ezrworker.mac.supervisor.plist" "$DEST_AGENT/"
         basedOnDependencyAnalysis: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: ai.clawdhome.mac
+        PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac
         PRODUCT_NAME: EZRWorker
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
@@ -120,10 +131,32 @@ targets:
         embed: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: ai.clawdhome.mac.helper
+        PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.helper
+        PRODUCT_NAME: EZRWorkerHelper
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_ENTITLEMENTS: ClawdHomeHelper/ClawdHomeHelper.entitlements
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: YES
+        SKIP_INSTALL: YES
+
+  EZRWorkerSupervisor:
+    type: tool
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: EZRWorkerSupervisor
+      - path: Shared
+    dependencies:
+      - framework: SystemConfiguration.framework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.supervisor
+        PRODUCT_NAME: EZRWorkerSupervisor
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES

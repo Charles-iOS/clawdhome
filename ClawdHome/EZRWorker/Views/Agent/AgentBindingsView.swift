@@ -7,7 +7,7 @@ struct AgentBindingsView: View {
     let agentId: String
 
     @Environment(AgentStore.self) private var store
-    @Environment(HelperClient.self) private var helperClient
+    @Environment(GatewayProcessManager.self) private var processManager
     @State private var showAddSheet = false
 
     private var agentBindings: [AgentBinding] {
@@ -103,21 +103,7 @@ struct AgentBindingsView: View {
     }
 
     private func restartGatewayAfterBindingMutation() async {
-        let username = store.username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !username.isEmpty else { return }
-        if !helperClient.isConnected {
-            helperClient.connect()
-            _ = await helperClient.waitUntilConnected()
-        }
-        guard helperClient.isConnected else {
-            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
-            return
-        }
-        do {
-            try await helperClient.restartGateway(username: username)
-        } catch {
-            appLog("[binding] 绑定变更后重启 gateway 失败: \(error)", level: .warn)
-        }
+        processManager.restart()
     }
 }
 
@@ -128,7 +114,7 @@ private struct AddBindingSheet: View {
 
     @Environment(AgentStore.self) private var store
     @Environment(GatewayService.self) private var gateway
-    @Environment(HelperClient.self) private var helperClient
+    @Environment(GatewayProcessManager.self) private var processManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var step: AddBindingStep = .selectChannel
@@ -523,21 +509,7 @@ private struct AddBindingSheet: View {
     }
 
     private func restartGatewayAfterBindingMutation() async {
-        let username = store.username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !username.isEmpty else { return }
-        if !helperClient.isConnected {
-            helperClient.connect()
-            _ = await helperClient.waitUntilConnected()
-        }
-        guard helperClient.isConnected else {
-            appLog("[binding] Helper 未连接，跳过 gateway 重启", level: .warn)
-            return
-        }
-        do {
-            try await helperClient.restartGateway(username: username)
-        } catch {
-            appLog("[binding] 添加绑定后重启 gateway 失败: \(error)", level: .warn)
-        }
+        processManager.restart()
     }
 }
 

@@ -7,6 +7,13 @@ struct AppSettingsView: View {
     @Environment(EnvironmentChecker.self) private var envChecker
     @Environment(GatewayService.self) private var gatewayService
     @Environment(AuthSessionStore.self) private var authStore
+    @Environment(GatewayProfileStore.self) private var profileStore
+    @Environment(SupervisorClient.self) private var supervisorClient
+
+    @State private var showCreateProfileSheet = false
+    @State private var pendingDeletionProfile: GatewayProfile?
+    @State private var isDeletingProfile = false
+    @State private var profileDeletionError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,6 +28,7 @@ struct AppSettingsView: View {
 
             Form {
                 accountSection
+                profilesSection
                 gatewaySection
                 environmentSection
                 aboutSection
@@ -28,6 +36,49 @@ struct AppSettingsView: View {
             .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showCreateProfileSheet) {
+            CreateProfileSheet()
+                .environment(profileStore)
+        }
+        .confirmationDialog(
+            "删除当前 Profile？",
+            isPresented: Binding(
+                get: { pendingDeletionProfile != nil },
+                set: { if !$0 { pendingDeletionProfile = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("取消", role: .cancel) {
+                pendingDeletionProfile = nil
+            }
+
+            if let profile = pendingDeletionProfile {
+                Button("删除 \(profile.displayName)", role: .destructive) {
+                    let targetProfile = profile
+                    pendingDeletionProfile = nil
+                    Task {
+                        await deleteProfile(targetProfile)
+                    }
+                }
+            }
+        } message: {
+            if let profile = pendingDeletionProfile {
+                Text(deleteMessage(for: profile))
+            }
+        }
+        .alert(
+            "删除 Profile 失败",
+            isPresented: Binding(
+                get: { profileDeletionError != nil },
+                set: { if !$0 { profileDeletionError = nil } }
+            )
+        ) {
+            Button("好", role: .cancel) {
+                profileDeletionError = nil
+            }
+        } message: {
+            Text(profileDeletionError ?? "未知错误")
+        }
     }
 
     @ViewBuilder
@@ -93,6 +144,73 @@ struct AppSettingsView: View {
             Text(gatewayActionHint)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var profilesSection: some View {
+        Section("Profiles") {
+            if profileStore.profiles.isEmpty {
+                Text("当前还没有可用 profile")
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("当前 Profile", selection: Binding(
+                    get: { profileStore.selectedProfileID ?? profileStore.profiles.first?.id ?? UUID() },
+                    set: { profileStore.selectProfile(id: $0) }
+                )) {
+                    ForEach(profileStore.profiles) { profile in
+                        Text("\(profile.displayName) (\(profile.slug))")
+                            .tag(profile.id)
+                    }
+                }
+
+                if let selected = profileStore.selectedProfile,
+                   let resolution = profileStore.selectedResolution {
+                    LabeledContent("来源", value: selected.sourceKind == .legacyReuse ? "legacyReuse" : "managed")
+                    LabeledContent("Slug", value: selected.slug)
+                    LabeledContent("Config", value: resolution.resolvedConfigPath)
+                    LabeledContent("State", value: resolution.resolvedStateDir)
+                    LabeledContent("Workspace", value: resolution.resolvedWorkspaceRoot)
+                    LabeledContent("Port", value: "\(resolution.resolvedPort)")
+                    Toggle("当前 Profile 自动启动", isOn: Binding(
+                        get: { selected.autoStart },
+                        set: { newValue in
+                            try? profileStore.update(profileID: selected.id, autoStart: newValue)
+                            Task { _ = await supervisorClient.reloadProfiles() }
+                        }
+                    ))
+                }
+            }
+
+            HStack(spacing: 12) {
+                Button("新建 Gateway/Profile") {
+                    showCreateProfileSheet = true
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isDeletingProfile)
+
+                if !profileStore.hasImportedLegacyProfile &&
+                    FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
+                    Button("导入 ~/.openclaw") {
+                        do {
+                            _ = try profileStore.importLegacyProfile()
+                            Task { _ = await supervisorClient.reloadProfiles() }
+                        } catch { }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isDeletingProfile)
+                }
+
+                if let selected = profileStore.selectedProfile {
+                    Button(role: .destructive) {
+                        pendingDeletionProfile = selected
+                    } label: {
+                        Text(isDeletingProfile ? "删除中…" : "删除当前 Profile")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isDeletingProfile)
+                }
+            }
         }
     }
 
@@ -165,6 +283,49 @@ struct AppSettingsView: View {
             return "Gateway 当前已停止，可在这里重新启动。"
         case .failed:
             return "Gateway 当前处于异常状态，建议尝试重启。"
+        }
+    }
+
+    private func deleteMessage(for profile: GatewayProfile) -> String {
+        let cleanupMessage: String
+        if profile.sourceKind == .managed {
+            cleanupMessage = "这会删除当前 profile 记录，并清理 App Support 下该 profile 的托管数据目录。"
+        } else {
+            cleanupMessage = "这会删除当前 profile 记录，但不会删除 ~/.openclaw 原始数据。"
+        }
+
+        if profileStore.profiles.count == 1 {
+            return "\(cleanupMessage) 删除后会自动创建新的默认 profile，避免应用落到无 profile 状态。"
+        }
+
+        return "\(cleanupMessage) 删除后会自动切换到其他 profile。"
+    }
+
+    @MainActor
+    private func deleteProfile(_ profile: GatewayProfile) async {
+        guard !isDeletingProfile else { return }
+        isDeletingProfile = true
+        defer { isDeletingProfile = false }
+
+        do {
+            if !supervisorClient.isConnected {
+                supervisorClient.connect()
+                guard await supervisorClient.waitUntilConnected() else {
+                    throw NSError(domain: "AppSettingsView", code: 1, userInfo: [
+                        NSLocalizedDescriptionKey: "EZRWorkerSupervisor 未就绪"
+                    ])
+                }
+            }
+
+            try await supervisorClient.stopProfile(profileID: profile.id)
+            let result = try profileStore.deleteProfile(profileID: profile.id)
+
+            if !result.deletedWasSelected {
+                _ = await supervisorClient.reloadProfiles()
+                await processManager.refreshRuntimeState()
+            }
+        } catch {
+            profileDeletionError = error.localizedDescription
         }
     }
 }

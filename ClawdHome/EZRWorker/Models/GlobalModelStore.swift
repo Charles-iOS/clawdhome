@@ -69,18 +69,24 @@ final class GlobalModelStore {
     // MARK: - 持久化
 
     private static var storeURL: URL {
-        let appSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("ClawdHome")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("global-models.json")
+        EZRWorkerPaths.ensureApplicationSupportDirectories()
+        return EZRWorkerPaths.applicationSupportDirectory.appendingPathComponent("global-models.json")
+    }
+
+    private static var legacyStoreURL: URL {
+        EZRWorkerPaths.legacyApplicationSupportDirectory.appendingPathComponent("global-models.json")
     }
 
     func load() {
-        guard let data = try? Data(contentsOf: Self.storeURL),
-              let state = try? JSONDecoder().decode(PersistedState.self, from: data)
-        else { return }
-        providers = state.providers
+        if let data = try? Data(contentsOf: Self.storeURL),
+           let state = try? JSONDecoder().decode(PersistedState.self, from: data) {
+            providers = state.providers
+            return
+        }
+        if let data = try? Data(contentsOf: Self.legacyStoreURL),
+           let state = try? JSONDecoder().decode(PersistedState.self, from: data) {
+            providers = state.providers
+        }
     }
 
     func save() {

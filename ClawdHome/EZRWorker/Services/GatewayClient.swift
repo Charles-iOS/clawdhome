@@ -83,7 +83,7 @@ actor GatewayClient {
         let sess = URLSession(configuration: config)
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         var wsRequest = URLRequest(url: url)
-        wsRequest.setValue("ClawdHome/\(appVersion)", forHTTPHeaderField: "User-Agent")
+        wsRequest.setValue("\(EZRWorkerBranding.userAgentPrefix)/\(appVersion)", forHTTPHeaderField: "User-Agent")
         // Gateway Control UI 校验 Origin header；设为同 host 的 HTTP origin 以通过检查
         wsRequest.setValue("http://\(url.host ?? "127.0.0.1"):\(url.port ?? 80)", forHTTPHeaderField: "Origin")
         let sock = sess.webSocketTask(with: wsRequest)
@@ -115,7 +115,7 @@ actor GatewayClient {
                     "maxProtocol": 3,
                     "client": [
                         "id": clientId,
-                        "displayName": "ClawdHome",
+                        "displayName": EZRWorkerBranding.appName,
                         "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                         "platform": "macos",
                         "mode": clientMode,

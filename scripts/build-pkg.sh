@@ -25,8 +25,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PROJECT_NAME="ClawdHome"
 APP_NAME="EZRWorker"
-BUNDLE_ID="ai.clawdhome.mac"        # 当前 bundle ID，将来可改为 app.clawdhome
-HELPER_LABEL="ai.clawdhome.mac.helper"
+BUNDLE_ID="ai.ezrworker.mac"
+HELPER_LABEL="ai.ezrworker.mac.helper"
+LEGACY_HELPER_LABEL="ai.clawdhome.mac.helper"
+SUPERVISOR_LABEL="ai.ezrworker.mac.supervisor"
 SCHEME="ClawdHome"
 CONFIGURATION="Release"
 
@@ -302,7 +304,7 @@ mkdir -p "$PKG_SCRIPTS"
 ditto "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
 
 # Helper 仍然按旧方式部署（过渡期保留，后续移除）
-HELPER_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchDaemons/ClawdHomeHelper"
+HELPER_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchDaemons/EZRWorkerHelper"
 if [ -f "$HELPER_IN_BUNDLE" ]; then
   mkdir -p "$PKG_ROOT/Library/PrivilegedHelperTools"
   mkdir -p "$PKG_ROOT/Library/LaunchDaemons"
@@ -337,6 +339,44 @@ else
   log "未找到 Helper 二进制，跳过 daemon 部署"
 fi
 
+SUPERVISOR_PLIST_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
+SUPERVISOR_BINARY_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
+if [ -f "$SUPERVISOR_PLIST_IN_BUNDLE" ] && [ -f "$SUPERVISOR_BINARY_IN_BUNDLE" ]; then
+  mkdir -p "$PKG_ROOT/Library/LaunchAgents"
+  cat > "$PKG_ROOT/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" << SUPERVISOR_PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${SUPERVISOR_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor</string>
+    </array>
+    <key>MachServices</key>
+    <dict>
+        <key>${SUPERVISOR_LABEL}</key>
+        <true/>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+</dict>
+</plist>
+SUPERVISOR_PLIST
+  chmod 644 "$PKG_ROOT/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
+  log "Supervisor LaunchAgent 已生成"
+else
+  log "未找到 Supervisor LaunchAgent，跳过 LaunchAgent 部署"
+fi
+
 ok "目录结构准备完成"
 
 # ── Step 3：preinstall 脚本（停止旧版本）─────────────────────────────────────
@@ -348,6 +388,16 @@ osascript -e 'tell application "${APP_NAME}" to quit' 2>/dev/null || true
 # 停止旧 Helper daemon（如果在运行）
 if launchctl print "system/${HELPER_LABEL}" &>/dev/null 2>&1; then
   launchctl bootout "system/${HELPER_LABEL}" 2>/dev/null || true
+fi
+if launchctl print "system/${LEGACY_HELPER_LABEL}" &>/dev/null 2>&1; then
+  launchctl bootout "system/${LEGACY_HELPER_LABEL}" 2>/dev/null || true
+fi
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+  CONSOLE_UID=$(id -u "$CONSOLE_USER" 2>/dev/null || echo "")
+  if [ -n "$CONSOLE_UID" ]; then
+    launchctl bootout "gui/${CONSOLE_UID}" "/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" 2>/dev/null || true
+  fi
 fi
 sleep 1
 exit 0
@@ -362,6 +412,7 @@ set -euo pipefail
 APP_DIR="/Applications/${APP_NAME}.app"
 HELPER="/Library/PrivilegedHelperTools/${HELPER_LABEL}"
 PLIST="/Library/LaunchDaemons/${HELPER_LABEL}.plist"
+SUPERVISOR_PLIST="/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
 
 # 解除 app 隔离（允许未签名 app 运行，无弹框）
 xattr -cr "\$APP_DIR" 2>/dev/null || true
@@ -375,26 +426,17 @@ if [ -f "\$HELPER" ] && [ -f "\$PLIST" ]; then
   launchctl bootstrap system "\$PLIST" 2>/dev/null || true
 fi
 
-# ── 为当前登录用户初始化 OpenClaw 环境 ──
+# ── 为当前登录用户安装并拉起 supervisor LaunchAgent ──
 CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
 if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
-  USER_HOME=\$(dscl . -read "/Users/\$CONSOLE_USER" NFSHomeDirectory 2>/dev/null | awk '{print \$2}')
-  if [ -n "\$USER_HOME" ]; then
-    OPENCLAW_DIR="\$USER_HOME/.openclaw"
-    mkdir -p "\$OPENCLAW_DIR/data" "\$OPENCLAW_DIR/logs"
-    chown -R "\$CONSOLE_USER" "\$OPENCLAW_DIR"
-    echo "OpenClaw 配置目录已初始化: \$OPENCLAW_DIR"
-
-    # 验证 bundled 运行时
-    NODE="\$APP_DIR/Contents/Resources/node/bin/node"
-    OPENCLAW_ENTRY="\$APP_DIR/Contents/Resources/openclaw/lib/node_modules/openclaw/openclaw.mjs"
-    if [ -x "\$NODE" ] && [ -f "\$OPENCLAW_ENTRY" ]; then
-      NODE_VER=\$("\$NODE" --version 2>/dev/null || echo "unknown")
-      echo "✅ Node.js \$NODE_VER 就绪"
-      echo "✅ OpenClaw 就绪"
-    else
-      echo "⚠️  bundled 运行时未找到，App 启动时将自动检测"
-    fi
+  CONSOLE_UID=\$(id -u "\$CONSOLE_USER" 2>/dev/null || echo "")
+  if [ -n "\$CONSOLE_UID" ] && [ -f "\$SUPERVISOR_PLIST" ]; then
+    chown root:wheel "\$SUPERVISOR_PLIST"
+    chmod 644 "\$SUPERVISOR_PLIST"
+    launchctl bootstrap "gui/\$CONSOLE_UID" "\$SUPERVISOR_PLIST" 2>/dev/null || true
+    launchctl enable "gui/\$CONSOLE_UID/${SUPERVISOR_LABEL}" 2>/dev/null || true
+    launchctl kickstart -k "gui/\$CONSOLE_UID/${SUPERVISOR_LABEL}" 2>/dev/null || true
+    echo "✅ EZRWorkerSupervisor LaunchAgent 已为当前用户安装"
   fi
 fi
 

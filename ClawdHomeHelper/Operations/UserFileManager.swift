@@ -137,7 +137,7 @@ struct UserFileManager {
         try data.write(to: url, options: .atomic)
         // 纠正所有权：root 写入的文件归还给虾用户
         do {
-            try ClawdHomeHelper.run("/usr/sbin/chown", args: [username, url.path])
+            try run("/usr/sbin/chown", args: [username, url.path])
         } catch {
             helperLog("[FileManager] chown failed for \(url.path): \(error.localizedDescription)", level: .warn)
         }
@@ -215,7 +215,7 @@ struct UserFileManager {
 
         if name.hasSuffix(".zip") {
             // 先列出条目校验路径安全性
-            let listing = try ClawdHomeHelper.run("/usr/bin/unzip", args: ["-l", url.path])
+            let listing = try run("/usr/bin/unzip", args: ["-l", url.path])
             // unzip -l 输出格式：每行末尾为文件名，跳过表头/表尾
             // 解析实际文件名列（第4列起），逐条校验
             let zipEntries = listing.split(separator: "\n").compactMap { line -> String? in
@@ -228,10 +228,10 @@ struct UserFileManager {
                 return String(parts[3])
             }.joined(separator: "\n")
             try validateArchiveEntries(zipEntries)
-            try ClawdHomeHelper.run("/usr/bin/unzip", args: ["-o", url.path, "-d", destDir])
+            try run("/usr/bin/unzip", args: ["-o", url.path, "-d", destDir])
         } else if let listArgs = tarListArgs(for: name, archivePath: url.path) {
             // tar 归档：先列出条目校验
-            let listing = try ClawdHomeHelper.run("/usr/bin/tar", args: listArgs)
+            let listing = try run("/usr/bin/tar", args: listArgs)
             try validateArchiveEntries(listing)
             // 构造解压参数：将 -t 替换为 -x，追加 -C destDir
             var extractArgs = listArgs
@@ -239,7 +239,7 @@ struct UserFileManager {
                 extractArgs[idx] = extractArgs[idx].replacingOccurrences(of: "t", with: "x")
             }
             extractArgs += ["-C", destDir]
-            try ClawdHomeHelper.run("/usr/bin/tar", args: extractArgs)
+            try run("/usr/bin/tar", args: extractArgs)
         } else {
             throw NSError(domain: "UserFileManager", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "不支持的压缩格式"])
@@ -247,7 +247,7 @@ struct UserFileManager {
 
         // 解压后纠正所有权
         do {
-            try ClawdHomeHelper.run("/usr/sbin/chown", args: ["-R", username, destDir])
+            try run("/usr/sbin/chown", args: ["-R", username, destDir])
         } catch {
             helperLog("[FileManager] chown -R failed after extract: \(error.localizedDescription)", level: .warn)
         }
@@ -272,7 +272,7 @@ struct UserFileManager {
         var currentUrl = url
         while currentUrl.path != homePath && currentUrl.path.hasPrefix(homePath) && currentUrl.path.count > homePath.count {
             do {
-                try ClawdHomeHelper.run("/usr/sbin/chown", args: [username, currentUrl.path])
+                try run("/usr/sbin/chown", args: [username, currentUrl.path])
             } catch {
                 helperLog("[FileManager] chown failed for \(currentUrl.path): \(error.localizedDescription)", level: .warn)
             }
@@ -283,14 +283,14 @@ struct UserFileManager {
         // 这里避免对整棵树重复做 chown -R，防止初始化数字员工时被大目录拖到 XPC 超时。
         if existedBefore {
             do {
-                try ClawdHomeHelper.run("/usr/sbin/chown", args: [username, url.path])
+                try run("/usr/sbin/chown", args: [username, url.path])
             } catch {
                 helperLog("[FileManager] chown failed for existing dir \(url.path): \(error.localizedDescription)", level: .warn)
             }
         } else {
             // 新创建的目录树通常很小，这里仍保留递归 chown，确保中间目录所有权正确。
             do {
-                try ClawdHomeHelper.run("/usr/sbin/chown", args: ["-R", username, url.path])
+                try run("/usr/sbin/chown", args: ["-R", username, url.path])
             } catch {
                 helperLog("[FileManager] chown -R failed for \(url.path): \(error.localizedDescription)", level: .warn)
             }

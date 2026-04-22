@@ -9,7 +9,8 @@
     <!-- 允许连接到 LaunchDaemon 的 Mach service -->
     <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
     <array>
-        <string>ai.clawdhome.mac.helper</string>
+        <string>ai.ezrworker.mac.helper</string>
+        <string>ai.ezrworker.mac.supervisor</string>
     </array>
 </dict>
 </plist>

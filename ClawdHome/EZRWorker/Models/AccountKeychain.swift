@@ -6,7 +6,7 @@ import Foundation
 import Security
 
 enum AccountKeychain {
-    private static let service = "ai.clawdhome.mac.accounts"
+    private static let service = EZRWorkerBranding.accountKeychainService
 
     static func save(_ value: String, for accountId: UUID) {
         guard let data = value.data(using: .utf8) else { return }
@@ -21,6 +21,11 @@ enum AccountKeychain {
     }
 
     static func load(for accountId: UUID) -> String? {
+        load(for: accountId, service: service)
+            ?? load(for: accountId, service: EZRWorkerBranding.legacyAccountKeychainService)
+    }
+
+    private static func load(for accountId: UUID, service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,

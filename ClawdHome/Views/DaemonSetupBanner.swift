@@ -97,7 +97,7 @@ struct DaemonSetupBanner: View {
             try? await Task.sleep(for: .seconds(2))
             helperClient.connect()
         } else {
-            errorMessage = "重启失败，请手动运行：sudo launchctl kickstart -k system/ai.clawdhome.mac.helper"
+            errorMessage = "重启失败，请手动运行：sudo launchctl kickstart -k system/ai.ezrworker.mac.helper"
         }
         isRestarting = false
     }

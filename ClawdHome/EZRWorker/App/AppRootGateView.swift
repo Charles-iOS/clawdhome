@@ -31,28 +31,49 @@ struct AppRootGateView: View {
 
 struct AuthenticatedAppShell: View {
     @Environment(AppBootstrapCoordinator.self) private var bootstrapCoordinator
+    @Environment(GatewayProfileStore.self) private var profileStore
 
     var body: some View {
         ZStack {
-            MainView()
+            if case .needsLegacyMigration(let legacyPort) = profileStore.status {
+                ProfileMigrationChoiceView(legacyPort: legacyPort)
+            } else {
+                MainView()
 
-            switch bootstrapCoordinator.state {
-            case .idle, .starting:
-                LoadingOverlayView(
-                    title: L10n.k("auth.bootstrap.loading_title", fallback: "正在进入 ClawdHome"),
-                    subtitle: L10n.k("auth.bootstrap.loading_subtitle", fallback: "正在连接本地服务并准备工作区，请稍候。")
-                )
-            case .failed(let message):
-                LoadingOverlayView(
-                    title: L10n.k("auth.bootstrap.failed_title", fallback: "应用初始化失败"),
-                    subtitle: message
-                )
-            case .started:
-                EmptyView()
+                switch bootstrapCoordinator.state {
+                case .idle, .starting:
+                    LoadingOverlayView(
+                        title: L10n.k("auth.bootstrap.loading_title", fallback: "正在进入 EZRWorker"),
+                        subtitle: L10n.k("auth.bootstrap.loading_subtitle", fallback: "正在连接当前 Gateway/Profile 并准备工作区，请稍候。")
+                    )
+                case .failed(let message):
+                    LoadingOverlayView(
+                        title: L10n.k("auth.bootstrap.failed_title", fallback: "应用初始化失败"),
+                        subtitle: message
+                    )
+                case .started:
+                    EmptyView()
+                }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .task {
-            await bootstrapCoordinator.startIfNeeded()
+            await profileStore.loadIfNeeded()
+            if profileStore.canBootstrap {
+                await bootstrapCoordinator.startIfNeeded()
+            }
+        }
+        .onChange(of: profileStore.selectedProfileID) { oldValue, newValue in
+            guard oldValue != nil, newValue != nil, oldValue != newValue else { return }
+            Task {
+                await bootstrapCoordinator.restartForProfileSwitch()
+            }
+        }
+        .onChange(of: profileStore.status) { _, newValue in
+            guard newValue == .ready else { return }
+            Task {
+                await bootstrapCoordinator.startIfNeeded()
+            }
         }
     }
 }
@@ -94,7 +115,7 @@ private struct ProtectedWindowPlaceholder: View {
 private struct LaunchSplashView: View {
     var body: some View {
         LoadingOverlayView(
-            title: L10n.k("auth.launch.title", fallback: "正在启动 ClawdHome"),
+            title: L10n.k("auth.launch.title", fallback: "正在启动 EZRWorker"),
             subtitle: L10n.k("auth.launch.subtitle", fallback: "正在检查认证配置，请稍候。")
         )
     }

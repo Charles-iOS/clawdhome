@@ -701,9 +701,9 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
                 // 删除前先彻底退出目标用户域，避免 dscl 因活跃会话/进程拒绝删除。
                 GatewayIntentionalStopStore.mark(username: username, reason: "delete-user")
                 _ = try? GatewayManager.stopGateway(username: username, uid: uid)
-                _ = try? ClawdHomeHelper.run("/bin/launchctl", args: ["bootout", "user/\(uid)"])
+                _ = try? run("/bin/launchctl", args: ["bootout", "user/\(uid)"])
                 Thread.sleep(forTimeInterval: 0.5)
-                _ = try? ClawdHomeHelper.run("/usr/bin/pkill", args: ["-9", "-U", "\(uid)"])
+                _ = try? run("/usr/bin/pkill", args: ["-9", "-U", "\(uid)"])
             }
             let trimmedAdminUser = adminUser.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedAdminPassword = adminPassword.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -788,13 +788,13 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
             GatewayIntentionalStopStore.mark(username: username, reason: "logout")
             try? GatewayManager.stopGateway(username: username, uid: uid)
             // bootout 整个用户 launchd 域，关停所有 launchd 管理的服务
-            _ = try? ClawdHomeHelper.run(
+            _ = try? run(
                 "/bin/launchctl",
                 args: ["bootout", "user/\(uid)"]
             )
             // 等待 launchd 完成清理，再 kill 残留进程（bootout 不处理非 launchd 进程）
             Thread.sleep(forTimeInterval: 0.5)
-            _ = try? ClawdHomeHelper.run("/usr/bin/pkill", args: ["-9", "-U", "\(uid)"])
+            _ = try? run("/usr/bin/pkill", args: ["-9", "-U", "\(uid)"])
             reply(true, nil)
         } catch {
             helperLog("用户注销失败 @\(username): \(error.localizedDescription)", level: .error)
@@ -3159,7 +3159,7 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
         helperLog("密钥重载 @\(username)")
         // openclaw secrets reload 让 gateway 进程热加载 secrets 文件
         // reload 失败不视为硬错误（gateway 可能未运行，下次启动时会读取新 secrets）
-        if let output = try? ClawdHomeHelper.run(
+        if let output = try? run(
             "/bin/su", args: ["-l", username, "-c", "openclaw secrets reload"]) {
             helperLog("密钥重载 @\(username): \(output)")
         } else {
@@ -3187,7 +3187,7 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
     func isScreenSharingEnabled(withReply reply: @escaping (Bool) -> Void) {
         // launchctl list 返回 exit 0 表示服务已加载（无论是否有 PID）
         // 返回非零 exit（try? → nil）表示服务未注册 / 未启用
-        let output = try? ClawdHomeHelper.run(
+        let output = try? run(
             "/bin/launchctl", args: ["list", "com.apple.screensharing"])
         reply(output != nil)
     }
@@ -3196,13 +3196,13 @@ final class ClawdHomeHelperImpl: NSObject, ClawdHomeHelperProtocol {
         helperLog("启用屏幕共享")
         do {
             // 第一步：标记为 enabled（重启后仍生效）
-            try ClawdHomeHelper.run(
+            try run(
                 "/bin/launchctl",
                 args: ["enable", "system/com.apple.screensharing"]
             )
             // 第二步：立即 bootstrap（若已 bootstrap 则幂等忽略错误）
             let plist = "/System/Library/LaunchDaemons/com.apple.screensharing.plist"
-            _ = try? ClawdHomeHelper.run(
+            _ = try? run(
                 "/bin/launchctl",
                 args: ["bootstrap", "system", plist]
             )

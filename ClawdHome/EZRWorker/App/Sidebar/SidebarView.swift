@@ -58,6 +58,7 @@ struct SidebarView: View {
     @Binding var selection: SidebarDestination?
     @Environment(GatewayProcessManager.self) private var processManager
     @Environment(GatewayService.self) private var gatewayService
+    @Environment(GatewayProfileStore.self) private var profileStore
 
     var body: some View {
         List(selection: $selection) {
@@ -93,13 +94,20 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var gatewayStatus: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            if let selectedProfile = profileStore.selectedProfile {
+                Text(selectedProfile.displayName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(statusText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
