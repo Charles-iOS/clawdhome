@@ -66,6 +66,7 @@ struct ChannelView: View {
     @Environment(GatewayService.self) private var gateway
     @Environment(AgentStore.self) private var agentStore
     @Environment(GatewayProcessManager.self) private var processManager
+    @Environment(GatewayProfileStore.self) private var profileStore
     @State private var setupDestination: ChannelSetupDestination?
     @State private var channelConfigs: [ChannelType: [String: String]] = [:]
     @State private var channelEnabledStates: [ChannelType: Bool] = [:]
@@ -76,6 +77,10 @@ struct ChannelView: View {
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16),
     ]
+
+    private var selectedLocalPaths: GatewayProfileLocalPaths? {
+        profileStore.selectedLocalPaths
+    }
 
     var body: some View {
         ScrollView {
@@ -270,9 +275,10 @@ struct ChannelView: View {
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
-        let credFile = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("credentials")
-            .appendingPathComponent("lark.secrets.json")
+        guard let credFile = selectedLocalPaths?.credentialsDirectoryURL
+            .appendingPathComponent("lark.secrets.json") else {
+            return false
+        }
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
               let fileSize = attrs[.size] as? NSNumber else {
             return false
@@ -281,8 +287,9 @@ struct ChannelView: View {
     }
 
     private func loadLocalChannelConfigDictionary() -> [String: Any] {
-        let configURL = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("openclaw.json")
+        guard let configURL = selectedLocalPaths?.configURL else {
+            return [:]
+        }
         guard let data = FileManager.default.contents(atPath: configURL.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return [:]
@@ -304,19 +311,21 @@ struct ChannelView: View {
 
     /// 直接读取本地 JSON 文件加载配对统计（无需启动 Node 进程）
     private func loadPairingStats() async {
-        let credDir = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("credentials")
+        guard let localPaths = selectedLocalPaths else {
+            pairingStats = [:]
+            return
+        }
         var result: [ChannelType: ChannelPairingStats] = [:]
 
         for channel in ChannelType.enabledCases where channelConnectionStatus(for: channel).isConfigured {
             result[channel] = ChannelPairingStats(
                 directCount: ChannelPairingDataLoader.approvedPeerIDs(
                     for: channel,
-                    credentialsDirectory: credDir
+                    localPaths: localPaths
                 ).count,
                 pendingCount: ChannelPairingDataLoader.pendingRequests(
                     for: channel,
-                    credentialsDirectory: credDir
+                    localPaths: localPaths
                 ).count
             )
         }

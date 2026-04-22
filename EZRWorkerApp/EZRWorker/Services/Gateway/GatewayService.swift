@@ -1,5 +1,5 @@
 // EZRWorkerApp/Services/Gateway/GatewayService.swift
-// 单实例 Gateway 连接管理（简化自 GatewayHub）
+// 单个 profile 的 Gateway 连接管理
 
 import Foundation
 import Observation

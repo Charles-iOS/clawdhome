@@ -41,6 +41,10 @@ final class GatewayProfileStore {
         selectedProfile.map(GatewayProfileResolver.resolve(_:))
     }
 
+    var selectedLocalPaths: GatewayProfileLocalPaths? {
+        selectedResolution?.localPaths
+    }
+
     var canBootstrap: Bool {
         if case .ready = status, selectedProfile != nil {
             return true
@@ -303,28 +307,34 @@ final class GatewayProfileStore {
         workspaceRootOverride: String?,
         portOverride: Int?
     ) throws {
-        guard GatewayProfileResolver.validateAbsoluteOverridePath(configPathOverride) else {
-            throw NSError(domain: "GatewayProfileStore", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "OPENCLAW_CONFIG_PATH 必须是绝对路径"
-            ])
-        }
-        guard GatewayProfileResolver.validateAbsoluteOverridePath(stateDirOverride) else {
-            throw NSError(domain: "GatewayProfileStore", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "OPENCLAW_STATE_DIR 必须是绝对路径"
-            ])
-        }
-        guard GatewayProfileResolver.validateAbsoluteOverridePath(workspaceRootOverride) else {
-            throw NSError(domain: "GatewayProfileStore", code: 3, userInfo: [
-                NSLocalizedDescriptionKey: "workspaceRoot 必须是绝对路径"
-            ])
-        }
+        try validateOverridePath(
+            configPathOverride,
+            label: "OPENCLAW_CONFIG_PATH",
+            expectsDirectory: false,
+            invalidPathCode: 1,
+            unusablePathCode: 7
+        )
+        try validateOverridePath(
+            stateDirOverride,
+            label: "OPENCLAW_STATE_DIR",
+            expectsDirectory: true,
+            invalidPathCode: 2,
+            unusablePathCode: 8
+        )
+        try validateOverridePath(
+            workspaceRootOverride,
+            label: "workspaceRoot",
+            expectsDirectory: true,
+            invalidPathCode: 3,
+            unusablePathCode: 9
+        )
         if let portOverride {
             guard (1...65535).contains(portOverride) else {
                 throw NSError(domain: "GatewayProfileStore", code: 4, userInfo: [
                     NSLocalizedDescriptionKey: "端口必须位于 1-65535"
                 ])
             }
-            let usedPorts = profiles.compactMap(\.portOverride)
+            let usedPorts = profiles.map { GatewayProfileResolver.resolve($0).resolvedPort }
             let conflictingPorts = GatewayProfileResolver.conflictingBasePorts(
                 for: portOverride,
                 existingPorts: usedPorts
@@ -336,6 +346,68 @@ final class GatewayProfileStore {
                         "端口 \(portOverride) 与现有 profile 基础端口 \(conflicts) 间距不足 \(GatewayProfileResolver.managedPortSpacing)，请至少保留 \(GatewayProfileResolver.managedPortSpacing) 个端口间隔"
                 ])
             }
+        }
+    }
+
+    private func validateOverridePath(
+        _ path: String?,
+        label: String,
+        expectsDirectory: Bool,
+        invalidPathCode: Int,
+        unusablePathCode: Int
+    ) throws {
+        guard let path else { return }
+        guard let url = GatewayProfileResolver.absoluteURLIfValid(path: path) else {
+            throw NSError(domain: "GatewayProfileStore", code: invalidPathCode, userInfo: [
+                NSLocalizedDescriptionKey: "\(label) 必须是绝对路径"
+            ])
+        }
+
+        let fm = FileManager.default
+        var isDirectory = ObjCBool(false)
+        if fm.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+            if expectsDirectory && !isDirectory.boolValue {
+                throw NSError(domain: "GatewayProfileStore", code: unusablePathCode, userInfo: [
+                    NSLocalizedDescriptionKey: "\(label) 已存在，但不是目录"
+                ])
+            }
+            if !expectsDirectory && isDirectory.boolValue {
+                throw NSError(domain: "GatewayProfileStore", code: unusablePathCode, userInfo: [
+                    NSLocalizedDescriptionKey: "\(label) 不能指向目录"
+                ])
+            }
+        }
+
+        let parentURL = url.deletingLastPathComponent()
+        guard let existingParent = nearestExistingDirectory(startingAt: parentURL) else {
+            throw NSError(domain: "GatewayProfileStore", code: unusablePathCode, userInfo: [
+                NSLocalizedDescriptionKey: "\(label) 的父目录不存在且无法解析"
+            ])
+        }
+
+        guard fm.isWritableFile(atPath: existingParent.path) else {
+            throw NSError(domain: "GatewayProfileStore", code: unusablePathCode, userInfo: [
+                NSLocalizedDescriptionKey: "\(label) 的父目录不可写：\(existingParent.path)"
+            ])
+        }
+    }
+
+    private func nearestExistingDirectory(startingAt url: URL) -> URL? {
+        let fm = FileManager.default
+        var currentURL = url
+
+        while true {
+            var isDirectory = ObjCBool(false)
+            if fm.fileExists(atPath: currentURL.path, isDirectory: &isDirectory),
+               isDirectory.boolValue {
+                return currentURL
+            }
+
+            let parentURL = currentURL.deletingLastPathComponent()
+            if parentURL.path == currentURL.path {
+                return nil
+            }
+            currentURL = parentURL
         }
     }
 
@@ -397,7 +469,7 @@ final class GatewayProfileStore {
 
     private func validatedLegacyPort() throws -> Int {
         let legacyPort = GatewayProfileResolver.readLegacyGatewayPort() ?? GatewayProfileResolver.defaultGatewayPort
-        let usedPorts = profiles.compactMap(\.portOverride)
+        let usedPorts = profiles.map { GatewayProfileResolver.resolve($0).resolvedPort }
         let conflictingPorts = GatewayProfileResolver.conflictingBasePorts(
             for: legacyPort,
             existingPorts: usedPorts

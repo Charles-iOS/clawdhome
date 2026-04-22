@@ -13,7 +13,9 @@ struct AppSettingsView: View {
     @State private var showCreateProfileSheet = false
     @State private var pendingDeletionProfile: GatewayProfile?
     @State private var isDeletingProfile = false
-    @State private var profileDeletionError: String?
+    @State private var isRefreshingProfiles = false
+    @State private var profileActionProfileID: UUID?
+    @State private var profileErrorMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -40,8 +42,16 @@ struct AppSettingsView: View {
             CreateProfileSheet()
                 .environment(profileStore)
         }
+        .task {
+            await refreshProfilesRuntime(reloadProfiles: true)
+        }
+        .onChange(of: profileStore.profiles) { _, _ in
+            Task {
+                await refreshProfilesRuntime(reloadProfiles: true)
+            }
+        }
         .confirmationDialog(
-            "删除当前 Profile？",
+            "删除这个 Profile？",
             isPresented: Binding(
                 get: { pendingDeletionProfile != nil },
                 set: { if !$0 { pendingDeletionProfile = nil } }
@@ -67,17 +77,17 @@ struct AppSettingsView: View {
             }
         }
         .alert(
-            "删除 Profile 失败",
+            "Profile 操作失败",
             isPresented: Binding(
-                get: { profileDeletionError != nil },
-                set: { if !$0 { profileDeletionError = nil } }
+                get: { profileErrorMessage != nil },
+                set: { if !$0 { profileErrorMessage = nil } }
             )
         ) {
             Button("好", role: .cancel) {
-                profileDeletionError = nil
+                profileErrorMessage = nil
             }
         } message: {
-            Text(profileDeletionError ?? "未知错误")
+            Text(profileErrorMessage ?? "未知错误")
         }
     }
 
@@ -106,6 +116,10 @@ struct AppSettingsView: View {
     @ViewBuilder
     private var gatewaySection: some View {
         Section(L10n.k("settings.gateway", fallback: "Gateway")) {
+            if let selectedProfile = profileStore.selectedProfile {
+                LabeledContent("当前 Profile", value: selectedProfile.displayName)
+            }
+
             LabeledContent(
                 L10n.k("settings.port", fallback: "端口"),
                 value: "\(processManager.gatewayPort)"
@@ -164,54 +178,184 @@ struct AppSettingsView: View {
                     }
                 }
 
-                if let selected = profileStore.selectedProfile,
-                   let resolution = profileStore.selectedResolution {
-                    LabeledContent("来源", value: selected.sourceKind == .legacyReuse ? "legacyReuse" : "managed")
-                    LabeledContent("Slug", value: selected.slug)
-                    LabeledContent("Config", value: resolution.resolvedConfigPath)
-                    LabeledContent("State", value: resolution.resolvedStateDir)
-                    LabeledContent("Workspace", value: resolution.resolvedWorkspaceRoot)
-                    LabeledContent("Port", value: "\(resolution.resolvedPort)")
-                    Toggle("当前 Profile 自动启动", isOn: Binding(
-                        get: { selected.autoStart },
-                        set: { newValue in
-                            try? profileStore.update(profileID: selected.id, autoStart: newValue)
-                            Task { _ = await supervisorClient.reloadProfiles() }
+                Text("当前选中的 profile 会接入完整业务上下文；其他 profile 只展示 Supervisor 提供的轻量运行态。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    Button("新建 Gateway/Profile") {
+                        showCreateProfileSheet = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isAnyProfileOperationInFlight)
+
+                    if !profileStore.hasImportedLegacyProfile &&
+                        FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
+                        Button("导入 ~/.openclaw") {
+                            importLegacyProfile()
                         }
-                    ))
-                }
-            }
+                        .buttonStyle(.bordered)
+                        .disabled(isAnyProfileOperationInFlight)
+                    }
 
-            HStack(spacing: 12) {
-                Button("新建 Gateway/Profile") {
-                    showCreateProfileSheet = true
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isDeletingProfile)
-
-                if !profileStore.hasImportedLegacyProfile &&
-                    FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
-                    Button("导入 ~/.openclaw") {
-                        do {
-                            _ = try profileStore.importLegacyProfile()
-                            Task { _ = await supervisorClient.reloadProfiles() }
-                        } catch { }
+                    Button("刷新运行态") {
+                        Task {
+                            await refreshProfilesRuntime(reloadProfiles: true)
+                        }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(isDeletingProfile)
+                    .disabled(isAnyProfileOperationInFlight)
                 }
 
-                if let selected = profileStore.selectedProfile {
-                    Button(role: .destructive) {
-                        pendingDeletionProfile = selected
-                    } label: {
-                        Text(isDeletingProfile ? "删除中…" : "删除当前 Profile")
+                if isRefreshingProfiles {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("正在同步 Profiles 运行态…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(isDeletingProfile)
+                }
+
+                ForEach(profileStore.profiles) { profile in
+                    profileCard(for: profile)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func profileCard(for profile: GatewayProfile) -> some View {
+        let resolution = GatewayProfileResolver.resolve(profile)
+        let runtime = runtime(for: profile)
+        let isSelected = profileStore.selectedProfile?.id == profile.id
+        let isBusy = isAnyProfileOperationInFlight
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(profile.displayName)
+                            .font(.headline)
+
+                        if isSelected {
+                            profileBadge("当前", tint: .accentColor)
+                        }
+
+                        profileBadge(profileSourceLabel(for: profile), tint: profileSourceColor(for: profile))
+                        profileBadge(profileRuntimeLabel(for: runtime), tint: profileRuntimeColor(for: runtime))
+                    }
+
+                    Text(profile.slug)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 0)
+
+                if profileActionProfileID == profile.id {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            Toggle("登录后自动恢复", isOn: Binding(
+                get: {
+                    profileStore.profiles.first(where: { $0.id == profile.id })?.autoStart ?? profile.autoStart
+                },
+                set: { newValue in
+                    updateAutoStart(enabled: newValue, for: profile.id)
+                }
+            ))
+            .disabled(isBusy)
+
+            VStack(alignment: .leading, spacing: 6) {
+                profileInfoRow("端口", "\(runtime?.resolvedPort ?? resolution.resolvedPort)")
+                profileInfoRow("Prepared", runtime?.isPrepared == true ? "是" : "否")
+                profileInfoRow("运行权属", profileOwnershipLabel(for: runtime))
+                profileInfoRow("PID", runtime?.pid.map(String.init) ?? "—")
+                profileInfoRow("最近探测", probeTimeLabel(for: runtime?.lastProbeAt))
+            }
+
+            if let runtime,
+               let lastError = runtime.lastError,
+               !lastError.isEmpty {
+                Text(lastError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            profilePathBlock(title: "Config", path: resolution.resolvedConfigPath)
+            profilePathBlock(title: "State", path: resolution.resolvedStateDir)
+            profilePathBlock(title: "Workspace", path: resolution.resolvedWorkspaceRoot)
+
+            HStack(spacing: 8) {
+                if !isSelected {
+                    Button("切换到此 Profile") {
+                        profileStore.selectProfile(id: profile.id)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isBusy)
+                }
+
+                Button("预热") {
+                    Task {
+                        await runProfileAction(.prepare, profile: profile)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+
+                if runtime?.isRunning == true {
+                    Button("停止") {
+                        Task {
+                            await runProfileAction(.stop, profile: profile)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+
+                    Button("重启") {
+                        Task {
+                            await runProfileAction(.restart, profile: profile)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+                } else {
+                    Button("启动") {
+                        Task {
+                            await runProfileAction(.start, profile: profile)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+                }
+
+                Button(role: .destructive) {
+                    pendingDeletionProfile = profile
+                } label: {
+                    Text("删除")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isBusy)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.7))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    isSelected ? Color.accentColor.opacity(0.35) : Color.primary.opacity(0.08),
+                    lineWidth: 1
+                )
+        )
     }
 
     @ViewBuilder
@@ -259,6 +403,10 @@ struct AppSettingsView: View {
         }
     }
 
+    private var isAnyProfileOperationInFlight: Bool {
+        isDeletingProfile || isRefreshingProfiles || profileActionProfileID != nil
+    }
+
     private var stateLabel: String {
         switch processManager.state {
         case .running: return L10n.k("dashboard.running", fallback: "运行中")
@@ -286,6 +434,106 @@ struct AppSettingsView: View {
         }
     }
 
+    private func runtime(for profile: GatewayProfile) -> SupervisorProfileRuntime? {
+        supervisorClient.runtimes.first(where: { $0.profileID == profile.id })
+    }
+
+    private func profileSourceLabel(for profile: GatewayProfile) -> String {
+        switch profile.sourceKind {
+        case .managed:
+            return "托管"
+        case .legacyReuse:
+            return "复用旧实例"
+        }
+    }
+
+    private func profileSourceColor(for profile: GatewayProfile) -> Color {
+        switch profile.sourceKind {
+        case .managed:
+            return .blue
+        case .legacyReuse:
+            return .orange
+        }
+    }
+
+    private func profileRuntimeLabel(for runtime: SupervisorProfileRuntime?) -> String {
+        guard let runtime else { return "未同步" }
+
+        switch runtime.readyState {
+        case .unknown:
+            return runtime.isRunning ? "运行中" : "未知"
+        case .stopped:
+            return runtime.isPrepared ? "已停止" : "未预热"
+        case .preparing:
+            return "预热中"
+        case .starting:
+            return "启动中"
+        case .ready:
+            return runtime.isRunning ? "运行中" : "已预热"
+        case .failed:
+            return "异常"
+        }
+    }
+
+    private func profileRuntimeColor(for runtime: SupervisorProfileRuntime?) -> Color {
+        guard let runtime else { return .secondary }
+
+        switch runtime.readyState {
+        case .ready:
+            return runtime.isRunning ? .green : .blue
+        case .preparing, .starting:
+            return .orange
+        case .failed:
+            return .red
+        case .stopped, .unknown:
+            return .secondary
+        }
+    }
+
+    private func profileOwnershipLabel(for runtime: SupervisorProfileRuntime?) -> String {
+        guard let runtime else { return "—" }
+
+        switch runtime.ownership {
+        case .none:
+            return "无"
+        case .supervised:
+            return "supervised"
+        case .adopted:
+            return "adopted"
+        }
+    }
+
+    private func probeTimeLabel(for date: Date?) -> String {
+        guard let date else { return "—" }
+        return date.formatted(date: .omitted, time: .standard)
+    }
+
+    private func profileRuntimeIsTransitional(_ runtime: SupervisorProfileRuntime?) -> Bool {
+        guard let runtime else { return false }
+        switch runtime.readyState {
+        case .preparing, .starting:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func updateAutoStart(enabled: Bool, for profileID: UUID) {
+        do {
+            try profileStore.update(profileID: profileID, autoStart: enabled)
+        } catch {
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func importLegacyProfile() {
+        do {
+            _ = try profileStore.importLegacyProfile()
+        } catch {
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteMessage(for profile: GatewayProfile) -> String {
         let cleanupMessage: String
         if profile.sourceKind == .managed {
@@ -302,30 +550,134 @@ struct AppSettingsView: View {
     }
 
     @MainActor
+    private func ensureSupervisorReady() async throws {
+        if supervisorClient.isConnected {
+            return
+        }
+
+        supervisorClient.connect()
+        guard await supervisorClient.waitUntilConnected() else {
+            throw NSError(domain: "AppSettingsView", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "EZRWorkerSupervisor 未就绪"
+            ])
+        }
+    }
+
+    @MainActor
+    private func refreshProfilesRuntime(reloadProfiles: Bool) async {
+        guard !isRefreshingProfiles else { return }
+
+        isRefreshingProfiles = true
+        defer { isRefreshingProfiles = false }
+
+        do {
+            try await ensureSupervisorReady()
+            if reloadProfiles {
+                guard await supervisorClient.reloadProfiles() else {
+                    throw NSError(domain: "AppSettingsView", code: 2, userInfo: [
+                        NSLocalizedDescriptionKey: "Profiles 运行态刷新失败"
+                    ])
+                }
+            } else {
+                _ = await supervisorClient.refreshRuntimes()
+            }
+
+            await processManager.refreshRuntimeState()
+        } catch {
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func runProfileAction(_ action: ProfileLifecycleAction, profile: GatewayProfile) async {
+        guard profileActionProfileID == nil else { return }
+
+        profileActionProfileID = profile.id
+        defer { profileActionProfileID = nil }
+
+        do {
+            try await ensureSupervisorReady()
+
+            switch action {
+            case .prepare:
+                try await supervisorClient.prepareProfile(profileID: profile.id)
+            case .start:
+                try await supervisorClient.startProfile(profileID: profile.id)
+            case .stop:
+                try await supervisorClient.stopProfile(profileID: profile.id)
+            case .restart:
+                try await supervisorClient.restartProfile(profileID: profile.id)
+            }
+
+            await processManager.refreshRuntimeState()
+        } catch {
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func deleteProfile(_ profile: GatewayProfile) async {
         guard !isDeletingProfile else { return }
         isDeletingProfile = true
         defer { isDeletingProfile = false }
 
         do {
-            if !supervisorClient.isConnected {
-                supervisorClient.connect()
-                guard await supervisorClient.waitUntilConnected() else {
-                    throw NSError(domain: "AppSettingsView", code: 1, userInfo: [
-                        NSLocalizedDescriptionKey: "EZRWorkerSupervisor 未就绪"
-                    ])
-                }
-            }
-
+            try await ensureSupervisorReady()
             try await supervisorClient.stopProfile(profileID: profile.id)
-            let result = try profileStore.deleteProfile(profileID: profile.id)
-
-            if !result.deletedWasSelected {
-                _ = await supervisorClient.reloadProfiles()
-                await processManager.refreshRuntimeState()
-            }
+            _ = try profileStore.deleteProfile(profileID: profile.id)
+            await processManager.refreshRuntimeState()
         } catch {
-            profileDeletionError = error.localizedDescription
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+}
+
+private enum ProfileLifecycleAction {
+    case prepare
+    case start
+    case stop
+    case restart
+}
+
+private struct ProfileBadge: View {
+    let title: String
+    let tint: Color
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(tint.opacity(0.12), in: Capsule())
+            .foregroundStyle(tint)
+    }
+}
+
+private extension AppSettingsView {
+    func profileBadge(_ title: String, tint: Color) -> some View {
+        ProfileBadge(title: title, tint: tint)
+    }
+
+    func profileInfoRow(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .leading)
+            Text(value)
+                .font(.caption)
+        }
+    }
+
+    func profilePathBlock(title: String, path: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(path)
+                .font(.caption.monospaced())
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

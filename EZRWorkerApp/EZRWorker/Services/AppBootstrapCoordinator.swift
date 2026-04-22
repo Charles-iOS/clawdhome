@@ -19,8 +19,6 @@ final class AppBootstrapCoordinator {
     @ObservationIgnored private let agentStore: AgentStore
     @ObservationIgnored private let workspaceManager: AgentWorkspaceManager
     @ObservationIgnored private let keychainStore: ProviderKeychainStore
-    @ObservationIgnored private let helperClient: HelperClient
-    @ObservationIgnored private let shrimpPool: ShrimpPool
     @ObservationIgnored private let modelStore: GlobalModelStore
     @ObservationIgnored private let profileStore: GatewayProfileStore
     @ObservationIgnored private let supervisorClient: SupervisorClient
@@ -35,8 +33,6 @@ final class AppBootstrapCoordinator {
         agentStore: AgentStore,
         workspaceManager: AgentWorkspaceManager,
         keychainStore: ProviderKeychainStore,
-        helperClient: HelperClient,
-        shrimpPool: ShrimpPool,
         modelStore: GlobalModelStore,
         profileStore: GatewayProfileStore,
         supervisorClient: SupervisorClient
@@ -47,8 +43,6 @@ final class AppBootstrapCoordinator {
         self.agentStore = agentStore
         self.workspaceManager = workspaceManager
         self.keychainStore = keychainStore
-        self.helperClient = helperClient
-        self.shrimpPool = shrimpPool
         self.modelStore = modelStore
         self.profileStore = profileStore
         self.supervisorClient = supervisorClient
@@ -88,10 +82,9 @@ final class AppBootstrapCoordinator {
     func prepareForAppTermination() {
         stopReconnectLoop()
         processManager.prepareForAppTermination()
-        helperClient.disconnect()
         gatewayService.prepareForAppTermination()
-        shrimpPool.stop()
         agentStore.markGatewayDisconnected()
+        workspaceManager.resetConfiguration()
         state = .idle
     }
 
@@ -156,7 +149,7 @@ final class AppBootstrapCoordinator {
         }
 
         let currentUsername = NSUserName()
-        workspaceManager.configure(profile: selectedResolution, helperClient: helperClient, username: currentUsername)
+        workspaceManager.configure(profile: selectedResolution)
 
         let configURL = URL(fileURLWithPath: runtime.resolvedConfigPath)
         guard let token = await Self.waitForGatewayToken(configURL: configURL) else {
@@ -176,9 +169,6 @@ final class AppBootstrapCoordinator {
             keychainStore: keychainStore
         )
 
-        helperClient.connect()
-        _ = await helperClient.waitUntilConnected()
-
         await agentStore.load(
             gateway: gatewayService,
             workspaceManager: workspaceManager,
@@ -186,17 +176,15 @@ final class AppBootstrapCoordinator {
         )
         await agentStore.migrateIfNeeded()
 
-        shrimpPool.start()
         modelStore.load()
         await processManager.refreshRuntimeState()
     }
 
     private func resetRuntimeState() async {
         await gatewayService.disconnect()
-        helperClient.disconnect()
         processManager.prepareForAppTermination()
-        shrimpPool.stop()
         agentStore.markGatewayDisconnected()
+        workspaceManager.resetConfiguration()
     }
 
     private func startReconnectLoop() {

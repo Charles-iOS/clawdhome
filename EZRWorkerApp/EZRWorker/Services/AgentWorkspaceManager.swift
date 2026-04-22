@@ -10,125 +10,114 @@ enum WorkspaceProbeResult: Equatable {
 @MainActor
 @Observable
 final class AgentWorkspaceManager {
-    private var helperClient: HelperClient?
-    private(set) var username: String = ""
     private(set) var currentProfileResolution: GatewayProfileResolution?
 
-    func configure(helperClient: HelperClient, username: String) {
-        self.helperClient = helperClient
-        self.username = username
-
-        if currentProfileResolution == nil {
-            currentProfileResolution = GatewayProfileResolution(
-                profileID: UUID(),
-                slug: "legacy-default",
-                displayName: "Legacy Default",
-                sourceKind: .legacyReuse,
-                resolvedConfigPath: EZRWorkerPaths.legacyOpenClawConfigURL.path,
-                resolvedStateDir: EZRWorkerPaths.legacyOpenClawDirectory.path,
-                resolvedWorkspaceRoot: EZRWorkerPaths.legacyOpenClawDirectory
-                    .appendingPathComponent("workspace", isDirectory: true)
-                    .path,
-                resolvedPort: GatewayProfileResolver.readLegacyGatewayPort() ?? GatewayProfileResolver.defaultGatewayPort
-            )
-        }
-    }
-
-    func configure(profile: GatewayProfileResolution, helperClient: HelperClient? = nil, username: String = NSUserName()) {
+    func configure(profile: GatewayProfileResolution) {
         self.currentProfileResolution = profile
-        self.helperClient = helperClient
-        self.username = username
     }
 
-    func workspacePath(for agentId: String) -> String {
-        relativePath(forAbsolutePath: workspaceURL(for: agentId).path)
+    func resetConfiguration() {
+        currentProfileResolution = nil
     }
 
-    func personaFilePath(agentId: String, file: PersonaFile) -> String {
-        workspacePath(for: agentId) + "/\(file.rawValue)"
+    func workspacePath(for agentId: String) throws -> String {
+        let resolution = try configuredResolution()
+        return relativePath(
+            forAbsolutePath: workspaceURL(for: agentId, resolution: resolution).path,
+            resolution: resolution
+        )
     }
 
-    func agentDirPath(for agentId: String) -> String {
-        relativePath(forAbsolutePath: agentDirURL(for: agentId).path)
+    func personaFilePath(agentId: String, file: PersonaFile) throws -> String {
+        try workspacePath(for: agentId) + "/\(file.rawValue)"
     }
 
-    func metadataPath(for agentId: String) -> String {
-        relativePath(forAbsolutePath: metadataURL(for: agentId).path)
+    func agentDirPath(for agentId: String) throws -> String {
+        let resolution = try configuredResolution()
+        return relativePath(
+            forAbsolutePath: agentDirURL(for: agentId, resolution: resolution).path,
+            resolution: resolution
+        )
     }
 
-    func sessionsDirPath(for agentId: String) -> String {
-        relativePath(forAbsolutePath: sessionsDirURL(for: agentId).path)
+    func metadataPath(for agentId: String) throws -> String {
+        let resolution = try configuredResolution()
+        return relativePath(
+            forAbsolutePath: metadataURL(for: agentId, resolution: resolution).path,
+            resolution: resolution
+        )
+    }
+
+    func sessionsDirPath(for agentId: String) throws -> String {
+        let resolution = try configuredResolution()
+        return relativePath(
+            forAbsolutePath: sessionsDirURL(for: agentId, resolution: resolution).path,
+            resolution: resolution
+        )
     }
 
     func initializeWorkspace(
         agentId: String,
         seedContent: [PersonaFile: String] = [:]
     ) async throws {
-        try ensureConfigured()
+        let resolution = try configuredResolution()
 
-        try createDirectory(workspaceURL(for: agentId))
-        try createDirectory(agentDirURL(for: agentId))
-        try createDirectory(sessionsDirURL(for: agentId))
+        try createDirectory(workspaceURL(for: agentId, resolution: resolution))
+        try createDirectory(agentDirURL(for: agentId, resolution: resolution))
+        try createDirectory(sessionsDirURL(for: agentId, resolution: resolution))
 
         for file in PersonaFile.allCases {
             let content = seedContent[file] ?? ""
             guard !content.isEmpty else { continue }
-            try writeFile(to: personaFileURL(agentId: agentId, file: file), data: Data(content.utf8))
+            try writeFile(
+                to: personaFileURL(agentId: agentId, file: file, resolution: resolution),
+                data: Data(content.utf8)
+            )
         }
     }
 
     func readPersonaFile(agentId: String, file: PersonaFile) async throws -> String {
-        let data = try await readRelativeFile(personaFilePath(agentId: agentId, file: file))
+        let data = try await readRelativeFile(try personaFilePath(agentId: agentId, file: file))
         return String(data: data, encoding: .utf8) ?? ""
     }
 
     func writePersonaFile(agentId: String, file: PersonaFile, content: String) async throws {
-        try ensureConfigured()
-        try createDirectory(workspaceURL(for: agentId))
-        try writeFile(to: personaFileURL(agentId: agentId, file: file), data: Data(content.utf8))
+        let resolution = try configuredResolution()
+        try createDirectory(workspaceURL(for: agentId, resolution: resolution))
+        try writeFile(
+            to: personaFileURL(agentId: agentId, file: file, resolution: resolution),
+            data: Data(content.utf8)
+        )
     }
 
     func readAgentMetadata(agentId: String) async throws -> AgentPersistedMetadata {
-        let data = try await readRelativeFile(metadataPath(for: agentId))
+        let data = try await readRelativeFile(try metadataPath(for: agentId))
         return try JSONDecoder().decode(AgentPersistedMetadata.self, from: data)
     }
 
     func writeAgentMetadata(agentId: String, metadata: AgentPersistedMetadata) async throws {
-        try ensureConfigured()
-        try createDirectory(agentDirURL(for: agentId).deletingLastPathComponent())
+        let resolution = try configuredResolution()
+        try createDirectory(agentDirURL(for: agentId, resolution: resolution).deletingLastPathComponent())
         let data = try JSONEncoder().encode(metadata)
-        try writeFile(to: metadataURL(for: agentId), data: data)
-    }
-
-    func commitPersonaFile(agentId: String, file: PersonaFile, message: String) async throws {
-        guard let helperClient, helperClient.isConnected else {
-            throw AgentWorkspaceError.gitHistoryUnavailable
-        }
-        try await helperClient.commitPersonaFile(
-            username: username,
-            filename: file.rawValue,
-            message: message
-        )
-    }
-
-    func getPersonaFileHistory(agentId: String, file: PersonaFile) async throws -> [PersonaCommit] {
-        guard let helperClient, helperClient.isConnected else {
-            throw AgentWorkspaceError.gitHistoryUnavailable
-        }
-        return try await helperClient.getPersonaFileHistory(
-            username: username,
-            filename: file.rawValue
-        )
+        try writeFile(to: metadataURL(for: agentId, resolution: resolution), data: data)
     }
 
     func listWorkspaceFiles(agentId: String) async throws -> [FileEntry] {
-        try ensureConfigured()
-        return try listDirectory(at: workspaceURL(for: agentId), showHidden: false)
+        let resolution = try configuredResolution()
+        return try listDirectory(
+            at: workspaceURL(for: agentId, resolution: resolution),
+            showHidden: false,
+            resolution: resolution
+        )
     }
 
     func listSessions(agentId: String) async throws -> [FileEntry] {
-        try ensureConfigured()
-        return try listDirectory(at: sessionsDirURL(for: agentId), showHidden: false)
+        let resolution = try configuredResolution()
+        return try listDirectory(
+            at: sessionsDirURL(for: agentId, resolution: resolution),
+            showHidden: false,
+            resolution: resolution
+        )
             .filter { entry in
                 guard !entry.isDirectory else { return false }
                 guard entry.name != "sessions.json" else { return false }
@@ -137,15 +126,18 @@ final class AgentWorkspaceManager {
     }
 
     func readRelativeFile(_ relativePath: String) async throws -> Data {
-        try ensureConfigured()
-        return try Data(contentsOf: resolvedURL(relativeOrAbsolutePath: relativePath))
+        let resolution = try configuredResolution()
+        return try Data(contentsOf: resolvedURL(relativeOrAbsolutePath: relativePath, resolution: resolution))
     }
 
     func probeWorkspace(agentId: String) async -> WorkspaceProbeResult {
         do {
-            try ensureConfigured()
+            let resolution = try configuredResolution()
             var isDirectory: ObjCBool = false
-            let exists = FileManager.default.fileExists(atPath: workspaceURL(for: agentId).path, isDirectory: &isDirectory)
+            let exists = FileManager.default.fileExists(
+                atPath: workspaceURL(for: agentId, resolution: resolution).path,
+                isDirectory: &isDirectory
+            )
             guard exists else { return .missing }
             return isDirectory.boolValue ? .exists : .indeterminate("目标不是目录")
         } catch {
@@ -161,11 +153,11 @@ final class AgentWorkspaceManager {
     }
 
     func deleteWorkspace(agentId: String) async throws {
-        try ensureConfigured()
+        let resolution = try configuredResolution()
         let fm = FileManager.default
         let paths = [
-            workspaceURL(for: agentId),
-            agentDirURL(for: agentId).deletingLastPathComponent(),
+            workspaceURL(for: agentId, resolution: resolution),
+            agentDirURL(for: agentId, resolution: resolution).deletingLastPathComponent(),
         ]
 
         for path in paths where fm.fileExists(atPath: path.path) {
@@ -173,10 +165,11 @@ final class AgentWorkspaceManager {
         }
     }
 
-    private func ensureConfigured() throws {
-        guard currentProfileResolution != nil else {
+    private func configuredResolution() throws -> GatewayProfileResolution {
+        guard let currentProfileResolution else {
             throw AgentWorkspaceError.notConfigured
         }
+        return currentProfileResolution
     }
 
     private func createDirectory(_ url: URL) throws {
@@ -188,7 +181,11 @@ final class AgentWorkspaceManager {
         try data.write(to: url, options: .atomic)
     }
 
-    private func listDirectory(at url: URL, showHidden: Bool) throws -> [FileEntry] {
+    private func listDirectory(
+        at url: URL,
+        showHidden: Bool,
+        resolution: GatewayProfileResolution
+    ) throws -> [FileEntry] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else { return [] }
 
@@ -205,7 +202,7 @@ final class AgentWorkspaceManager {
             let values = try? itemURL.resourceValues(forKeys: Set(keys))
             return FileEntry(
                 name: itemURL.lastPathComponent,
-                path: relativePath(forAbsolutePath: itemURL.path),
+                path: relativePath(forAbsolutePath: itemURL.path, resolution: resolution),
                 isDirectory: values?.isDirectory ?? false,
                 size: Int64(values?.fileSize ?? 0),
                 modifiedAt: values?.contentModificationDate,
@@ -219,62 +216,48 @@ final class AgentWorkspaceManager {
         }
     }
 
-    private func workspaceURL(for agentId: String) -> URL {
-        guard let resolution = currentProfileResolution else {
-            return EZRWorkerPaths.legacyOpenClawDirectory.appendingPathComponent("workspace", isDirectory: true)
-        }
+    private func workspaceURL(for agentId: String, resolution: GatewayProfileResolution) -> URL {
         if agentId == "main" {
             return resolution.workspaceRootURL
         }
         return resolution.stateDirURL.appendingPathComponent("workspace-\(agentId)", isDirectory: true)
     }
 
-    private func personaFileURL(agentId: String, file: PersonaFile) -> URL {
-        workspaceURL(for: agentId).appendingPathComponent(file.rawValue)
+    private func personaFileURL(
+        agentId: String,
+        file: PersonaFile,
+        resolution: GatewayProfileResolution
+    ) -> URL {
+        workspaceURL(for: agentId, resolution: resolution).appendingPathComponent(file.rawValue)
     }
 
-    private func agentDirURL(for agentId: String) -> URL {
-        guard let resolution = currentProfileResolution else {
-            return EZRWorkerPaths.legacyOpenClawDirectory
-                .appendingPathComponent("agents/\(agentId)/agent", isDirectory: true)
-        }
+    private func agentDirURL(for agentId: String, resolution: GatewayProfileResolution) -> URL {
         return URL(fileURLWithPath: resolution.agentDirPath(for: agentId), isDirectory: true)
     }
 
-    private func metadataURL(for agentId: String) -> URL {
-        guard let resolution = currentProfileResolution else {
-            return EZRWorkerPaths.legacyOpenClawDirectory
-                .appendingPathComponent("agents/\(agentId)/metadata.json")
-        }
+    private func metadataURL(for agentId: String, resolution: GatewayProfileResolution) -> URL {
         return URL(fileURLWithPath: resolution.metadataPath(for: agentId))
     }
 
-    private func sessionsDirURL(for agentId: String) -> URL {
-        guard let resolution = currentProfileResolution else {
-            return EZRWorkerPaths.legacyOpenClawDirectory
-                .appendingPathComponent("agents/\(agentId)/sessions", isDirectory: true)
-        }
+    private func sessionsDirURL(for agentId: String, resolution: GatewayProfileResolution) -> URL {
         return URL(fileURLWithPath: resolution.sessionsDirPath(for: agentId), isDirectory: true)
     }
 
-    private func resolvedURL(relativeOrAbsolutePath: String) -> URL {
+    private func resolvedURL(
+        relativeOrAbsolutePath: String,
+        resolution: GatewayProfileResolution
+    ) -> URL {
         let trimmed = relativeOrAbsolutePath.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("/") {
             return URL(fileURLWithPath: trimmed)
         }
-        guard let resolution = currentProfileResolution else {
-            return EZRWorkerPaths.legacyOpenClawDirectory.appendingPathComponent(trimmed)
-        }
         return resolution.stateDirURL.appendingPathComponent(trimmed)
     }
 
-    private func relativePath(forAbsolutePath path: String) -> String {
-        guard let resolution = currentProfileResolution else {
-            if path.hasPrefix(EZRWorkerPaths.legacyOpenClawDirectory.path + "/") {
-                return String(path.dropFirst(EZRWorkerPaths.legacyOpenClawDirectory.path.count + 1))
-            }
-            return path
-        }
+    private func relativePath(
+        forAbsolutePath path: String,
+        resolution: GatewayProfileResolution
+    ) -> String {
         let stateDirPath = resolution.stateDirURL.path
         if path == stateDirPath {
             return "."
@@ -290,7 +273,6 @@ enum AgentWorkspaceError: LocalizedError {
     case notConfigured
     case workspaceNotFound(String)
     case localAccessUnavailable
-    case gitHistoryUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -300,8 +282,6 @@ enum AgentWorkspaceError: LocalizedError {
             return "智能体 \(agentId) 的 workspace 不存在"
         case .localAccessUnavailable:
             return "当前用户本地文件访问不可用"
-        case .gitHistoryUnavailable:
-            return "当前 profile 未接入 helper Git 历史能力"
         }
     }
 }

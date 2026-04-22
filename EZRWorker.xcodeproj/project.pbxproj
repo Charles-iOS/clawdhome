@@ -41,7 +41,6 @@
 		181EB79773E6ACC06EC32E05 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245C733CB708D2CC4657D10B /* DashboardModels.swift */; };
 		19F095F7F36465E9A09E8424 /* LLMManagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */; };
 		1AAE22BB1A45A87CD72D472C /* Stable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 03F20F22E1D3B0500B2B2F36 /* Stable.xcstrings */; };
-		1AD5EC400F1A0D66BF37B597 /* CLIConfigStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE401EA730FDD02948702BB /* CLIConfigStep.swift */; };
 		1B263219094E1E3BDA9C6963 /* CreateProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F4555D06326E7D96A34A8B /* CreateProfileSheet.swift */; };
 		1B618D0AF3E7A7A4F91CFBA0 /* TelegramChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DB4B622DA108773F0D7066 /* TelegramChannelConfigSheet.swift */; };
 		1BC5C36E35CFAC54DA9CEE4C /* CloneClawModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4142B9D2C5922D549BDECEEE /* CloneClawModels.swift */; };
@@ -75,7 +74,6 @@
 		3DB2FBAD4E55E24B635CE091 /* NetworkPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D4D0E228886626AAE92DA7 /* NetworkPolicyView.swift */; };
 		3DC268CC24604EA975DF47B5 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */; };
 		3E0B0A8AD7B4BE3866E64391 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19D83219F5B96BE0F4E7F1F3 /* ContentView.swift */; };
-		3E9CEDDB94A395AE802F146B /* ModelConfigWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5525A7C5C86969431B174713 /* ModelConfigWizard.swift */; };
 		400D2CEDFF2AC76714154770 /* ConfigWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12D93EDCF3E599D6FCB43F5 /* ConfigWriter.swift */; };
 		404053F6AA2474CB754B1BD8 /* GatewayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC3D0DE440728AE3F88B8070 /* GatewayManager.swift */; };
 		4251623040D1848B350C8861 /* CreateAgentWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5EE4419BA91C11D57D8784 /* CreateAgentWizardView.swift */; };
@@ -165,12 +163,10 @@
 		AB4DEC6B28295032A4EAE80C /* Agent Creation CLI Fallback.md in Resources */ = {isa = PBXBuildFile; fileRef = 7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */; };
 		ACAB18484DB65AD95A8F8220 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8882ACE6E5A6DC465DCA7BB3 /* GatewayProfiles.swift */; };
 		B059514600834292CB43165C /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403CB48EA9A20CF985208776 /* AuthModels.swift */; };
-		B0BF2C8B81EEC26A20BE52FB /* FallbackManagerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C1BB48087D5078996565F9 /* FallbackManagerSheet.swift */; };
 		B0E55779E8344D3B14B2D790 /* 飞书渠道配置弹窗改版方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 094E133C596E16E8D2538B5D /* 飞书渠道配置弹窗改版方案.md */; };
 		B2F31069FA5381C0E0983039 /* ClawPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62647684D4B8CA197E7CA9E2 /* ClawPoolView.swift */; };
 		B420F13632AE057202D9DE57 /* AppLockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2458E0408D92958E211D87A6 /* AppLockScreen.swift */; };
 		B4FA57E59BFD8991D3F5534F /* WizardStep4UserInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76879C02F2548FC5B6641740 /* WizardStep4UserInfoView.swift */; };
-		B700339CF15C08C0D715D205 /* CommandOutputPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E45792FB54B78636E7C5074 /* CommandOutputPanel.swift */; };
 		B79DC9D9B8D7067AFE0D51B8 /* GatewayCronModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FD8336226F6CD693C12B80 /* GatewayCronModels.swift */; };
 		B7ED7126F6DB9590527CA039 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245C733CB708D2CC4657D10B /* DashboardModels.swift */; };
 		B85227CB3B44B10A0B8F472F /* AccountKeychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = B956AEF42E1524A3EC205AD7 /* AccountKeychain.swift */; };
@@ -331,13 +327,11 @@
 		4C2310FF1CAB90CD0860B18A /* 模型配置自动同步 + 智能体独立选模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "模型配置自动同步 + 智能体独立选模型.md"; sourceTree = "<group>"; };
 		4D0EFCA69D499A0D7CE634EE /* ApplyCredentialSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyCredentialSheet.swift; sourceTree = "<group>"; };
 		4E179BEE0F9C2AEB933ACFB0 /* OpenDirectory.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenDirectory.framework; sourceTree = "<group>"; };
-		4FE401EA730FDD02948702BB /* CLIConfigStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIConfigStep.swift; sourceTree = "<group>"; };
 		50154BBC1CADA61EBF44496C /* ChannelPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPairingSheet.swift; sourceTree = "<group>"; };
 		52048ED8CE2A7913214CE038 /* AppNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotifications.swift; sourceTree = "<group>"; };
 		53929C9886023FF85F7BA88E /* PortAllocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortAllocator.swift; sourceTree = "<group>"; };
 		541837AF1938E6F28B6CB902 /* AgentWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentWorkspaceView.swift; sourceTree = "<group>"; };
 		54AC8681A32D884DCD5FDF50 /* AgentCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCategory.swift; sourceTree = "<group>"; };
-		5525A7C5C86969431B174713 /* ModelConfigWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelConfigWizard.swift; sourceTree = "<group>"; };
 		5897A92AD3507B7E21BAC67B /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
 		593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeychainStore.swift; sourceTree = "<group>"; };
 		5B0B3D07289A447AB0573591 /* GatewayCronStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronStore.swift; sourceTree = "<group>"; };
@@ -357,12 +351,10 @@
 		680ECFFDD674F840DB3D093B /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		695541C9C5B3FE577CE17E56 /* CloneClawSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneClawSheet.swift; sourceTree = "<group>"; };
 		6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedUserDisplayName.swift; sourceTree = "<group>"; };
-		6E45792FB54B78636E7C5074 /* CommandOutputPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandOutputPanel.swift; sourceTree = "<group>"; };
 		6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMManagerTab.swift; sourceTree = "<group>"; };
 		6F3E305DD9F6C20E0AE4720C /* EZRWorker 架构重设计：单实例智能体配置管理面板.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 架构重设计：单实例智能体配置管理面板.md"; sourceTree = "<group>"; };
 		737B53A6520DDF241C124184 /* EnvironmentChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentChecker.swift; sourceTree = "<group>"; };
 		74A2E865F4893F817C7BF536 /* EZRWorkerSupervisor */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
-		74C1BB48087D5078996565F9 /* FallbackManagerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FallbackManagerSheet.swift; sourceTree = "<group>"; };
 		76879C02F2548FC5B6641740 /* WizardStep4UserInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep4UserInfoView.swift; sourceTree = "<group>"; };
 		77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayHealthProbe.swift; sourceTree = "<group>"; };
 		776D9DF1069AC323CFCA85F1 /* AILabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILabView.swift; sourceTree = "<group>"; };
@@ -518,6 +510,85 @@
 			path = EZRWorkerHelper;
 			sourceTree = "<group>";
 		};
+		A1B2C3D4E5F60718293A4B5C /* LegacyCompatibility */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293A4B5D /* App */,
+				A1B2C3D4E5F60718293A4B5E /* Models */,
+				A1B2C3D4E5F60718293A4B5F /* Services */,
+				A1B2C3D4E5F60718293A4B60 /* Views */,
+			);
+			path = LegacyCompatibility;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B5D /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D673CE675CB318832026792D /* AppSecondaryWindows.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B5E /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				E5781220540C42616F28B4FF /* ManagedUser.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B5F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				49563B20F3738C58FCEC1E04 /* DaemonInstaller.swift */,
+				A9AA0B8150DC0E634DE6145D /* GatewayHub.swift */,
+				AF787ADCA6119A9A30DEB724 /* HelperClient.swift */,
+				198F31820F0D59F39A7FBCBE /* ShrimpPool.swift */,
+				FB72758F8075D4246EA869B0 /* WizardConnection.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B60 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				19D83219F5B96BE0F4E7F1F3 /* ContentView.swift */,
+				4D0EFCA69D499A0D7CE634EE /* ApplyCredentialSheet.swift */,
+				5897A92AD3507B7E21BAC67B /* BackupView.swift */,
+				695541C9C5B3FE577CE17E56 /* CloneClawSheet.swift */,
+				5D7B5A894F16C47CCB3CBF3F /* ConfigEditorSheet.swift */,
+				A075137F55AE8CACA52DFA73 /* DaemonSetupBanner.swift */,
+				C25D45202349DD02D4CCD55B /* DashboardView.swift */,
+				AE5A5222E89CCDF7124713A5 /* GatewayProviderKeySheet.swift */,
+				EEE65F6B2E3D9A8A9848F090 /* HealthCheckSheet.swift */,
+				3C4F33C2AC621A956B473305 /* LogViewerSheet.swift */,
+				D6B0F192D27FB7A20718E669 /* MemoryTabView.swift */,
+				3AC5DE311F7D6003F641059C /* ModelPrioritySheet.swift */,
+				29D4D0E228886626AAE92DA7 /* NetworkPolicyView.swift */,
+				285BB8B97B189AD58A39CA16 /* PersonaDefView.swift */,
+				A2AE640833BFFD2A68EB3847 /* RoleMarketView.swift */,
+				B6E9C1086DF51EE16F745F80 /* SecurityAuditView.swift */,
+				F2385DF4A5910EE10765044B /* SessionsTabView.swift */,
+				DE4D1A479B616C31A6EF204A /* SettingsView.swift */,
+				13975E7790EC792E72AD5B33 /* TerminalLogView.swift */,
+				A39A99F260B852F3082F7B4C /* UserDetailView.swift */,
+				60CD295E886713198432A99C /* UserFilesView.swift */,
+				7A075DCFCFD7176E076A2F09 /* UserInitWizardView.swift */,
+				F5B0240A383EDBE822FDF8D0 /* UserListView.swift */,
+				A1B2C3D4E5F60718293A4B61 /* ModelManager */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B61 /* ModelManager */ = {
+			isa = PBXGroup;
+			children = (
+				E97173A7AF4964FC9ED96037 /* LocalAITab.swift */,
+				7DD195A972396B7A9004468A /* ModelManagerView.swift */,
+			);
+			path = ModelManager;
+			sourceTree = "<group>";
+		};
 		1FBA9AC118B12A95C5F9490C /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -527,25 +598,20 @@
 				EE5365116B6E72E2B01D3176 /* AppLogger.swift */,
 				04F1CDF86B604C553735889E /* AuthAPIClient.swift */,
 				360302D93CA3B23E3A2CB64F /* AuthSessionStore.swift */,
-				49563B20F3738C58FCEC1E04 /* DaemonInstaller.swift */,
 				B30FB396DBACF647230E1ADA /* DeviceIdentity.swift */,
 				737B53A6520DDF241C124184 /* EnvironmentChecker.swift */,
 				C5B8C75A78263C4C9B8C6E4B /* GatewayClient.swift */,
 				5B0B3D07289A447AB0573591 /* GatewayCronStore.swift */,
-				A9AA0B8150DC0E634DE6145D /* GatewayHub.swift */,
 				9DDCCE3581AF68B6A18F0829 /* GatewayProfileStore.swift */,
 				C3CD29580049C3C28EB5D4A7 /* GatewaySkillsStore.swift */,
-				AF787ADCA6119A9A30DEB724 /* HelperClient.swift */,
 				1AB8CCD5F5E790E50CFD9928 /* ModelPingService.swift */,
 				48F9BE1B58385F1831D981E3 /* OpenClawProviderKeySync.swift */,
 				593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */,
-				198F31820F0D59F39A7FBCBE /* ShrimpPool.swift */,
 				B9C4248D2AA44226F4452987 /* SupervisorClient.swift */,
 				D7C9300D00E62DEBBD1135DA /* UpdateChecker.swift */,
 				E2CE856C50D2EFD17B00A5C6 /* UpdateCheckPolicy.swift */,
 				F1EDBB82362FBD65CA0EB745 /* UserDirectoryService.swift */,
 				A245488B0EA1984454B05131 /* UserPasswordStore.swift */,
-				FB72758F8075D4246EA869B0 /* WizardConnection.swift */,
 				5561C7D75A930E100EF605A8 /* Gateway */,
 				5F6C279CD6C0DF0BB9C09C6F /* Stores */,
 			);
@@ -757,7 +823,6 @@
 				00AD7BA6A94E1C97733FD849 /* GatewaySkillModels.swift */,
 				C0C4D900EFBBA3ED016FBDB6 /* GlobalModelStore.swift */,
 				B22A6BDE79B358E22BEE2B74 /* GlobalSecretsStore.swift */,
-				E5781220540C42616F28B4FF /* ManagedUser.swift */,
 				63E7ECFB0052218EC40E1AE8 /* ModelsStatus.swift */,
 				00B57166787F28D6CA0DC966 /* ProviderKeyConfig.swift */,
 				98F8ADF4F753E82EC62D93F1 /* VoiceProfile.swift */,
@@ -770,9 +835,7 @@
 			children = (
 				79D4EB2C3C8B59CC871802B4 /* AddProviderModelSheet.swift */,
 				6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */,
-				E97173A7AF4964FC9ED96037 /* LocalAITab.swift */,
 				3E78B5A13EC9C7018814E07F /* ModelDetailView.swift */,
-				7DD195A972396B7A9004468A /* ModelManagerView.swift */,
 				93E086F51C967E1AB9C7AF00 /* ProviderKeySheet.swift */,
 				1BCD6661514B0ACBAA2AAC6F /* TTSManagerTab.swift */,
 				341A536C67D8695DE5B73B98 /* VoiceLibraryTab.swift */,
@@ -786,29 +849,10 @@
 				131B2DAEA7A5596D65C89538 /* AddUserSheet.swift */,
 				776D9DF1069AC323CFCA85F1 /* AILabView.swift */,
 				2458E0408D92958E211D87A6 /* AppLockScreen.swift */,
-				4D0EFCA69D499A0D7CE634EE /* ApplyCredentialSheet.swift */,
 				5BED324F1ED7BF01A2E94129 /* AppUpdateBanner.swift */,
 				17D5DEA24C5BED726C91F8A6 /* AwakeningWizardView.swift */,
 				15D848C1B5EF0CDD59CE126E /* BackupManagerSheet.swift */,
-				5897A92AD3507B7E21BAC67B /* BackupView.swift */,
 				62647684D4B8CA197E7CA9E2 /* ClawPoolView.swift */,
-				695541C9C5B3FE577CE17E56 /* CloneClawSheet.swift */,
-				A075137F55AE8CACA52DFA73 /* DaemonSetupBanner.swift */,
-				C25D45202349DD02D4CCD55B /* DashboardView.swift */,
-				AE5A5222E89CCDF7124713A5 /* GatewayProviderKeySheet.swift */,
-				3C4F33C2AC621A956B473305 /* LogViewerSheet.swift */,
-				D6B0F192D27FB7A20718E669 /* MemoryTabView.swift */,
-				29D4D0E228886626AAE92DA7 /* NetworkPolicyView.swift */,
-				285BB8B97B189AD58A39CA16 /* PersonaDefView.swift */,
-				A2AE640833BFFD2A68EB3847 /* RoleMarketView.swift */,
-				B6E9C1086DF51EE16F745F80 /* SecurityAuditView.swift */,
-				F2385DF4A5910EE10765044B /* SessionsTabView.swift */,
-				DE4D1A479B616C31A6EF204A /* SettingsView.swift */,
-				13975E7790EC792E72AD5B33 /* TerminalLogView.swift */,
-				A39A99F260B852F3082F7B4C /* UserDetailView.swift */,
-				60CD295E886713198432A99C /* UserFilesView.swift */,
-				7A075DCFCFD7176E076A2F09 /* UserInitWizardView.swift */,
-				F5B0240A383EDBE822FDF8D0 /* UserListView.swift */,
 				CC94021EFAC848EEE00483AD /* ModelManager */,
 			);
 			path = Views;
@@ -828,7 +872,6 @@
 			isa = PBXGroup;
 			children = (
 				C525F7E05443D608CFE0D1DB /* AppRootGateView.swift */,
-				D673CE675CB318832026792D /* AppSecondaryWindows.swift */,
 				E2A4315E9D76AF6CFFBFA6D7 /* EZRWorkerApp.swift */,
 				35AD2C49D4474A7A30A332D8 /* MainView.swift */,
 				BE26EFBD8E1A7991E7319A9E /* Sidebar */,
@@ -885,14 +928,7 @@
 		FD1B76ED6F1360593B66A5FE /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				4FE401EA730FDD02948702BB /* CLIConfigStep.swift */,
-				6E45792FB54B78636E7C5074 /* CommandOutputPanel.swift */,
-				5D7B5A894F16C47CCB3CBF3F /* ConfigEditorSheet.swift */,
-				74C1BB48087D5078996565F9 /* FallbackManagerSheet.swift */,
-				EEE65F6B2E3D9A8A9848F090 /* HealthCheckSheet.swift */,
-				5525A7C5C86969431B174713 /* ModelConfigWizard.swift */,
 				17EBE5B457012294EFE0E076 /* ModelPickerSheet.swift */,
-				3AC5DE311F7D6003F641059C /* ModelPrioritySheet.swift */,
 				0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */,
 				79F52960A35FCDC71FC976B7 /* ProfileMigrationChoiceView.swift */,
 				89F3149513BC01F516421443 /* UpgradeConfirmSheet.swift */,
@@ -910,10 +946,10 @@
 			children = (
 				41729DA0971439D7C20400D0 /* AppIcon.icns */,
 				65DFDC9A5D564622349F186D /* Assets.xcassets */,
-				19D83219F5B96BE0F4E7F1F3 /* ContentView.swift */,
 				A4250EB561AA0155DE283768 /* EZRWorker.entitlements */,
 				024A24C4A426107D68445692 /* Info.plist */,
 				03F20F22E1D3B0500B2B2F36 /* Stable.xcstrings */,
+				A1B2C3D4E5F60718293A4B5C /* LegacyCompatibility */,
 				9B04B4EA7437AD00449F316E /* EZRWorker */,
 				7E628D04FB0571A2545B9C7C /* Localization */,
 				A87AD192ACBB0C60B6C195B7 /* plans */,
@@ -1185,7 +1221,6 @@
 				2CA596360957A695BF7DF730 /* AwakeningWizardView.swift in Sources */,
 				E341234CCE9EE02B48CAA9EB /* BackupManagerSheet.swift in Sources */,
 				87FE66E706DF588C961E87B6 /* BackupView.swift in Sources */,
-				1AD5EC400F1A0D66BF37B597 /* CLIConfigStep.swift in Sources */,
 				EE08386CB00390E39127AC25 /* ChannelBindSheet.swift in Sources */,
 				7DE39E0A59531ADBEB772CEA /* ChannelBotConfigSheet.swift in Sources */,
 				68EACC33DF17AD36D7F2F793 /* ChannelPairingSheet.swift in Sources */,
@@ -1194,7 +1229,6 @@
 				B2F31069FA5381C0E0983039 /* ClawPoolView.swift in Sources */,
 				1BC5C36E35CFAC54DA9CEE4C /* CloneClawModels.swift in Sources */,
 				4E4BBCE52AE5F1E24256DC6A /* CloneClawSheet.swift in Sources */,
-				B700339CF15C08C0D715D205 /* CommandOutputPanel.swift in Sources */,
 				545E6930B249008C63CA999E /* ConfigEditorSheet.swift in Sources */,
 				3E0B0A8AD7B4BE3866E64391 /* ContentView.swift in Sources */,
 				47D2E8C47D07C2D04F294BB3 /* CreateAgentSheet.swift in Sources */,
@@ -1212,7 +1246,6 @@
 				13A532108EB6EDB8F29DF459 /* EZRWorkerApp.swift in Sources */,
 				73439DEDEBD676CA95BEC88A /* EZRWorkerBranding.swift in Sources */,
 				53609128E116AEC60E9DB5BD /* EnvironmentChecker.swift in Sources */,
-				B0BF2C8B81EEC26A20BE52FB /* FallbackManagerSheet.swift in Sources */,
 				E6B71EC87DD08A1B125F3C68 /* FeishuChannelConfigSheet.swift in Sources */,
 				CC35A6BD4D1E1AF3E5F3B66B /* FeishuChannelOnboardingSheet.swift in Sources */,
 				57DE6A88D02779A43098531F /* FileInputAcceptFilter.swift in Sources */,
@@ -1248,7 +1281,6 @@
 				BCC8FA0D08A302D2729ED3BD /* ManagedUserDisplayName.swift in Sources */,
 				3B3E441BDCF0F8AF81A2365D /* MemoryTabView.swift in Sources */,
 				469F180DF12F7D1A2D4861AF /* ModelConfigView.swift in Sources */,
-				3E9CEDDB94A395AE802F146B /* ModelConfigWizard.swift in Sources */,
 				66404CB724247583F6E84608 /* ModelDetailView.swift in Sources */,
 				EDBA56589718C88250AD48ED /* ModelManagerView.swift in Sources */,
 				14FA84A360B5643A3053C7E8 /* ModelPickerSheet.swift in Sources */,

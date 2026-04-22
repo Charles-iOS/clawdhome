@@ -22,6 +22,7 @@ fi
 matches=$(printf '%s\n' "$staged_text" | grep -nE "$pattern" || true)
 
 if [ -z "$matches" ]; then
+  bash scripts/check-mainline-no-helper.sh
   exit 0
 fi
 

@@ -157,6 +157,7 @@ final class GatewayProcessManager {
     static var bundledNodeURL: URL { OpenClawRuntime.bundledNodeURL }
     static var bundledOpenClawEntry: URL { OpenClawRuntime.bundledOpenClawEntry }
     static var bundledNpxURL: URL { OpenClawRuntime.bundledNpxURL }
+    @available(*, deprecated, message: "仅保留给 legacy 兼容代码；主线请改用 GatewayProfileResolution.localPaths")
     static var openClawConfigDir: URL { EZRWorkerPaths.legacyOpenClawDirectory }
 
     static func buildEnvironment(profile: GatewayProfileResolution? = nil) -> [String: String] {

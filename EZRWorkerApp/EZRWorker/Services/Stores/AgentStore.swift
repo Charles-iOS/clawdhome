@@ -759,7 +759,11 @@ final class AgentStore {
         case .exists:
             break
         case .indeterminate(let reason):
-            throw HelperError.operationFailed("无法确认智能体 \(agentId) 的 workspace 状态：\(reason)")
+            throw NSError(
+                domain: "AgentStore",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "无法确认智能体 \(agentId) 的 workspace 状态：\(reason)"]
+            )
         }
 
         for (file, content) in seedContent where !content.isEmpty {

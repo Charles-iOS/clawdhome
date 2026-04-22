@@ -50,6 +50,7 @@ struct FeishuChannelOnboardingSheet: View {
     let username: String
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var terminalControl = LocalTerminalControl()
@@ -76,8 +77,11 @@ struct FeishuChannelOnboardingSheet: View {
     private let uiTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private var commandArgs: [String] { flow.commandArgs }
     private var logPrefix: String { flow.rawValue }
+    private var selectedResolution: GatewayProfileResolution? { profileStore.selectedResolution }
+    private var selectedLocalPaths: GatewayProfileLocalPaths? { profileStore.selectedLocalPaths }
     private var commandEnvironment: [String: String] {
-        let home = "/Users/\(username)"
+        var environment = GatewayProcessManager.buildEnvironment(profile: selectedResolution)
+        let home = environment["HOME"] ?? "/Users/\(username)"
         let nodeBin = GatewayProcessManager.bundledNodeURL.deletingLastPathComponent().path
         let openclawBin = GatewayProcessManager.bundledOpenClawEntry
             .deletingLastPathComponent()
@@ -87,11 +91,10 @@ struct FeishuChannelOnboardingSheet: View {
             .appendingPathComponent("bin")
             .path
         let npmGlobalBin = "\(home)/.npm-global/bin"
-        let existingPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
-        return [
-            "PATH": "\(nodeBin):\(openclawBin):\(npmGlobalBin):\(existingPath)",
-            "NODE_ENV": "production"
-        ]
+        let existingPath = environment["PATH"] ?? ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+        environment["PATH"] = "\(nodeBin):\(openclawBin):\(npmGlobalBin):\(existingPath)"
+        environment["NODE_ENV"] = "production"
+        return environment
     }
 
     private var commandSummary: String {
@@ -658,8 +661,9 @@ struct FeishuChannelOnboardingSheet: View {
     }
 
     private func loadChannelConfigSnapshot(for channel: ChannelType) -> (connected: Bool, enabled: Bool?) {
-        let configURL = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("openclaw.json")
+        guard let configURL = selectedLocalPaths?.configURL else {
+            return (false, nil)
+        }
         guard let data = FileManager.default.contents(atPath: configURL.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return (false, nil)

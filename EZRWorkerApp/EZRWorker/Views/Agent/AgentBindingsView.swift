@@ -115,6 +115,7 @@ private struct AddBindingSheet: View {
     @Environment(AgentStore.self) private var store
     @Environment(GatewayService.self) private var gateway
     @Environment(GatewayProcessManager.self) private var processManager
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var step: AddBindingStep = .selectChannel
@@ -127,6 +128,10 @@ private struct AddBindingSheet: View {
     // 凭据配置 / QR 子 sheet
     @State private var showCredentialSheet = false
     @State private var showQRSheet = false
+
+    private var selectedLocalPaths: GatewayProfileLocalPaths? {
+        profileStore.selectedLocalPaths
+    }
 
     var body: some View {
         NavigationStack {
@@ -456,9 +461,10 @@ private struct AddBindingSheet: View {
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
-        let credFile = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("credentials")
-            .appendingPathComponent("lark.secrets.json")
+        guard let credFile = selectedLocalPaths?.credentialsDirectoryURL
+            .appendingPathComponent("lark.secrets.json") else {
+            return false
+        }
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
               let fileSize = attrs[.size] as? NSNumber else {
             return false
@@ -467,8 +473,9 @@ private struct AddBindingSheet: View {
     }
 
     private func loadLocalChannelConfigDictionary() -> [String: Any] {
-        let configURL = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("openclaw.json")
+        guard let configURL = selectedLocalPaths?.configURL else {
+            return [:]
+        }
         guard let data = FileManager.default.contents(atPath: configURL.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return [:]

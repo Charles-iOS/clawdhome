@@ -183,17 +183,6 @@ final class UpdateChecker {
         }
     }
 
-    func refreshAppUpdateState(helperClient: HelperClient) async {
-        if !helperClient.isConnected {
-            helperClient.connect()
-        }
-        if let cached = await helperClient.getCachedAppUpdateState() {
-            applyAppUpdateState(cached)
-            return
-        }
-        await checkAppIfNeeded()
-    }
-
     private func applyAppUpdateState(_ state: AppUpdateState) {
         appLatestVersion = state.latestVersion
         UserDefaults.standard.set(state.latestVersion, forKey: Self.udKeyAppVersion)
@@ -436,10 +425,6 @@ final class UpdateChecker {
     func needsUpdate(_ installed: String?) -> Bool {
         guard let installed, let latest = latestVersion else { return false }
         return compareVersions(installed, latest) == .orderedAscending
-    }
-
-    func upgradableCount(in users: [ManagedUser]) -> Int {
-        users.filter { needsUpdate($0.openclawVersion) }.count
     }
 
     /// 逐段比较版本号（支持 "YYYY.M.DL10n.k("services.update_checker.text_ed4b80bf", fallback: " 和 ")1.0.180" 两种格式）

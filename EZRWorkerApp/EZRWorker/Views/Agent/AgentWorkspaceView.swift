@@ -1,7 +1,7 @@
 // EZRWorkerApp/Views/Agent/AgentWorkspaceView.swift
 // 智能体 Workspace 详情视图 — Tab 结构：Persona | Bindings | Sessions | Settings
 //
-// Persona Tab 实现分栏式多文件编辑器（复用 PersonaFile 枚举和 HelperClient 文件读写）
+// Persona Tab 实现分栏式多文件编辑器（复用 PersonaFile 枚举和 AgentWorkspaceManager 工作区读写）
 
 import SwiftUI
 
@@ -9,8 +9,6 @@ struct AgentWorkspaceView: View {
     let agentId: String
 
     @Environment(AgentStore.self) private var store
-    @Environment(AgentWorkspaceManager.self) private var workspaceManager
-    @Environment(HelperClient.self) private var helperClient
 
     @State private var selectedTab: WorkspaceTab = .persona
     @State private var showEditorSheet = false
@@ -343,6 +341,7 @@ private struct AgentSettingsView: View {
     @Environment(AgentStore.self) private var store
     @Environment(GatewayService.self) private var gateway
     @Environment(GlobalModelStore.self) private var modelStore
+    @Environment(AgentWorkspaceManager.self) private var workspaceManager
 
     @State private var preferredModel = ""
     @State private var skillsAllowList = ""
@@ -400,7 +399,7 @@ private struct AgentSettingsView: View {
                 LabeledContent("Agent ID", value: agentId)
                 if let agent {
                     LabeledContent(L10n.k("agent.settings.workspace_path", fallback: "Workspace 路径"),
-                                   value: agent.workspace ?? "~/.openclaw/workspace\(agentId == "main" ? "" : "-\(agentId)")")
+                                   value: workspaceDisplayPath(for: agent))
                     LabeledContent(L10n.k("agent.settings.bindings_count", fallback: "绑定数"),
                                    value: "\(agent.boundBindings.count)")
                     LabeledContent(L10n.k("agent.settings.sessions_count", fallback: "会话数"),
@@ -434,5 +433,18 @@ private struct AgentSettingsView: View {
             preferredModel = agent?.preferredModel ?? ""
         }
         isSavingModel = false
+    }
+
+    private func workspaceDisplayPath(for agent: Agent) -> String {
+        if let workspace = agent.workspace,
+           !workspace.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return workspace
+        }
+
+        if let resolution = workspaceManager.currentProfileResolution {
+            return NSString(string: resolution.workspacePath(for: agentId)).abbreviatingWithTildeInPath
+        }
+
+        return L10n.k("agent.settings.workspace_pending", fallback: "当前 profile 未就绪")
     }
 }

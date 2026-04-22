@@ -1,9 +1,6 @@
 import Foundation
 import SwiftUI
 
-private let openClawConfigDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent(".openclaw")
-
 enum ChannelDmPolicy: String, CaseIterable, Identifiable {
     case open
     case pairing
@@ -115,8 +112,11 @@ private struct ChannelConfigValidationError: LocalizedError {
 enum ChannelPairingDataLoader {
     static func pendingRequests(
         for channel: ChannelType,
-        credentialsDirectory: URL = credentialsDirectoryURL
+        localPaths: GatewayProfileLocalPaths?
     ) -> [PairingRequest] {
+        guard let credentialsDirectory = localPaths?.credentialsDirectoryURL else {
+            return []
+        }
         let pairingFile = credentialsDirectory.appendingPathComponent("\(channel.rawValue)-pairing.json")
         guard let data = FileManager.default.contents(atPath: pairingFile.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -162,8 +162,10 @@ enum ChannelPairingDataLoader {
 
     static func approvedPeers(
         for channel: ChannelType,
-        credentialsDirectory: URL = credentialsDirectoryURL
+        localPaths: GatewayProfileLocalPaths?
     ) -> [PairingPeer] {
+        guard let localPaths else { return [] }
+        let credentialsDirectory = localPaths.credentialsDirectoryURL
         var peersByID: [String: PairingPeer] = [:]
 
         let storePeers: [PairingPeer]
@@ -177,7 +179,7 @@ enum ChannelPairingDataLoader {
             merge(peer, into: &peersByID)
         }
 
-        for peerId in ChannelConfigSupport.allowFromPeerIDs(for: channel) {
+        for peerId in ChannelConfigSupport.allowFromPeerIDs(for: channel, localPaths: localPaths) {
             merge(
                 PairingPeer(
                     id: peerId,
@@ -193,13 +195,10 @@ enum ChannelPairingDataLoader {
 
     static func approvedPeerIDs(
         for channel: ChannelType,
-        credentialsDirectory: URL = credentialsDirectoryURL
+        localPaths: GatewayProfileLocalPaths?
     ) -> [String] {
-        approvedPeers(for: channel, credentialsDirectory: credentialsDirectory).map(\.id)
+        approvedPeers(for: channel, localPaths: localPaths).map(\.id)
     }
-
-    private static let credentialsDirectoryURL = openClawConfigDirectoryURL
-        .appendingPathComponent("credentials")
     private static let defaultFeishuAccountID = "default"
 
     private static func loadStoreApprovedPeers(
@@ -329,20 +328,34 @@ enum ChannelPairingDataLoader {
 }
 
 enum ChannelConfigSupport {
-    static func loadLocalChannelConfig(for channel: ChannelType) -> [String: Any] {
-        let rootConfig = loadLocalConfigRoot()
+    static func loadLocalChannelConfig(
+        for channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) -> [String: Any] {
+        let rootConfig = loadLocalConfigRoot(localPaths: localPaths)
         let channels = rootConfig["channels"] as? [String: Any] ?? [:]
         return channels[channel.rawValue] as? [String: Any] ?? [:]
     }
 
-    static func allowFromPeerIDs(for channel: ChannelType) -> [String] {
-        let channelConfig = loadLocalChannelConfig(for: channel)
+    static func allowFromPeerIDs(
+        for channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) -> [String] {
+        let channelConfig = loadLocalChannelConfig(for: channel, localPaths: localPaths)
         return normalizeStringArray(from: channelConfig["allowFrom"])
     }
 
     @discardableResult
-    static func removeAllowFromPeerFromLocalConfig(_ peerID: String, for channel: ChannelType) throws -> Bool {
-        var rootConfig = loadLocalConfigRoot()
+    static func removeAllowFromPeerFromLocalConfig(
+        _ peerID: String,
+        for channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) throws -> Bool {
+        guard let localPaths else {
+            throw ChannelConfigValidationError(message: "当前未选择 profile，无法更新本地渠道配置。")
+        }
+
+        var rootConfig = loadLocalConfigRoot(localPaths: localPaths)
         var channels = rootConfig["channels"] as? [String: Any] ?? [:]
         var channelConfig = channels[channel.rawValue] as? [String: Any] ?? [:]
         let currentAllowFrom = normalizeStringArray(from: channelConfig["allowFrom"], allowWildcard: true)
@@ -362,8 +375,7 @@ enum ChannelConfigSupport {
         channels[channel.rawValue] = channelConfig
         rootConfig["channels"] = channels
 
-        let configURL = openClawConfigDirectoryURL
-            .appendingPathComponent("openclaw.json")
+        let configURL = localPaths.configURL
         guard JSONSerialization.isValidJSONObject(rootConfig) else {
             throw ChannelConfigValidationError(message: "本地 OpenClaw 配置不是合法 JSON，无法更新私信白名单。")
         }
@@ -447,9 +459,10 @@ enum ChannelConfigSupport {
         }
     }
 
-    private static func loadLocalConfigRoot() -> [String: Any] {
-        let configURL = openClawConfigDirectoryURL
-            .appendingPathComponent("openclaw.json")
+    private static func loadLocalConfigRoot(localPaths: GatewayProfileLocalPaths?) -> [String: Any] {
+        guard let configURL = localPaths?.configURL else {
+            return [:]
+        }
         guard let data = FileManager.default.contents(atPath: configURL.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return [:]
@@ -463,15 +476,20 @@ enum ChannelPairingMutationSupport {
     static func removeApprovedPeer(
         _ peer: PairingPeer,
         channel: ChannelType,
-        gateway: GatewayService
+        gateway: GatewayService,
+        profile: GatewayProfileResolution?,
+        localPaths: GatewayProfileLocalPaths?
     ) async throws -> Bool {
         var removedAny = false
         var errors: [String] = []
 
         if peer.isStoreBacked {
+            guard let profile else {
+                throw ChannelConfigValidationError(message: "当前未选择 profile，无法修改本地配对 store。")
+            }
             let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: [
                 "pairing", "remove", channel.rawValue, peer.id
-            ])
+            ], profile: profile)
             if ok {
                 removedAny = true
             } else {
@@ -481,7 +499,12 @@ enum ChannelPairingMutationSupport {
 
         if peer.isConfigBacked {
             do {
-                let changed = try await removeConfigAllowFromPeer(peer.id, channel: channel, gateway: gateway)
+                let changed = try await removeConfigAllowFromPeer(
+                    peer.id,
+                    channel: channel,
+                    gateway: gateway,
+                    localPaths: localPaths
+                )
                 removedAny = removedAny || changed
             } catch {
                 errors.append(error.localizedDescription)
@@ -498,7 +521,8 @@ enum ChannelPairingMutationSupport {
     private static func removeConfigAllowFromPeer(
         _ peerID: String,
         channel: ChannelType,
-        gateway: GatewayService
+        gateway: GatewayService,
+        localPaths: GatewayProfileLocalPaths?
     ) async throws -> Bool {
         if gateway.isConnected {
             do {
@@ -510,7 +534,11 @@ enum ChannelPairingMutationSupport {
             }
         }
 
-        return try ChannelConfigSupport.removeAllowFromPeerFromLocalConfig(peerID, for: channel)
+        return try ChannelConfigSupport.removeAllowFromPeerFromLocalConfig(
+            peerID,
+            for: channel,
+            localPaths: localPaths
+        )
     }
 
     private static func removeConfigAllowFromPeerViaGateway(
@@ -552,10 +580,11 @@ enum ChannelPairingMutationSupport {
 }
 
 private enum FeishuChannelConfigSupport {
-    static func hasQRCodeCredentials() -> Bool {
-        let credFile = openClawConfigDirectoryURL
-            .appendingPathComponent("credentials")
-            .appendingPathComponent("lark.secrets.json")
+    static func hasQRCodeCredentials(localPaths: GatewayProfileLocalPaths?) -> Bool {
+        guard let credFile = localPaths?.credentialsDirectoryURL
+            .appendingPathComponent("lark.secrets.json") else {
+            return false
+        }
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
               let fileSize = attrs[.size] as? NSNumber else {
             return false
@@ -563,12 +592,16 @@ private enum FeishuChannelConfigSupport {
         return fileSize.intValue > 0
     }
 
-    static func credentialMode(for feishuConfig: [String: Any]) -> ChannelCredentialMode {
+    static func credentialMode(
+        for feishuConfig: [String: Any],
+        localPaths: GatewayProfileLocalPaths?
+    ) -> ChannelCredentialMode {
         if let appSecret = feishuConfig["appSecret"] as? String,
            !appSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .manual
         }
-        if isQRCodeSecretReference(feishuConfig["appSecret"]) || hasQRCodeCredentials() {
+        if isQRCodeSecretReference(feishuConfig["appSecret"])
+            || hasQRCodeCredentials(localPaths: localPaths) {
             return .qrCode
         }
         return .unknown
@@ -596,6 +629,7 @@ struct FeishuChannelConfigSheet: View {
     var onSaved: (() -> Void)?
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft = FeishuChannelConfigDraft()
@@ -605,6 +639,8 @@ struct FeishuChannelConfigSheet: View {
     @State private var successMessage: String?
     @State private var showOnboardingSheet = false
     @State private var showCredentialSheet = false
+
+    private var selectedLocalPaths: GatewayProfileLocalPaths? { profileStore.selectedLocalPaths }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -945,7 +981,10 @@ struct FeishuChannelConfigSheet: View {
         errorMessage = nil
         defer { isLoading = false }
 
-        let localConfig = ChannelConfigSupport.loadLocalChannelConfig(for: .feishu)
+        let localConfig = ChannelConfigSupport.loadLocalChannelConfig(
+            for: .feishu,
+            localPaths: selectedLocalPaths
+        )
         var feishuConfig = localConfig
         var readOnly = !gateway.isConnected
 
@@ -976,7 +1015,10 @@ struct FeishuChannelConfigSheet: View {
                 from: ChannelConfigSupport.normalizeStringArray(from: feishuConfig["groupAllowFrom"])
             ),
             groupsJSONText: ChannelConfigSupport.prettyPrintedJSONText(from: groupsObject),
-            credentialMode: FeishuChannelConfigSupport.credentialMode(for: feishuConfig),
+            credentialMode: FeishuChannelConfigSupport.credentialMode(
+                for: feishuConfig,
+                localPaths: selectedLocalPaths
+            ),
             isReadOnly: isReadOnly,
             validationError: nil
         )
@@ -1069,6 +1111,7 @@ struct ChannelPairingManagerSection: View {
     var onChanged: (() async -> Void)?
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(GatewayProfileStore.self) private var profileStore
 
     @State private var pendingRequests: [PairingRequest] = []
     @State private var approvedPeers: [PairingPeer] = []
@@ -1081,6 +1124,8 @@ struct ChannelPairingManagerSection: View {
     @State private var peerToRemove: PairingPeer?
 
     private let refreshTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
+    private var selectedResolution: GatewayProfileResolution? { profileStore.selectedResolution }
+    private var selectedLocalPaths: GatewayProfileLocalPaths? { profileStore.selectedLocalPaths }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1378,15 +1423,13 @@ struct ChannelPairingManagerSection: View {
             hasLoadedOnce = true
         }
 
-        let credentialsDirectory = openClawConfigDirectoryURL
-            .appendingPathComponent("credentials")
         pendingRequests = ChannelPairingDataLoader.pendingRequests(
             for: channelType,
-            credentialsDirectory: credentialsDirectory
+            localPaths: selectedLocalPaths
         )
         approvedPeers = ChannelPairingDataLoader.approvedPeers(
             for: channelType,
-            credentialsDirectory: credentialsDirectory
+            localPaths: selectedLocalPaths
         )
     }
 
@@ -1398,9 +1441,14 @@ struct ChannelPairingManagerSection: View {
         successMessage = nil
         defer { isApproving = false }
 
+        guard let selectedResolution else {
+            errorMessage = "当前未选择 profile，无法执行配对审批"
+            return
+        }
+
         let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: [
             "pairing", "approve", channelType.rawValue, trimmed
-        ])
+        ], profile: selectedResolution)
 
         if ok {
             successMessage = "已审批通过配对码 \(trimmed)"
@@ -1423,9 +1471,14 @@ struct ChannelPairingManagerSection: View {
         errorMessage = nil
         successMessage = nil
 
+        guard let selectedResolution else {
+            errorMessage = "当前未选择 profile，无法执行配对拒绝"
+            return
+        }
+
         let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: [
             "pairing", "reject", channelType.rawValue, code
-        ])
+        ], profile: selectedResolution)
 
         if ok {
             pendingRequests.removeAll { $0.code == code }
@@ -1451,7 +1504,9 @@ struct ChannelPairingManagerSection: View {
             let changed = try await ChannelPairingMutationSupport.removeApprovedPeer(
                 peer,
                 channel: channelType,
-                gateway: gateway
+                gateway: gateway,
+                profile: selectedResolution,
+                localPaths: selectedLocalPaths
             )
             if changed {
                 await loadAll()

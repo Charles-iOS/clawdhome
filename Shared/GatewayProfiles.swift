@@ -24,6 +24,12 @@ struct GatewayProfilesDocument: Codable {
     var profiles: [GatewayProfile] = []
 }
 
+struct GatewayProfileLocalPaths: Equatable, Hashable {
+    var configURL: URL
+    var configDirectoryURL: URL
+    var credentialsDirectoryURL: URL
+}
+
 struct GatewayProfileResolution: Codable, Equatable, Hashable {
     var profileID: UUID
     var slug: String
@@ -35,8 +41,19 @@ struct GatewayProfileResolution: Codable, Equatable, Hashable {
     var resolvedPort: Int
 
     var configURL: URL { URL(fileURLWithPath: resolvedConfigPath) }
+    var configDirectoryURL: URL { configURL.deletingLastPathComponent() }
+    var credentialsDirectoryURL: URL {
+        configDirectoryURL.appendingPathComponent("credentials", isDirectory: true)
+    }
     var stateDirURL: URL { URL(fileURLWithPath: resolvedStateDir, isDirectory: true) }
     var workspaceRootURL: URL { URL(fileURLWithPath: resolvedWorkspaceRoot, isDirectory: true) }
+    var localPaths: GatewayProfileLocalPaths {
+        GatewayProfileLocalPaths(
+            configURL: configURL,
+            configDirectoryURL: configDirectoryURL,
+            credentialsDirectoryURL: credentialsDirectoryURL
+        )
+    }
 
     func workspacePath(for agentId: String) -> String {
         if agentId == "main" {
@@ -207,7 +224,7 @@ enum GatewayProfileResolver {
         existingProfiles: [GatewayProfile],
         preferred: Int? = nil
     ) -> Int {
-        let used = existingProfiles.compactMap(\.portOverride)
+        let used = existingProfiles.map { resolve($0).resolvedPort }
         if let preferred,
            managedPortRange.contains(preferred),
            !hasReservedPortConflict(preferred, existingPorts: used),

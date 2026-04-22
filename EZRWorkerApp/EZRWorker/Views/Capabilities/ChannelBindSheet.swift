@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ChannelBindSheet: View {
     let skill: GatewaySkillStatus
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var output = ""
@@ -65,7 +66,7 @@ struct ChannelBindSheet: View {
         let proc = Process()
         proc.executableURL = npxURL
         proc.arguments = ["-y", skill.source, "install"]
-        proc.environment = GatewayProcessManager.buildEnvironment()
+        proc.environment = GatewayProcessManager.buildEnvironment(profile: profileStore.selectedResolution)
         proc.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
 
         let pipe = Pipe()

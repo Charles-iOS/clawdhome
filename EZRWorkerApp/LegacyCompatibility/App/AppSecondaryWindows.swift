@@ -3,6 +3,184 @@ import Observation
 import SwiftUI
 
 @MainActor
+final class LegacyCompatibilityContainer {
+    private var helperClientStorage: HelperClient?
+    private var shrimpPoolStorage: ShrimpPool?
+    private var gatewayHubStorage: GatewayHub?
+    private var didStartLegacyRuntime = false
+    private var startupTask: Task<Bool, Never>?
+
+    var helperClient: HelperClient {
+        resolveHelperClient()
+    }
+
+    var shrimpPool: ShrimpPool {
+        resolveShrimpPool()
+    }
+
+    var gatewayHub: GatewayHub {
+        resolveGatewayHub()
+    }
+
+    func prepareForLegacyWindowPresentation() async -> Bool {
+        if didStartLegacyRuntime {
+            return true
+        }
+        if let startupTask {
+            return await startupTask.value
+        }
+
+        let helperClient = resolveHelperClient()
+        let shrimpPool = resolveShrimpPool()
+        let task = Task<Bool, Never> { @MainActor [weak self] in
+            helperClient.connect()
+            let connected = await helperClient.waitUntilConnected()
+            guard connected, !Task.isCancelled else {
+                self?.startupTask = nil
+                return false
+            }
+
+            shrimpPool.start()
+            self?.didStartLegacyRuntime = true
+            self?.startupTask = nil
+            return true
+        }
+
+        startupTask = task
+        return await task.value
+    }
+
+    func prepareForAppTermination() {
+        startupTask?.cancel()
+        startupTask = nil
+        didStartLegacyRuntime = false
+        helperClientStorage?.disconnect()
+        shrimpPoolStorage?.stop()
+
+        let gatewayHub = gatewayHubStorage
+        helperClientStorage = nil
+        shrimpPoolStorage = nil
+        gatewayHubStorage = nil
+
+        if let gatewayHub {
+            Task { @MainActor in
+                await gatewayHub.disconnectAll()
+            }
+        }
+    }
+
+    private func resolveHelperClient() -> HelperClient {
+        if let helperClientStorage {
+            return helperClientStorage
+        }
+        let helperClient = HelperClient()
+        helperClientStorage = helperClient
+        return helperClient
+    }
+
+    private func resolveShrimpPool() -> ShrimpPool {
+        if let shrimpPoolStorage {
+            return shrimpPoolStorage
+        }
+        let shrimpPool = ShrimpPool(helperClient: resolveHelperClient())
+        shrimpPoolStorage = shrimpPool
+        return shrimpPool
+    }
+
+    private func resolveGatewayHub() -> GatewayHub {
+        if let gatewayHubStorage {
+            return gatewayHubStorage
+        }
+        let gatewayHub = GatewayHub()
+        gatewayHubStorage = gatewayHub
+        return gatewayHub
+    }
+}
+
+struct LegacyCompatibilityScene<Content: View>: View {
+    let container: LegacyCompatibilityContainer
+    let includeGatewayHub: Bool
+    private let content: () -> Content
+
+    @State private var isReady = false
+    @State private var startupError: String?
+
+    init(
+        container: LegacyCompatibilityContainer,
+        includeGatewayHub: Bool = false,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.container = container
+        self.includeGatewayHub = includeGatewayHub
+        self.content = content
+    }
+
+    var body: some View {
+        Group {
+            if isReady {
+                preparedContent
+            } else if let startupError {
+                CompatibilityRuntimeStatusView(
+                    title: "旧版兼容运行时未就绪",
+                    message: startupError,
+                    showProgress: false
+                )
+            } else {
+                CompatibilityRuntimeStatusView(
+                    title: "正在准备旧版兼容运行时",
+                    message: "正在连接 Helper 并恢复旧窗口所需依赖，请稍候。",
+                    showProgress: true
+                )
+            }
+        }
+        .task {
+            guard !isReady, startupError == nil else { return }
+            let ready = await container.prepareForLegacyWindowPresentation()
+            if ready {
+                isReady = true
+            } else {
+                startupError = "Helper 连接失败，请确认旧版兼容环境已安装后重试。"
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var preparedContent: some View {
+        if includeGatewayHub {
+            content()
+                .environment(container.helperClient)
+                .environment(container.shrimpPool)
+                .environment(container.gatewayHub)
+        } else {
+            content()
+                .environment(container.helperClient)
+                .environment(container.shrimpPool)
+        }
+    }
+}
+
+private struct CompatibilityRuntimeStatusView: View {
+    let title: String
+    let message: String
+    let showProgress: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if showProgress {
+                ProgressView()
+                    .controlSize(.large)
+            }
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(24)
+    }
+}
+
+@MainActor
 @Observable
 final class MaintenanceWindowRegistry {
     struct Payload: Codable, Hashable {

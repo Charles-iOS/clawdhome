@@ -20,7 +20,7 @@ SIGN_PKG ?= false
 NOTARIZE ?= true
 BUILD_ARCHS ?= arm64
 
-.PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
+.PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
 WEBSITE_DIR ?= ../clawdhome_website
 
@@ -55,6 +55,7 @@ help:
 	@echo "  log-app          实时跟踪 App 系统日志（os_log）"
 	@echo "  i18n             运行 Stable.xcstrings 本地化检查"
 	@echo "  i18n-check       本地化 CI 检查（未本地化/缺失翻译/占位符一致性）"
+	@echo "  check-mainline-no-helper  检查主线路径是否重新引入 helper 依赖"
 	@echo "  clean            清理 build/ dist/ 目录"
 	@echo ""
 	@echo "── 自动化测试 ──"
@@ -271,6 +272,9 @@ i18n-check:
 	scripts/i18n_check_untranslated.py
 	scripts/i18n_ci_check.py
 	scripts/i18n_forbid_legacy_t.py
+
+check-mainline-no-helper:
+	bash scripts/check-mainline-no-helper.sh
 
 # ==============================================================================
 # 自动化测试环境模块 (带 test- 前缀)

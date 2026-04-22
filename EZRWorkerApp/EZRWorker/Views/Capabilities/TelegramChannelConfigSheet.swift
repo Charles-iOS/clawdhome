@@ -51,6 +51,7 @@ struct TelegramChannelConfigSheet: View {
     var onSaved: (() -> Void)?
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var draft = TelegramChannelConfigDraft()
@@ -59,6 +60,10 @@ struct TelegramChannelConfigSheet: View {
     @State private var errorMessage: String?
     @State private var successMessage: String?
     @State private var showCredentialSheet = false
+
+    private var selectedLocalPaths: GatewayProfileLocalPaths? {
+        profileStore.selectedLocalPaths
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -373,7 +378,10 @@ struct TelegramChannelConfigSheet: View {
         errorMessage = nil
         defer { isLoading = false }
 
-        let localConfig = ChannelConfigSupport.loadLocalChannelConfig(for: .telegram)
+        let localConfig = ChannelConfigSupport.loadLocalChannelConfig(
+            for: .telegram,
+            localPaths: selectedLocalPaths
+        )
         var telegramConfig = localConfig
         var readOnly = !gateway.isConnected
 

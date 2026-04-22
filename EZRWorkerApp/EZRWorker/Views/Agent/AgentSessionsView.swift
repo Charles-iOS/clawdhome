@@ -131,7 +131,7 @@ struct AgentSessionsView: View {
         loadError = nil
         defer { isLoading = false }
         do {
-            let path = workspaceManager.sessionsDirPath(for: agentId) + "/\(entry.name)"
+            let path = try workspaceManager.sessionsDirPath(for: agentId) + "/\(entry.name)"
             let data = try await workspaceManager.readRelativeFile(path)
             sessionContent = String(data: data, encoding: .utf8) ?? ""
         } catch {

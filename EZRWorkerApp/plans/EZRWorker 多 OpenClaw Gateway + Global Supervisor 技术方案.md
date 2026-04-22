@@ -4,19 +4,19 @@ overview: 将当前单实例 EZRWorker 主线升级为当前用户下多 OpenCla
 todos:
   - id: phase1-branding
     content: "Phase 1: 统一运行时品牌为 EZRWorker，重命名 project/target/bundle/service/path"
-    status: pending
+    status: completed
   - id: phase2-supervisor
     content: "Phase 2: 新增 EZRWorkerSupervisor + LaunchAgent + Supervisor XPC 协议"
-    status: pending
+    status: completed
   - id: phase3-profiles
     content: "Phase 3: 引入 GatewayProfileStore、Profile UI、multi-gateway lifecycle"
-    status: pending
+    status: completed
   - id: phase4-migration
-    content: "Phase 4: 实现 EZRWorker -> EZRWorker 数据迁移和老单实例迁移选择流"
-    status: pending
+    content: "Phase 4: App 接入 Profile Runtime"
+    status: completed
   - id: phase5-cleanup
-    content: "Phase 5: 将新主线 runtime 从 helper 脱钩，仅保留旧多用户兼容能力"
-    status: pending
+    content: "Phase 5: 迁移与兼容"
+    status: completed
 isProject: false
 ---
 
@@ -689,6 +689,13 @@ Helper 的新定位：
 - 保留旧 helper 兼容窗口
 
 ## 十六、测试与验收
+
+### 当前仓库审计状态（2026-04-22）
+
+- 代码实现层面：Phase 1 ~ Phase 5 已全部落地。
+- 当前构建审计：`check-mainline-no-helper` 通过，`EZRWorker` Debug 构建通过。
+- 验收口径下仍有 1 项未完全收口：
+  - **16.6 品牌迁移** 仍缺少显式实现证据。仓库内未发现“旧 Application Support 目录 / 旧 Keychain service 自动迁入 `EZRWorker`”的迁移代码，当前更多是“新品牌路径已切换完成”，而不是“旧品牌数据已自动迁移完成”。
 
 ### 16.1 品牌与产物
 

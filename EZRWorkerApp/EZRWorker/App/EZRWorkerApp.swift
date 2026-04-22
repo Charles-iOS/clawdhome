@@ -27,11 +27,9 @@ struct EZRWorkerApp: App {
     @State private var agentStore: AgentStore
     @State private var workspaceManager: AgentWorkspaceManager
     @State private var keychainStore: ProviderKeychainStore
-    @State private var helperClient: HelperClient
-    @State private var shrimpPool: ShrimpPool
+    @State private var legacyCompatibility: LegacyCompatibilityContainer
     @State private var updater: UpdateChecker
     @State private var modelStore: GlobalModelStore
-    @State private var gatewayHub: GatewayHub
     @State private var lockStore: AppLockStore
     @State private var maintenanceWindowRegistry: MaintenanceWindowRegistry
     @State private var authStore: AuthSessionStore
@@ -50,11 +48,9 @@ struct EZRWorkerApp: App {
         let agentStore = AgentStore()
         let workspaceManager = AgentWorkspaceManager()
         let keychainStore = ProviderKeychainStore()
-        let helperClient = HelperClient()
-        let shrimpPool = ShrimpPool(helperClient: helperClient)
+        let legacyCompatibility = LegacyCompatibilityContainer()
         let updater = UpdateChecker()
         let modelStore = GlobalModelStore()
-        let gatewayHub = GatewayHub()
         let lockStore = AppLockStore()
         let maintenanceWindowRegistry = MaintenanceWindowRegistry()
         let authStore = AuthSessionStore(apiClient: BackendAuthClient())
@@ -67,8 +63,6 @@ struct EZRWorkerApp: App {
             agentStore: agentStore,
             workspaceManager: workspaceManager,
             keychainStore: keychainStore,
-            helperClient: helperClient,
-            shrimpPool: shrimpPool,
             modelStore: modelStore,
             profileStore: profileStore,
             supervisorClient: supervisorClient
@@ -80,11 +74,9 @@ struct EZRWorkerApp: App {
         _agentStore = State(initialValue: agentStore)
         _workspaceManager = State(initialValue: workspaceManager)
         _keychainStore = State(initialValue: keychainStore)
-        _helperClient = State(initialValue: helperClient)
-        _shrimpPool = State(initialValue: shrimpPool)
+        _legacyCompatibility = State(initialValue: legacyCompatibility)
         _updater = State(initialValue: updater)
         _modelStore = State(initialValue: modelStore)
-        _gatewayHub = State(initialValue: gatewayHub)
         _lockStore = State(initialValue: lockStore)
         _maintenanceWindowRegistry = State(initialValue: maintenanceWindowRegistry)
         _authStore = State(initialValue: authStore)
@@ -109,16 +101,14 @@ struct EZRWorkerApp: App {
                 .environment(supervisorClient)
                 .environment(bootstrapCoordinator)
                 .environment(\.locale, appLanguage.locale)
-                .environment(helperClient)
-                .environment(shrimpPool)
                 .environment(updater)
                 .environment(modelStore)
-                .environment(gatewayHub)
                 .environment(lockStore)
                 .environment(maintenanceWindowRegistry)
                 .task {
                     appDelegate.onWillTerminate = {
                         bootstrapCoordinator.prepareForAppTermination()
+                        legacyCompatibility.prepareForAppTermination()
                     }
                 }
         }
@@ -132,14 +122,16 @@ struct EZRWorkerApp: App {
         WindowGroup(id: "claw-detail", for: String.self) { $username in
             if let name = username {
                 AuthenticatedSceneGate {
-                    ClawDetailWindow(username: name)
+                    LegacyCompatibilityScene(
+                        container: legacyCompatibility,
+                        includeGatewayHub: true
+                    ) {
+                        ClawDetailWindow(username: name)
+                    }
                 }
-                .environment(helperClient)
-                .environment(shrimpPool)
                 .environment(updater)
                 .environment(modelStore)
                 .environment(keychainStore)
-                .environment(gatewayHub)
                 .environment(authStore)
                 .environment(maintenanceWindowRegistry)
                 .environment(\.locale, appLanguage.locale)
@@ -156,14 +148,16 @@ struct EZRWorkerApp: App {
         WindowGroup(id: "user-init-wizard", for: String.self) { $username in
             if let name = username {
                 AuthenticatedSceneGate {
-                    UserInitWizardWindow(username: name)
+                    LegacyCompatibilityScene(
+                        container: legacyCompatibility,
+                        includeGatewayHub: true
+                    ) {
+                        UserInitWizardWindow(username: name)
+                    }
                 }
-                .environment(helperClient)
-                .environment(shrimpPool)
                 .environment(updater)
                 .environment(modelStore)
                 .environment(keychainStore)
-                .environment(gatewayHub)
                 .environment(authStore)
                 .environment(maintenanceWindowRegistry)
                 .environment(\.locale, appLanguage.locale)
@@ -176,14 +170,13 @@ struct EZRWorkerApp: App {
 
         WindowGroup(id: "channel-onboarding", for: String.self) { $payload in
             AuthenticatedSceneGate {
-                ChannelOnboardingWindow(payload: payload)
+                LegacyCompatibilityScene(container: legacyCompatibility) {
+                    ChannelOnboardingWindow(payload: payload)
+                }
             }
-            .environment(helperClient)
-            .environment(shrimpPool)
             .environment(updater)
             .environment(modelStore)
             .environment(keychainStore)
-            .environment(gatewayHub)
             .environment(lockStore)
             .environment(authStore)
             .environment(maintenanceWindowRegistry)
@@ -195,10 +188,10 @@ struct EZRWorkerApp: App {
 
         WindowGroup(id: "maintenance-terminal", for: String.self) { $payload in
             AuthenticatedSceneGate {
-                MaintenanceTerminalWindow(payload: payload)
+                LegacyCompatibilityScene(container: legacyCompatibility) {
+                    MaintenanceTerminalWindow(payload: payload)
+                }
             }
-            .environment(helperClient)
-            .environment(shrimpPool)
             .environment(authStore)
             .environment(maintenanceWindowRegistry)
             .environment(\.locale, appLanguage.locale)
@@ -210,10 +203,10 @@ struct EZRWorkerApp: App {
         WindowGroup(id: "clone-claw", for: String.self) { $sourceUsername in
             if let username = sourceUsername {
                 AuthenticatedSceneGate {
-                    CloneClawSheet(sourceUsername: username)
+                    LegacyCompatibilityScene(container: legacyCompatibility) {
+                        CloneClawSheet(sourceUsername: username)
+                    }
                 }
-                .environment(helperClient)
-                .environment(shrimpPool)
                 .environment(authStore)
                 .environment(\.locale, appLanguage.locale)
             }

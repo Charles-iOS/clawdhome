@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mainline-helper-guard:
+    name: Mainline Helper Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify mainline stays helper-free
+        run: bash scripts/check-mainline-no-helper.sh
+
+  build-macos:
+    name: Build EZRWorker
+    runs-on: macos-15
+    needs: mainline-helper-guard
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project EZRWorker.xcodeproj
+
+      - name: Build macOS app
+        run: >
+          xcodebuild
+          -project EZRWorker.xcodeproj
+          -scheme EZRWorker
+          -destination 'platform=macOS'
+          -configuration Debug
+          -derivedDataPath "$RUNNER_TEMP/ezrworker-derived"
+          build
+          CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs
+          path: ${{ runner.temp }}/ezrworker-derived/Logs
+          if-no-files-found: ignore

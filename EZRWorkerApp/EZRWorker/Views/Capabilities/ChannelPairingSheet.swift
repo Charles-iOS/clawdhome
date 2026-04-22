@@ -29,6 +29,7 @@ struct ChannelPairingSheet: View {
     let channelType: ChannelType
 
     @Environment(GatewayService.self) private var gateway
+    @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var pendingRequests: [PairingRequest] = []
@@ -47,6 +48,8 @@ struct ChannelPairingSheet: View {
 
     // 自动刷新
     private let refreshTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
+    private var selectedResolution: GatewayProfileResolution? { profileStore.selectedResolution }
+    private var selectedLocalPaths: GatewayProfileLocalPaths? { profileStore.selectedLocalPaths }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -408,8 +411,8 @@ struct ChannelPairingSheet: View {
 
     // MARK: - 数据操作
 
-    /// 直接读取本地 JSON 文件加载配对数据（无需启动 Node 进程）
-    /// - 待审批：~/.openclaw/credentials/<channel>-pairing.json → { requests: [...] }
+    /// 直接读取当前 profile 的本地 JSON 文件加载配对数据（无需启动 Node 进程）
+    /// - 待审批：`<profile>/credentials/<channel>-pairing.json` → `{ requests: [...] }`
     /// - 已配对：合并 allowFrom store 与 `channels.<channel>.allowFrom`
     private func loadAll() async {
         isLoading = true
@@ -418,15 +421,13 @@ struct ChannelPairingSheet: View {
             hasLoadedOnce = true
         }
 
-        let credDir = GatewayProcessManager.openClawConfigDir
-            .appendingPathComponent("credentials")
         pendingRequests = ChannelPairingDataLoader.pendingRequests(
             for: channelType,
-            credentialsDirectory: credDir
+            localPaths: selectedLocalPaths
         )
         approvedPeers = ChannelPairingDataLoader.approvedPeers(
             for: channelType,
-            credentialsDirectory: credDir
+            localPaths: selectedLocalPaths
         )
     }
 
@@ -439,7 +440,14 @@ struct ChannelPairingSheet: View {
         successMessage = nil
         defer { isApproving = false }
 
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["pairing"] + ["approve", channelType.rawValue, trimmed]
+        guard let selectedResolution else {
+            errorMessage = "当前未选择 profile，无法执行配对审批"
+            return
+        }
+
+        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(
+            args: ["pairing"] + ["approve", channelType.rawValue, trimmed],
+            profile: selectedResolution
         )
 
         if ok {
@@ -463,7 +471,14 @@ struct ChannelPairingSheet: View {
         errorMessage = nil
         successMessage = nil
 
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: ["pairing"] + ["reject", channelType.rawValue, code]
+        guard let selectedResolution else {
+            errorMessage = "当前未选择 profile，无法执行配对拒绝"
+            return
+        }
+
+        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(
+            args: ["pairing"] + ["reject", channelType.rawValue, code],
+            profile: selectedResolution
         )
 
         if ok {
@@ -488,7 +503,9 @@ struct ChannelPairingSheet: View {
             let changed = try await ChannelPairingMutationSupport.removeApprovedPeer(
                 peer,
                 channel: channelType,
-                gateway: gateway
+                gateway: gateway,
+                profile: selectedResolution,
+                localPaths: selectedLocalPaths
             )
             if changed {
                 await loadAll()
