@@ -25,6 +25,8 @@ final class AppBootstrapCoordinator {
 
     @ObservationIgnored
     private var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var gatewayDependentStartupCompleted = false
 
     init(
         processManager: GatewayProcessManager,
@@ -159,11 +161,50 @@ final class AppBootstrapCoordinator {
         }
 
         await gatewayService.reconfigure(port: runtime.resolvedPort, token: token)
-        guard await Self.connectGatewayService(gatewayService: gatewayService) else {
-            throw NSError(domain: "AppBootstrapCoordinator", code: 9, userInfo: [
-                NSLocalizedDescriptionKey: "Gateway 已启动，但当前 profile 的控制连接建立失败"
-            ])
+        if await Self.connectGatewayService(gatewayService: gatewayService) {
+            await completeGatewayDependentStartup(currentUsername: currentUsername)
+        } else {
+            appLog("bootstrap: gateway control connection deferred; reconnect loop will continue", level: .warn)
         }
+        await processManager.refreshRuntimeState()
+    }
+
+    private func resetRuntimeState() async {
+        await gatewayService.disconnect()
+        processManager.prepareForAppTermination()
+        agentStore.markGatewayDisconnected()
+        workspaceManager.resetConfiguration()
+        gatewayDependentStartupCompleted = false
+    }
+
+    private func startReconnectLoop() {
+        stopReconnectLoop()
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                guard !Task.isCancelled else { return }
+                if self.processManager.isRunning && !self.gatewayService.isConnected {
+                    await self.processManager.refreshRuntimeState()
+                    if await Self.connectGatewayService(gatewayService: self.gatewayService) {
+                        await self.completeGatewayDependentStartup(currentUsername: NSUserName())
+                    }
+                } else if self.gatewayService.isConnected {
+                    await self.completeGatewayDependentStartup(currentUsername: NSUserName())
+                }
+            }
+        }
+    }
+
+    private func stopReconnectLoop() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+    }
+
+    private func completeGatewayDependentStartup(currentUsername: String) async {
+        guard gatewayService.isConnected, !gatewayDependentStartupCompleted else { return }
+        gatewayDependentStartupCompleted = true
+
         await Self.provisionDefaultMiniMaxModelIfNeeded(
             gatewayService: gatewayService,
             keychainStore: keychainStore
@@ -177,34 +218,6 @@ final class AppBootstrapCoordinator {
         await agentStore.migrateIfNeeded()
 
         modelStore.load()
-        await processManager.refreshRuntimeState()
-    }
-
-    private func resetRuntimeState() async {
-        await gatewayService.disconnect()
-        processManager.prepareForAppTermination()
-        agentStore.markGatewayDisconnected()
-        workspaceManager.resetConfiguration()
-    }
-
-    private func startReconnectLoop() {
-        stopReconnectLoop()
-        reconnectTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                guard !Task.isCancelled else { return }
-                if self.processManager.isRunning && !self.gatewayService.isConnected {
-                    await self.processManager.refreshRuntimeState()
-                    _ = await Self.connectGatewayService(gatewayService: self.gatewayService)
-                }
-            }
-        }
-    }
-
-    private func stopReconnectLoop() {
-        reconnectTask?.cancel()
-        reconnectTask = nil
     }
 
     private static func connectGatewayService(
