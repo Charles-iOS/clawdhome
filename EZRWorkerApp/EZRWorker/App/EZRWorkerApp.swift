@@ -200,6 +200,23 @@ struct EZRWorkerApp: App {
         .windowResizability(.automatic)
         .defaultSize(width: 860, height: 560)
 
+        WindowGroup(id: "profile-terminal", for: String.self) { $profileID in
+            if let profileID {
+                AuthenticatedSceneGate {
+                    ProfileTerminalWindow(profileIDString: profileID)
+                }
+                .environment(processManager)
+                .environment(gatewayService)
+                .environment(profileStore)
+                .environment(supervisorClient)
+                .environment(authStore)
+                .environment(\.locale, appLanguage.locale)
+            }
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.automatic)
+        .defaultSize(width: 940, height: 620)
+
         WindowGroup(id: "clone-claw", for: String.self) { $sourceUsername in
             if let username = sourceUsername {
                 AuthenticatedSceneGate {

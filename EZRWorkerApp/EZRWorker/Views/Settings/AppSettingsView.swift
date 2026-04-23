@@ -9,6 +9,7 @@ struct AppSettingsView: View {
     @Environment(AuthSessionStore.self) private var authStore
     @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(SupervisorClient.self) private var supervisorClient
+    @Environment(\.openWindow) private var openWindow
 
     @State private var showCreateProfileSheet = false
     @State private var pendingDeletionProfile: GatewayProfile?
@@ -32,6 +33,7 @@ struct AppSettingsView: View {
                 accountSection
                 profilesSection
                 gatewaySection
+                terminalSection
                 environmentSection
                 aboutSection
             }
@@ -158,6 +160,31 @@ struct AppSettingsView: View {
             Text(gatewayActionHint)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var terminalSection: some View {
+        Section("OpenClaw 终端") {
+            if let selectedProfile = profileStore.selectedProfile,
+               let selectedResolution = profileStore.selectedResolution {
+                LabeledContent("当前 Profile", value: "\(selectedProfile.displayName) (\(selectedProfile.slug))")
+                LabeledContent("工作目录", value: selectedResolution.resolvedWorkspaceRoot)
+
+                Button {
+                    openWindow(id: "profile-terminal", value: selectedProfile.id.uuidString)
+                } label: {
+                    Label("打开内嵌终端", systemImage: "terminal")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("终端会自动进入当前 profile 环境，可执行 openclaw configure --section model、openclaw agents list 等命令。openclaw gateway 会被保护，避免重复启动 Gateway。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("当前没有可用 profile，暂时无法打开 OpenClaw 终端。")
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
