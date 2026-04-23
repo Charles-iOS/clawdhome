@@ -68,6 +68,10 @@ final class GatewayProfileStore {
 
         if let document = readProfilesDocument() {
             profiles = document.profiles.sorted(by: { $0.createdAt < $1.createdAt })
+            if profiles.isEmpty {
+                restoreDefaultProfileAfterEmptyDocument()
+                return
+            }
             ensureSelectedProfileExists()
             status = .ready
             return
@@ -418,12 +422,39 @@ final class GatewayProfileStore {
     }
 
     private func ensureSelectedProfileExists() {
+        guard !profiles.isEmpty else {
+            selectedProfileID = nil
+            UserDefaults.standard.removeObject(forKey: EZRWorkerBranding.lastSelectedProfileDefaultsKey)
+            return
+        }
+
         if let selectedProfileID,
            profiles.contains(where: { $0.id == selectedProfileID }) {
             return
         }
         if let first = profiles.first {
             selectProfile(id: first.id)
+        }
+    }
+
+    private func restoreDefaultProfileAfterEmptyDocument() {
+        do {
+            let profile = try makeManagedProfile(
+                displayName: "Default",
+                requestedSlug: "default",
+                autoStart: true,
+                configPathOverride: nil,
+                stateDirOverride: nil,
+                workspaceRootOverride: nil,
+                portOverride: nil
+            )
+            profiles = [profile]
+            selectProfile(id: profile.id)
+            try persistProfiles()
+            status = .ready
+        } catch {
+            ensureSelectedProfileExists()
+            status = .failed(error.localizedDescription)
         }
     }
 

@@ -661,17 +661,14 @@ struct FeishuChannelOnboardingSheet: View {
     }
 
     private func loadChannelConfigSnapshot(for channel: ChannelType) -> (connected: Bool, enabled: Bool?) {
-        guard let configURL = selectedLocalPaths?.configURL else {
-            return (false, nil)
-        }
-        guard let data = FileManager.default.contents(atPath: configURL.path),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let rootConfig = selectedLocalPaths?.loadConfigRoot() else {
             return (false, nil)
         }
 
-        let channels = json["channels"] as? [String: Any] ?? [:]
+        let channels = rootConfig["channels"] as? [String: Any] ?? [:]
         let channelConfig = channels[channel.rawValue] as? [String: Any] ?? [:]
-        return (!channelConfig.isEmpty, channelConfig["enabled"] as? Bool)
+        let hasLocalCredentials = channel == .feishu ? hasFeishuQRCodeCredentials() : false
+        return (!channelConfig.isEmpty || hasLocalCredentials, channelConfig["enabled"] as? Bool)
     }
 
     private func localChannelConfigSnapshot() -> (connected: Bool, enabled: Bool?) {
@@ -679,6 +676,27 @@ struct FeishuChannelOnboardingSheet: View {
             return (false, nil)
         }
         return loadChannelConfigSnapshot(for: channel)
+    }
+
+    private func hasFeishuQRCodeCredentials() -> Bool {
+        guard let localPaths = selectedLocalPaths else {
+            return false
+        }
+        let candidateURLs = [
+            localPaths.existingSecretProviderFileURL(providerID: "lark-secrets"),
+            localPaths.existingCredentialFile(named: "lark.secrets.json"),
+        ].compactMap { $0 }
+
+        for fileURL in candidateURLs {
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                  let fileSize = attrs[.size] as? NSNumber else {
+                continue
+            }
+            if fileSize.intValue > 0 {
+                return true
+            }
+        }
+        return false
     }
 
     private func codeForLog() -> Int32 {

@@ -47,6 +47,13 @@ final class SupervisorRecord {
 actor EZRWorkerSupervisorController {
     private static let gatewayStartupProbeAttempts = 90
     private static let gatewayStartupProbeIntervalNanoseconds: UInt64 = 1_000_000_000
+    private static let meaningfulLegacyConfigKeys: Set<String> = [
+        "agents",
+        "bindings",
+        "channels",
+        "models",
+        "secrets",
+    ]
 
     private var profiles: [UUID: GatewayProfile] = [:]
     private var profileOrder: [UUID] = []
@@ -81,7 +88,12 @@ actor EZRWorkerSupervisorController {
     }
 
     func reloadProfiles() async -> (Bool, String?) {
-        loadProfilesFromDisk()
+        let removedRecords = loadProfilesFromDisk()
+        for record in removedRecords {
+            inFlightStartTasks[record.profile.id]?.cancel()
+            inFlightStartTasks.removeValue(forKey: record.profile.id)
+            _ = await stopRecord(record)
+        }
         return (true, nil)
     }
 
@@ -96,6 +108,7 @@ actor EZRWorkerSupervisorController {
 
         do {
             try ensureProfileDirectories(record.resolution)
+            try reconcileManagedConfigLayoutIfNeeded(record.resolution)
 
             if profile.sourceKind == .legacyReuse {
                 guard FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath) else {
@@ -144,18 +157,29 @@ actor EZRWorkerSupervisorController {
     }
 
     private func performStartProfile(profileID: UUID) async -> (Bool, String?) {
+        guard !Task.isCancelled else {
+            return (false, "Gateway 启动已取消")
+        }
+
         let prepareResult = await prepareProfile(profileID: profileID)
         guard prepareResult.0 else { return prepareResult }
+        guard !Task.isCancelled else {
+            if let record = records[profileID] {
+                _ = await stopRecord(record)
+            }
+            return (false, "Gateway 启动已取消")
+        }
         guard let record = records[profileID] else {
             return (false, "缺少运行时记录")
         }
 
         if let process = record.process, process.isRunning {
-            record.isRunning = true
-            record.pid = process.processIdentifier
-            record.readyState = .ready
-            record.ownership = .supervised
-            return (true, nil)
+            return await waitForGatewayReady(
+                record: record,
+                pid: process.processIdentifier,
+                ownership: .supervised,
+                requireSameListeningPID: false
+            )
         }
 
         let currentProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
@@ -168,6 +192,7 @@ actor EZRWorkerSupervisorController {
                 record.ownership = .adopted
                 record.pid = pid
                 record.lastProbeAt = Date()
+                record.lastError = nil
                 return (true, nil)
             case .relaunch:
                 break
@@ -180,13 +205,24 @@ actor EZRWorkerSupervisorController {
             }
         }
 
-        if let occupiedPID = gatewayPIDListening(onPort: record.resolution.resolvedPort),
-           let commandLine = processCommandLine(pid: occupiedPID),
-           !looksLikeGatewayProcess(commandLine) {
-            let message = "端口 \(record.resolution.resolvedPort) 已被其他进程占用"
-            record.lastError = message
-            record.readyState = .failed
-            return (false, message)
+        if let occupiedPID = gatewayPIDListening(onPort: record.resolution.resolvedPort) {
+            switch await existingGatewayDisposition(for: record, listeningPID: occupiedPID) {
+            case .adopt(let pid):
+                return await waitForGatewayReady(
+                    record: record,
+                    pid: pid,
+                    ownership: .adopted,
+                    requireSameListeningPID: true
+                )
+            case .relaunch:
+                break
+            case .fail(let message):
+                record.lastError = message
+                record.readyState = .failed
+                record.isRunning = false
+                record.ownership = .none
+                return (false, message)
+            }
         }
 
         let process = Process()
@@ -194,16 +230,23 @@ actor EZRWorkerSupervisorController {
         process.arguments = [OpenClawRuntime.bundledOpenClawEntry.path, "gateway"]
         process.environment = OpenClawRuntime.buildEnvironment(profile: record.resolution)
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        let startupOutput = ProcessOutputCollector()
+        let outputPipe = Pipe()
+        startupOutput.attach(to: outputPipe)
+        process.standardOutput = outputPipe
+        process.standardError = outputPipe
 
         let controller = self
         let recordID = profileID
         process.terminationHandler = { terminated in
+            startupOutput.finishReading(from: outputPipe)
+            let terminatedPID = terminated.processIdentifier
             Task {
                 await controller.handleProcessTermination(
                     profileID: recordID,
-                    exitCode: terminated.terminationStatus
+                    pid: terminatedPID,
+                    exitCode: terminated.terminationStatus,
+                    capturedOutput: startupOutput.output
                 )
             }
         }
@@ -224,11 +267,63 @@ actor EZRWorkerSupervisorController {
             return (false, error.localizedDescription)
         }
 
+        return await waitForGatewayReady(
+            record: record,
+            pid: process.processIdentifier,
+            ownership: .supervised,
+            requireSameListeningPID: false,
+            startupOutput: startupOutput
+        )
+    }
+
+    private func waitForGatewayReady(
+        record: SupervisorRecord,
+        pid: Int32?,
+        ownership: SupervisorOwnership,
+        requireSameListeningPID: Bool,
+        startupOutput: ProcessOutputCollector? = nil
+    ) async -> (Bool, String?) {
+        record.isRunning = true
+        record.pid = pid
+        record.readyState = .starting
+        record.ownership = ownership
+        record.lastError = nil
+
         for _ in 0..<Self.gatewayStartupProbeAttempts {
-            if let process = record.process, !process.isRunning {
-                let message = record.lastError ?? "Gateway 异常退出"
+            if Task.isCancelled {
+                _ = await stopRecord(record)
+                return (false, "Gateway 启动已取消")
+            }
+
+            if ownership == .supervised,
+               record.process == nil,
+               record.readyState == .failed {
+                return (false, record.lastError ?? "Gateway 异常退出")
+            }
+
+            if ownership == .supervised,
+               let process = record.process,
+               !process.isRunning {
+                let message =
+                    record.lastError
+                    ?? extractStartupFailureMessage(from: startupOutput?.output)
+                    ?? "Gateway 异常退出"
                 record.readyState = .failed
                 record.isRunning = false
+                record.ownership = .none
+                record.lastError = message
+                return (false, message)
+            }
+
+            if requireSameListeningPID,
+               let pid,
+               let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort),
+               currentPID != pid {
+                let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                record.readyState = .failed
+                record.isRunning = false
+                record.ownership = .none
+                record.lastError = message
                 return (false, message)
             }
 
@@ -237,15 +332,39 @@ actor EZRWorkerSupervisorController {
             if probe.ready {
                 record.readyState = .ready
                 record.isRunning = true
+                record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
+                record.lastError = nil
                 return (true, nil)
             }
             try? await Task.sleep(nanoseconds: Self.gatewayStartupProbeIntervalNanoseconds)
         }
 
-        _ = await stopProfile(profileID: profileID)
+        let finalProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        record.lastProbeAt = Date()
+        if finalProbe.ready {
+            record.readyState = .ready
+            record.isRunning = true
+            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
+            record.lastError = nil
+            return (true, nil)
+        }
+
+        if ownership == .supervised, record.process?.isRunning == true {
+            let capturedOutput = startupOutput?.output
+            _ = await stopProfile(profileID: record.profile.id)
+            let message =
+                extractStartupFailureMessage(from: capturedOutput)
+                ?? "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
+            record.lastError = message
+            record.readyState = .failed
+            return (false, message)
+        }
+
         let message = "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
         record.lastError = message
         record.readyState = .failed
+        record.isRunning = false
+        record.ownership = .none
         return (false, message)
     }
 
@@ -254,6 +373,10 @@ actor EZRWorkerSupervisorController {
             return (true, nil)
         }
 
+        return await stopRecord(record)
+    }
+
+    private func stopRecord(_ record: SupervisorRecord) async -> (Bool, String?) {
         if let process = record.process, process.isRunning {
             process.terminationHandler = nil
             process.terminate()
@@ -297,7 +420,12 @@ actor EZRWorkerSupervisorController {
     }
 
     func reconcileLaunchState() async {
-        loadProfilesFromDisk()
+        let removedRecords = loadProfilesFromDisk()
+        for record in removedRecords {
+            inFlightStartTasks[record.profile.id]?.cancel()
+            inFlightStartTasks.removeValue(forKey: record.profile.id)
+            _ = await stopRecord(record)
+        }
         scheduleAutoStartReconcile()
     }
 
@@ -328,11 +456,14 @@ actor EZRWorkerSupervisorController {
         }
     }
 
-    private func loadProfilesFromDisk() {
+    @discardableResult
+    private func loadProfilesFromDisk() -> [SupervisorRecord] {
         guard let document = Self.readProfilesDocumentFromDisk() else {
+            let removedRecords = Array(records.values)
             profiles = [:]
             profileOrder = []
-            return
+            records = [:]
+            return removedRecords
         }
 
         let orderedProfiles = Self.sortedProfiles(from: document)
@@ -346,9 +477,13 @@ actor EZRWorkerSupervisorController {
         }
 
         let knownIDs = Set(orderedProfiles.map(\.id))
+        var removedRecords: [SupervisorRecord] = []
         for recordID in Array(records.keys) where !knownIDs.contains(recordID) {
-            records.removeValue(forKey: recordID)
+            if let record = records.removeValue(forKey: recordID) {
+                removedRecords.append(record)
+            }
         }
+        return removedRecords
     }
 
     private static func readProfilesDocumentFromDisk() -> GatewayProfilesDocument? {
@@ -376,17 +511,47 @@ actor EZRWorkerSupervisorController {
         return created
     }
 
-    private func handleProcessTermination(profileID: UUID, exitCode: Int32) {
+    private func handleProcessTermination(
+        profileID: UUID,
+        pid terminatedPID: Int32,
+        exitCode: Int32,
+        capturedOutput: String?
+    ) async {
         guard let record = records[profileID] else { return }
-        record.process = nil
+
+        let terminatedWasCurrent =
+            record.process?.processIdentifier == terminatedPID
+            || record.pid == terminatedPID
+
+        if record.process?.processIdentifier == terminatedPID {
+            record.process = nil
+        }
+
+        if !terminatedWasCurrent {
+            record.lastProbeAt = Date()
+            return
+        }
+
+        let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        record.lastProbeAt = Date()
+        if probe.ready {
+            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            record.isRunning = true
+            record.ownership = .adopted
+            record.readyState = .ready
+            record.lastError = nil
+            return
+        }
+
         record.pid = nil
         record.isRunning = false
         record.ownership = .none
         if record.readyState != .stopped {
             record.readyState = .failed
-            record.lastError = "Gateway 异常退出 (exit \(exitCode))"
+            record.lastError =
+                extractStartupFailureMessage(from: capturedOutput)
+                ?? "Gateway 异常退出 (exit \(exitCode))"
         }
-        record.lastProbeAt = Date()
     }
 
     private func ensureProfileDirectories(_ resolution: GatewayProfileResolution) throws {
@@ -400,6 +565,168 @@ actor EZRWorkerSupervisorController {
         for directory in directories {
             try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
         }
+    }
+
+    private func reconcileManagedConfigLayoutIfNeeded(_ resolution: GatewayProfileResolution) throws {
+        guard resolution.sourceKind == .managed,
+              let legacyConfigURL = resolution.legacyManagedConfigURL,
+              legacyConfigURL.standardizedFileURL.path != resolution.configURL.standardizedFileURL.path
+        else {
+            return
+        }
+
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: legacyConfigURL.path) else { return }
+
+        let canonicalConfigURL = resolution.configURL
+        guard let migratedLegacyRoot = migratedLegacyConfigRoot(from: legacyConfigURL) else {
+            return
+        }
+
+        if !fm.fileExists(atPath: canonicalConfigURL.path) {
+            try writeJSONObject(migratedLegacyRoot, to: canonicalConfigURL)
+            return
+        }
+
+        guard let canonicalRoot = loadJSONObject(at: canonicalConfigURL) else {
+            try writeJSONObject(migratedLegacyRoot, to: canonicalConfigURL)
+            return
+        }
+
+        guard shouldPromoteLegacyConfig(
+            migratedLegacyRoot,
+            over: canonicalRoot,
+            legacyConfigURL: legacyConfigURL,
+            canonicalConfigURL: canonicalConfigURL
+        ) else {
+            return
+        }
+
+        var mergedRoot = canonicalRoot
+        for (key, value) in migratedLegacyRoot where key != "gateway" {
+            mergedRoot[key] = value
+        }
+
+        guard !jsonObjectsEqual(mergedRoot, canonicalRoot) else { return }
+        try writeJSONObject(mergedRoot, to: canonicalConfigURL)
+    }
+
+    private func migratedLegacyConfigRoot(
+        from legacyConfigURL: URL
+    ) -> [String: Any]? {
+        guard var root = loadJSONObject(at: legacyConfigURL) else { return nil }
+        root = rewriteRelativeSecretProviderPaths(
+            in: root,
+            from: legacyConfigURL.deletingLastPathComponent()
+        )
+        return root
+    }
+
+    private func rewriteRelativeSecretProviderPaths(
+        in root: [String: Any],
+        from sourceDirectoryURL: URL
+    ) -> [String: Any] {
+        guard var secrets = root["secrets"] as? [String: Any],
+              var providers = secrets["providers"] as? [String: Any]
+        else {
+            return root
+        }
+
+        for (providerID, rawProvider) in providers {
+            guard var provider = rawProvider as? [String: Any],
+                  let rawPath = provider["path"] as? String
+            else {
+                continue
+            }
+
+            let trimmedPath = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+            let expandedPath = NSString(string: trimmedPath).expandingTildeInPath
+            guard !expandedPath.isEmpty, !expandedPath.hasPrefix("/") else { continue }
+
+            let absoluteSourceURL = sourceDirectoryURL
+                .appendingPathComponent(expandedPath)
+                .standardizedFileURL
+            provider["path"] = absoluteSourceURL.path
+            providers[providerID] = provider
+        }
+
+        var updatedRoot = root
+        secrets["providers"] = providers
+        updatedRoot["secrets"] = secrets
+        return updatedRoot
+    }
+
+    private func shouldPromoteLegacyConfig(
+        _ legacyRoot: [String: Any],
+        over canonicalRoot: [String: Any],
+        legacyConfigURL: URL,
+        canonicalConfigURL: URL
+    ) -> Bool {
+        if meaningfulConfigSectionCount(in: canonicalRoot) == 0,
+           meaningfulConfigSectionCount(in: legacyRoot) > 0 {
+            return true
+        }
+
+        guard let legacyModifiedAt = modificationDate(for: legacyConfigURL),
+              let canonicalModifiedAt = modificationDate(for: canonicalConfigURL) else {
+            return false
+        }
+        return legacyModifiedAt > canonicalModifiedAt
+    }
+
+    private func meaningfulConfigSectionCount(in root: [String: Any]) -> Int {
+        Self.meaningfulLegacyConfigKeys.reduce(into: 0) { count, key in
+            if isMeaningfulJSONObjectValue(root[key]) {
+                count += 1
+            }
+        }
+    }
+
+    private func isMeaningfulJSONObjectValue(_ value: Any?) -> Bool {
+        switch value {
+        case let string as String:
+            return !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case let dictionary as [String: Any]:
+            return !dictionary.isEmpty
+        case let array as [Any]:
+            return !array.isEmpty
+        case nil, is NSNull:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func loadJSONObject(at url: URL) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return nil
+        }
+        return json
+    }
+
+    private func writeJSONObject(_ root: [String: Any], to url: URL) throws {
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: url, options: .atomic)
+    }
+
+    private func jsonObjectsEqual(_ lhs: [String: Any], _ rhs: [String: Any]) -> Bool {
+        guard JSONSerialization.isValidJSONObject(lhs),
+              JSONSerialization.isValidJSONObject(rhs),
+              let lhsData = try? JSONSerialization.data(withJSONObject: lhs, options: [.sortedKeys]),
+              let rhsData = try? JSONSerialization.data(withJSONObject: rhs, options: [.sortedKeys])
+        else {
+            return false
+        }
+        return lhsData == rhsData
+    }
+
+    private func modificationDate(for url: URL) -> Date? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return nil
+        }
+        return attributes[.modificationDate] as? Date
     }
 
     private func normalizeConfig(for resolution: GatewayProfileResolution) throws {
@@ -450,6 +777,27 @@ actor EZRWorkerSupervisorController {
 
         return UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased().prefix(16)
+    }
+
+    private func extractStartupFailureMessage(from output: String?) -> String? {
+        guard let output else { return nil }
+
+        let lines = output
+            .components(separatedBy: .newlines)
+            .map(Self.stripANSIEscapeCodes)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for line in lines.reversed() where !line.localizedCaseInsensitiveContains("OpenClaw") {
+            if line.localizedCaseInsensitiveContains("Gateway failed to start:") {
+                return line
+            }
+            if line.localizedCaseInsensitiveContains("error:") {
+                return line
+            }
+        }
+
+        return lines.last
     }
 
     private func configToken(at url: URL) -> String? {
@@ -583,12 +931,61 @@ actor EZRWorkerSupervisorController {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)
     }
+
+    private static func stripANSIEscapeCodes(from text: String) -> String {
+        guard
+            let regex = try? NSRegularExpression(
+                pattern: #"\u{001B}\[[0-?]*[ -/]*[@-~]"#,
+                options: []
+            )
+        else {
+            return text
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
+    }
 }
 
 private enum ExistingGatewayDisposition {
     case adopt(Int32?)
     case relaunch
     case fail(String)
+}
+
+private final class ProcessOutputCollector {
+    private let lock = NSLock()
+    private var data = Data()
+
+    func attach(to pipe: Pipe) {
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let chunk = handle.availableData
+            guard !chunk.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
+            self?.append(chunk)
+        }
+    }
+
+    func finishReading(from pipe: Pipe) {
+        pipe.fileHandleForReading.readabilityHandler = nil
+        let remaining = pipe.fileHandleForReading.readDataToEndOfFile()
+        append(remaining)
+    }
+
+    var output: String {
+        lock.lock()
+        defer { lock.unlock() }
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    private func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
 }
 
 final class EZRWorkerSupervisorService: NSObject, EZRWorkerSupervisorProtocol {

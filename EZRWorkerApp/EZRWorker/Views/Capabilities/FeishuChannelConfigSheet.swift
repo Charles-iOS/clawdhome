@@ -114,11 +114,13 @@ enum ChannelPairingDataLoader {
         for channel: ChannelType,
         localPaths: GatewayProfileLocalPaths?
     ) -> [PairingRequest] {
-        guard let credentialsDirectory = localPaths?.credentialsDirectoryURL else {
+        guard let localPaths else {
             return []
         }
-        let pairingFile = credentialsDirectory.appendingPathComponent("\(channel.rawValue)-pairing.json")
-        guard let data = FileManager.default.contents(atPath: pairingFile.path),
+        let pairingFile = localPaths.credentialFileCandidates(named: "\(channel.rawValue)-pairing.json")
+            .first(where: { FileManager.default.fileExists(atPath: $0.path) })
+        guard let pairingFile,
+              let data = FileManager.default.contents(atPath: pairingFile.path),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let rawRequests = json["requests"] as? [[String: Any]] else {
             return []
@@ -165,18 +167,19 @@ enum ChannelPairingDataLoader {
         localPaths: GatewayProfileLocalPaths?
     ) -> [PairingPeer] {
         guard let localPaths else { return [] }
-        let credentialsDirectory = localPaths.credentialsDirectoryURL
         var peersByID: [String: PairingPeer] = [:]
 
-        let storePeers: [PairingPeer]
-        if channel == .feishu {
-            storePeers = loadFeishuApprovedPeers(credentialsDirectory: credentialsDirectory)
-        } else {
-            storePeers = loadStoreApprovedPeers(for: channel, credentialsDirectory: credentialsDirectory)
-        }
+        for credentialsDirectory in localPaths.credentialsDirectoryCandidates {
+            let storePeers: [PairingPeer]
+            if channel == .feishu {
+                storePeers = loadFeishuApprovedPeers(credentialsDirectory: credentialsDirectory)
+            } else {
+                storePeers = loadStoreApprovedPeers(for: channel, credentialsDirectory: credentialsDirectory)
+            }
 
-        for peer in storePeers {
-            merge(peer, into: &peersByID)
+            for peer in storePeers {
+                merge(peer, into: &peersByID)
+            }
         }
 
         for peerId in ChannelConfigSupport.allowFromPeerIDs(for: channel, localPaths: localPaths) {
@@ -375,7 +378,7 @@ enum ChannelConfigSupport {
         channels[channel.rawValue] = channelConfig
         rootConfig["channels"] = channels
 
-        let configURL = localPaths.configURL
+        let configURL = localPaths.preferredConfigWriteURL
         guard JSONSerialization.isValidJSONObject(rootConfig) else {
             throw ChannelConfigValidationError(message: "本地 OpenClaw 配置不是合法 JSON，无法更新私信白名单。")
         }
@@ -460,14 +463,7 @@ enum ChannelConfigSupport {
     }
 
     private static func loadLocalConfigRoot(localPaths: GatewayProfileLocalPaths?) -> [String: Any] {
-        guard let configURL = localPaths?.configURL else {
-            return [:]
-        }
-        guard let data = FileManager.default.contents(atPath: configURL.path),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return [:]
-        }
-        return json
+        localPaths?.loadConfigRoot() ?? [:]
     }
 }
 
@@ -581,15 +577,24 @@ enum ChannelPairingMutationSupport {
 
 private enum FeishuChannelConfigSupport {
     static func hasQRCodeCredentials(localPaths: GatewayProfileLocalPaths?) -> Bool {
-        guard let credFile = localPaths?.credentialsDirectoryURL
-            .appendingPathComponent("lark.secrets.json") else {
+        guard let localPaths else {
             return false
         }
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
-              let fileSize = attrs[.size] as? NSNumber else {
-            return false
+        let candidateURLs = [
+            localPaths.existingSecretProviderFileURL(providerID: "lark-secrets"),
+            localPaths.existingCredentialFile(named: "lark.secrets.json"),
+        ].compactMap { $0 }
+
+        for fileURL in candidateURLs {
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                  let fileSize = attrs[.size] as? NSNumber else {
+                continue
+            }
+            if fileSize.intValue > 0 {
+                return true
+            }
         }
-        return fileSize.intValue > 0
+        return false
     }
 
     static func credentialMode(

@@ -255,9 +255,17 @@ struct ChannelView: View {
                 for field in channel.configFields {
                     if let value = chConfig[field.id] as? String, !value.isEmpty {
                         fields[field.id] = value
+                    } else if channel == .feishu,
+                              field.id == "appSecret",
+                              isConfiguredLeafValue(chConfig[field.id]) {
+                        fields[field.id] = "provider"
                     }
                 }
                 if channel.configFields.isEmpty, !chConfig.isEmpty {
+                    fields["configured"] = "true"
+                } else if channel == .feishu,
+                          fields.isEmpty,
+                          isChannelConfigConfigured(channel, config: chConfig, hasFeishuQRCodeCredentials: false) {
                     fields["configured"] = "true"
                 }
             } else {
@@ -275,25 +283,59 @@ struct ChannelView: View {
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
-        guard let credFile = selectedLocalPaths?.credentialsDirectoryURL
-            .appendingPathComponent("lark.secrets.json") else {
+        guard let localPaths = selectedLocalPaths else {
             return false
         }
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
-              let fileSize = attrs[.size] as? NSNumber else {
-            return false
+        let candidateURLs = [
+            localPaths.existingSecretProviderFileURL(providerID: "lark-secrets"),
+            localPaths.existingCredentialFile(named: "lark.secrets.json"),
+        ].compactMap { $0 }
+
+        for fileURL in candidateURLs {
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                  let fileSize = attrs[.size] as? NSNumber else {
+                continue
+            }
+            if fileSize.intValue > 0 {
+                return true
+            }
         }
-        return fileSize.intValue > 0
+        return false
+    }
+
+    private func isChannelConfigConfigured(
+        _ channel: ChannelType,
+        config: [String: Any],
+        hasFeishuQRCodeCredentials: Bool
+    ) -> Bool {
+        if channel == .feishu && hasFeishuQRCodeCredentials {
+            return true
+        }
+        if channel.configFields.isEmpty {
+            return !config.isEmpty
+        }
+        return channel.configFields.contains { field in
+            isConfiguredLeafValue(config[field.id])
+        }
+    }
+
+    private func isConfiguredLeafValue(_ rawValue: Any?) -> Bool {
+        switch rawValue {
+        case let value as String:
+            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case let value as [String: Any]:
+            return !value.isEmpty
+        case let value as [Any]:
+            return !value.isEmpty
+        case nil, is NSNull:
+            return false
+        default:
+            return true
+        }
     }
 
     private func loadLocalChannelConfigDictionary() -> [String: Any] {
-        guard let configURL = selectedLocalPaths?.configURL else {
-            return [:]
-        }
-        guard let data = FileManager.default.contents(atPath: configURL.path),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return [:]
-        }
+        guard let json = selectedLocalPaths?.loadConfigRoot() else { return [:] }
         return json["channels"] as? [String: Any] ?? [:]
     }
 

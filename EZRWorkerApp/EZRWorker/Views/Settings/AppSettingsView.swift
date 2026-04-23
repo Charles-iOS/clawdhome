@@ -625,6 +625,11 @@ struct AppSettingsView: View {
             try await ensureSupervisorReady()
             try await supervisorClient.stopProfile(profileID: profile.id)
             _ = try profileStore.deleteProfile(profileID: profile.id)
+            guard await supervisorClient.reloadProfiles() else {
+                throw NSError(domain: "AppSettingsView", code: 3, userInfo: [
+                    NSLocalizedDescriptionKey: "Profile 已删除，但 Supervisor 同步新列表失败"
+                ])
+            }
             await processManager.refreshRuntimeState()
         } catch {
             profileErrorMessage = error.localizedDescription

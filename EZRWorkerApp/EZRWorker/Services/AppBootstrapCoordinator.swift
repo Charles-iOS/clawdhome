@@ -151,8 +151,8 @@ final class AppBootstrapCoordinator {
         let currentUsername = NSUserName()
         workspaceManager.configure(profile: selectedResolution)
 
-        let configURL = URL(fileURLWithPath: runtime.resolvedConfigPath)
-        guard let token = await Self.waitForGatewayToken(configURL: configURL) else {
+        let configURLs = selectedResolution.localPaths.configSnapshotURLs
+        guard let token = await Self.waitForGatewayToken(configURLs: configURLs) else {
             throw NSError(domain: "AppBootstrapCoordinator", code: 8, userInfo: [
                 NSLocalizedDescriptionKey: "Gateway 已启动，但当前 profile 的 gateway token 尚未写入配置"
             ])
@@ -236,19 +236,24 @@ final class AppBootstrapCoordinator {
         return token
     }
 
-    private static func waitForGatewayToken(configURL: URL) async -> String? {
-        if let token = readGatewayToken(configURL: configURL) {
-            return token
-        }
-
-        for _ in 0..<20 {
-            try? await Task.sleep(nanoseconds: 500_000_000)
+    private static func waitForGatewayToken(configURLs: [URL]) async -> String? {
+        for configURL in configURLs {
             if let token = readGatewayToken(configURL: configURL) {
                 return token
             }
         }
 
-        appLog("bootstrap: gateway token did not appear in \(configURL.path)", level: .error)
+        for _ in 0..<20 {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            for configURL in configURLs {
+                if let token = readGatewayToken(configURL: configURL) {
+                    return token
+                }
+            }
+        }
+
+        let paths = configURLs.map(\.path).joined(separator: ", ")
+        appLog("bootstrap: gateway token did not appear in \(paths)", level: .error)
         return nil
     }
 

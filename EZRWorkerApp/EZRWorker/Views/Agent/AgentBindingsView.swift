@@ -437,15 +437,7 @@ private struct AddBindingSheet: View {
                 continue
             }
             if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
-                // 纯扫码渠道无 configFields，有配置即视为已配置
-                if channel.configFields.isEmpty {
-                    result[channel] = !chConfig.isEmpty
-                } else {
-                    result[channel] = channel.configFields.contains { field in
-                        guard let value = chConfig[field.id] as? String else { return false }
-                        return !value.isEmpty
-                    }
-                }
+                result[channel] = isChannelConfigConfigured(channel, config: chConfig)
             } else {
                 result[channel] = false
             }
@@ -461,25 +453,52 @@ private struct AddBindingSheet: View {
     }
 
     private func hasFeishuQRCodeCredentials() -> Bool {
-        guard let credFile = selectedLocalPaths?.credentialsDirectoryURL
-            .appendingPathComponent("lark.secrets.json") else {
+        guard let localPaths = selectedLocalPaths else {
             return false
         }
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: credFile.path),
-              let fileSize = attrs[.size] as? NSNumber else {
-            return false
+        let candidateURLs = [
+            localPaths.existingSecretProviderFileURL(providerID: "lark-secrets"),
+            localPaths.existingCredentialFile(named: "lark.secrets.json"),
+        ].compactMap { $0 }
+
+        for fileURL in candidateURLs {
+            guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                  let fileSize = attrs[.size] as? NSNumber else {
+                continue
+            }
+            if fileSize.intValue > 0 {
+                return true
+            }
         }
-        return fileSize.intValue > 0
+        return false
+    }
+
+    private func isChannelConfigConfigured(_ channel: ChannelType, config: [String: Any]) -> Bool {
+        if channel.configFields.isEmpty {
+            return !config.isEmpty
+        }
+        return channel.configFields.contains { field in
+            isConfiguredLeafValue(config[field.id])
+        }
+    }
+
+    private func isConfiguredLeafValue(_ rawValue: Any?) -> Bool {
+        switch rawValue {
+        case let value as String:
+            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case let value as [String: Any]:
+            return !value.isEmpty
+        case let value as [Any]:
+            return !value.isEmpty
+        case nil, is NSNull:
+            return false
+        default:
+            return true
+        }
     }
 
     private func loadLocalChannelConfigDictionary() -> [String: Any] {
-        guard let configURL = selectedLocalPaths?.configURL else {
-            return [:]
-        }
-        guard let data = FileManager.default.contents(atPath: configURL.path),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return [:]
-        }
+        guard let json = selectedLocalPaths?.loadConfigRoot() else { return [:] }
         return json["channels"] as? [String: Any] ?? [:]
     }
 

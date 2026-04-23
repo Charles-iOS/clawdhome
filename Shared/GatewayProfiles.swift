@@ -27,7 +27,98 @@ struct GatewayProfilesDocument: Codable {
 struct GatewayProfileLocalPaths: Equatable, Hashable {
     var configURL: URL
     var configDirectoryURL: URL
+    var stateDirectoryURL: URL
     var credentialsDirectoryURL: URL
+    var legacyConfigURL: URL?
+    var legacyCredentialsDirectoryURL: URL?
+
+    var runtimeConfigURL: URL {
+        stateDirectoryURL.appendingPathComponent("openclaw.json")
+    }
+
+    var configSnapshotURLs: [URL] {
+        dedupedURLs([configURL, runtimeConfigURL, legacyConfigURL].compactMap { $0 })
+    }
+
+    var credentialsDirectoryCandidates: [URL] {
+        dedupedURLs([
+            stateDirectoryURL.appendingPathComponent("credentials", isDirectory: true),
+            credentialsDirectoryURL,
+            legacyCredentialsDirectoryURL,
+        ].compactMap { $0 })
+    }
+
+    var preferredConfigWriteURL: URL {
+        configURL
+    }
+
+    func loadConfigRoot() -> [String: Any] {
+        for url in configSnapshotURLs {
+            if let json = Self.loadJSONObject(at: url) {
+                return json
+            }
+        }
+        return [:]
+    }
+
+    func credentialFileCandidates(named fileName: String) -> [URL] {
+        credentialsDirectoryCandidates.map { directory in
+            directory.appendingPathComponent(fileName)
+        }
+    }
+
+    func existingCredentialFile(named fileName: String) -> URL? {
+        credentialFileCandidates(named: fileName)
+            .first(where: { FileManager.default.fileExists(atPath: $0.path) })
+    }
+
+    func secretProviderFileURL(providerID: String) -> URL? {
+        for url in configSnapshotURLs {
+            guard let root = Self.loadJSONObject(at: url),
+                  let secrets = root["secrets"] as? [String: Any],
+                  let providers = secrets["providers"] as? [String: Any],
+                  let provider = providers[providerID] as? [String: Any],
+                  let rawPath = provider["path"] as? String else {
+                continue
+            }
+            return Self.resolveFileURL(rawPath, relativeTo: url.deletingLastPathComponent())
+        }
+        return nil
+    }
+
+    func existingSecretProviderFileURL(providerID: String) -> URL? {
+        guard let url = secretProviderFileURL(providerID: providerID),
+              FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+        return url
+    }
+
+    private static func loadJSONObject(at url: URL) -> [String: Any]? {
+        guard let data = FileManager.default.contents(atPath: url.path),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+        return json
+    }
+
+    private static func resolveFileURL(_ rawPath: String, relativeTo baseDirectoryURL: URL) -> URL {
+        let trimmed = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expanded = NSString(string: trimmed).expandingTildeInPath
+        if expanded.hasPrefix("/") {
+            return URL(fileURLWithPath: expanded)
+        }
+        return baseDirectoryURL.appendingPathComponent(expanded)
+    }
+
+    private func dedupedURLs(_ urls: [URL]) -> [URL] {
+        var seen = Set<String>()
+        var result: [URL] = []
+        for url in urls where seen.insert(url.standardizedFileURL.path).inserted {
+            result.append(url)
+        }
+        return result
+    }
 }
 
 struct GatewayProfileResolution: Codable, Equatable, Hashable {
@@ -41,17 +132,35 @@ struct GatewayProfileResolution: Codable, Equatable, Hashable {
     var resolvedPort: Int
 
     var configURL: URL { URL(fileURLWithPath: resolvedConfigPath) }
+    var runtimeConfigURL: URL { stateDirURL.appendingPathComponent("openclaw.json") }
     var configDirectoryURL: URL { configURL.deletingLastPathComponent() }
     var credentialsDirectoryURL: URL {
         configDirectoryURL.appendingPathComponent("credentials", isDirectory: true)
     }
     var stateDirURL: URL { URL(fileURLWithPath: resolvedStateDir, isDirectory: true) }
     var workspaceRootURL: URL { URL(fileURLWithPath: resolvedWorkspaceRoot, isDirectory: true) }
+    var legacyManagedRootURL: URL? {
+        guard sourceKind == .managed else { return nil }
+        guard configURL.standardizedFileURL.path == runtimeConfigURL.standardizedFileURL.path else {
+            return nil
+        }
+        guard stateDirURL.lastPathComponent == "state" else { return nil }
+        return stateDirURL.deletingLastPathComponent()
+    }
+    var legacyManagedConfigURL: URL? {
+        legacyManagedRootURL?.appendingPathComponent("openclaw.json")
+    }
+    var legacyManagedCredentialsDirectoryURL: URL? {
+        legacyManagedRootURL?.appendingPathComponent("credentials", isDirectory: true)
+    }
     var localPaths: GatewayProfileLocalPaths {
         GatewayProfileLocalPaths(
             configURL: configURL,
             configDirectoryURL: configDirectoryURL,
-            credentialsDirectoryURL: credentialsDirectoryURL
+            stateDirectoryURL: stateDirURL,
+            credentialsDirectoryURL: credentialsDirectoryURL,
+            legacyConfigURL: legacyManagedConfigURL,
+            legacyCredentialsDirectoryURL: legacyManagedCredentialsDirectoryURL
         )
     }
 
@@ -179,9 +288,16 @@ enum GatewayProfileResolver {
         let stateDir = profile.stateDirOverride
             .flatMap(Self.absoluteURLIfValid(path:))
             ?? managedRoot.appendingPathComponent("state", isDirectory: true)
+        let defaultConfigURL: URL
+        switch profile.sourceKind {
+        case .managed:
+            defaultConfigURL = stateDir.appendingPathComponent("openclaw.json")
+        case .legacyReuse:
+            defaultConfigURL = managedRoot.appendingPathComponent("openclaw.json")
+        }
         let configURL = profile.configPathOverride
             .flatMap(Self.absoluteURLIfValid(path:))
-            ?? managedRoot.appendingPathComponent("openclaw.json")
+            ?? defaultConfigURL
         let workspaceRoot = profile.workspaceRootOverride
             .flatMap(Self.absoluteURLIfValid(path:))
             ?? stateDir.appendingPathComponent("workspace", isDirectory: true)
