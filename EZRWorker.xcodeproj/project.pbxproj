@@ -136,6 +136,16 @@
 		7F01095C41E7284CAF0119E5 /* ProviderKeyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B57166787F28D6CA0DC966 /* ProviderKeyConfig.swift */; };
 		8093AFA6118892180BBEB830 /* UserDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EDBB82362FBD65CA0EB745 /* UserDirectoryService.swift */; };
 		816163E208A30C242C77413F /* SupervisorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */; };
+		A1C000000000000000000001 /* SupervisorRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000001 /* SupervisorRecord.swift */; };
+		A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000002 /* SupervisorController+Profiles.swift */; };
+		A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000003 /* SupervisorController+AutoStart.swift */; };
+		A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */; };
+		A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000005 /* SupervisorController+Readiness.swift */; };
+		A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000006 /* SupervisorController+Config.swift */; };
+		A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */; };
+		A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */; };
+		A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000009 /* ProcessOutputCollector.swift */; };
+		A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */; };
 		81DD6EB14A52BA5DC1D1A6B7 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0B7A4C6E52DA59C04D7A051 /* SystemConfiguration.framework */; };
 		8239CDB3AC1AFE7C7F476A23 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A58E344AB8D39F8E09BCE42 /* ProcessManager.swift */; };
 		82EB45092DE1110669843D4F /* PortAllocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53929C9886023FF85F7BA88E /* PortAllocator.swift */; };
@@ -454,6 +464,16 @@
 		E2CE856C50D2EFD17B00A5C6 /* UpdateCheckPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckPolicy.swift; sourceTree = "<group>"; };
 		E3A166CCCC9E924E212D44E7 /* InstallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallManager.swift; sourceTree = "<group>"; };
 		E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorController.swift; sourceTree = "<group>"; };
+		A1F000000000000000000001 /* SupervisorRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorRecord.swift; sourceTree = "<group>"; };
+		A1F000000000000000000002 /* SupervisorController+Profiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Profiles.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000003 /* SupervisorController+AutoStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+AutoStart.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Lifecycle.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000005 /* SupervisorController+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Readiness.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000006 /* SupervisorController+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Config.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+GatewayProcess.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000009 /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
+		A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
 		E7FD8336226F6CD693C12B80 /* GatewayCronModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronModels.swift; sourceTree = "<group>"; };
 		EA4DB2255DD0BABA2748481C /* HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthCheck.swift; sourceTree = "<group>"; };
 		EA587CAEEC9E0880E72A31EA /* EZRWorkerHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerHelper; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -698,6 +718,16 @@
 			children = (
 				7B3B624688C78F5F968C4BED /* main.swift */,
 				E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */,
+				A1F000000000000000000001 /* SupervisorRecord.swift */,
+				A1F000000000000000000002 /* SupervisorController+Profiles.swift */,
+				A1F000000000000000000003 /* SupervisorController+AutoStart.swift */,
+				A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */,
+				A1F000000000000000000005 /* SupervisorController+Readiness.swift */,
+				A1F000000000000000000006 /* SupervisorController+Config.swift */,
+				A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */,
+				A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */,
+				A1F000000000000000000009 /* ProcessOutputCollector.swift */,
+				A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */,
 			);
 			path = EZRWorkerSupervisor;
 			sourceTree = "<group>";
@@ -1427,6 +1457,16 @@
 				F7B2439907A521F18192A0B6 /* OpenClawRuntime.swift in Sources */,
 				546EC8249B3774DA048428B9 /* ProcessModels.swift in Sources */,
 				816163E208A30C242C77413F /* SupervisorController.swift in Sources */,
+				A1C000000000000000000001 /* SupervisorRecord.swift in Sources */,
+				A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */,
+				A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */,
+				A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */,
+				A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */,
+				A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */,
+				A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */,
+				A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */,
+				A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */,
+				A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */,
 				E86F287DDA71CE8B3485951A /* SupervisorProtocol.swift in Sources */,
 				AB3B802AE7680B5CB4EFB2B0 /* UserAdoptionFlow.swift in Sources */,
 				725139BB755221E62DA5B75C /* UserDetailWindowLayout.swift in Sources */,
