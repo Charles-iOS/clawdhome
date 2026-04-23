@@ -272,7 +272,7 @@ struct AppSettingsView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 profileInfoRow("端口", "\(runtime?.resolvedPort ?? resolution.resolvedPort)")
-                profileInfoRow("Prepared", runtime?.isPrepared == true ? "是" : "否")
+                profileInfoRow("配置已准备", runtime?.isPrepared == true ? "是" : "否")
                 profileInfoRow("运行权属", profileOwnershipLabel(for: runtime))
                 profileInfoRow("PID", runtime?.pid.map(String.init) ?? "—")
                 profileInfoRow("最近探测", probeTimeLabel(for: runtime?.lastProbeAt))
@@ -300,13 +300,15 @@ struct AppSettingsView: View {
                     .disabled(isBusy)
                 }
 
-                Button("预热") {
-                    Task {
-                        await runProfileAction(.prepare, profile: profile)
+                if shouldShowPrepareAction(for: runtime) {
+                    Button(prepareActionTitle(for: runtime)) {
+                        Task {
+                            await runProfileAction(.prepare, profile: profile)
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
                 }
-                .buttonStyle(.bordered)
-                .disabled(isBusy || profileRuntimeIsTransitional(runtime))
 
                 if runtime?.isRunning == true {
                     Button("停止") {
@@ -463,13 +465,13 @@ struct AppSettingsView: View {
         case .unknown:
             return runtime.isRunning ? "运行中" : "未知"
         case .stopped:
-            return runtime.isPrepared ? "已停止" : "未预热"
+            return runtime.isPrepared ? "已停止" : "未准备"
         case .preparing:
-            return "预热中"
+            return "准备中"
         case .starting:
             return "启动中"
         case .ready:
-            return runtime.isRunning ? "运行中" : "已预热"
+            return runtime.isRunning ? "运行中" : "已准备"
         case .failed:
             return "异常"
         }
@@ -516,6 +518,14 @@ struct AppSettingsView: View {
         default:
             return false
         }
+    }
+
+    private func shouldShowPrepareAction(for runtime: SupervisorProfileRuntime?) -> Bool {
+        runtime?.isRunning != true
+    }
+
+    private func prepareActionTitle(for runtime: SupervisorProfileRuntime?) -> String {
+        runtime?.isPrepared == true ? "重新准备配置" : "准备配置"
     }
 
     private func updateAutoStart(enabled: Bool, for profileID: UUID) {
