@@ -1,6 +1,20 @@
 import Foundation
 
 enum OpenClawRuntime {
+    private static let inheritedSupervisorMarkerKeys = [
+        "LAUNCH_JOB_LABEL",
+        "LAUNCH_JOB_NAME",
+        "XPC_SERVICE_NAME",
+        "OPENCLAW_LAUNCHD_LABEL",
+        "OPENCLAW_SYSTEMD_UNIT",
+        "INVOCATION_ID",
+        "SYSTEMD_EXEC_PID",
+        "JOURNAL_STREAM",
+        "OPENCLAW_WINDOWS_TASK_NAME",
+        "OPENCLAW_SERVICE_MARKER",
+        "OPENCLAW_SERVICE_KIND",
+    ]
+
     static var bundledNodeURL: URL {
         runtimeRootURL.appendingPathComponent("node/bin/node")
     }
@@ -28,6 +42,11 @@ enum OpenClawRuntime {
         // Letting an inherited OPENCLAW_PROFILE leak through makes OpenClaw
         // derive legacy ~/.openclaw/workspace-<profile> defaults again.
         environment.removeValue(forKey: "OPENCLAW_PROFILE")
+        for key in inheritedSupervisorMarkerKeys {
+            environment.removeValue(forKey: key)
+        }
+        environment["EZRWORKER_SUPERVISOR_CHILD"] = "1"
+        environment["OPENCLAW_NO_RESPAWN"] = "1"
 
         if let profile {
             environment["OPENCLAW_CONFIG_PATH"] = profile.resolvedConfigPath

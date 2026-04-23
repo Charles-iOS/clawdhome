@@ -45,8 +45,12 @@ final class SupervisorRecord {
 }
 
 actor EZRWorkerSupervisorController {
-    private static let gatewayStartupProbeAttempts = 90
+    private static let gatewayStartupProbeAttempts = 240
     private static let gatewayStartupProbeIntervalNanoseconds: UInt64 = 1_000_000_000
+    private static let gatewayRestartHandoffWindow: TimeInterval = 60
+    private static let maxGatewayRestartHandoffsInWindow = 3
+    private static let gatewayRestartHandoffLimitMessage =
+        "Gateway 连续请求 supervisor restart，已停止自动重启以避免循环"
     private static let meaningfulLegacyConfigKeys: Set<String> = [
         "agents",
         "bindings",
@@ -59,6 +63,7 @@ actor EZRWorkerSupervisorController {
     private var profileOrder: [UUID] = []
     private var records: [UUID: SupervisorRecord] = [:]
     private var inFlightStartTasks: [UUID: Task<(Bool, String?), Never>] = [:]
+    private var restartHandoffTimestamps: [UUID: [Date]] = [:]
     private var isReconcilingAutoStart = false
     private var needsAutoStartReconcile = false
 
@@ -161,6 +166,14 @@ actor EZRWorkerSupervisorController {
             return (false, "Gateway 启动已取消")
         }
 
+        guard let profile = profiles[profileID] else {
+            return (false, "未找到 profile: \(profileID.uuidString)")
+        }
+        let record = recordForProfile(profile)
+        if let existingGatewayResult = await adoptExistingHealthyGatewayIfAvailable(for: record) {
+            return existingGatewayResult
+        }
+
         let prepareResult = await prepareProfile(profileID: profileID)
         guard prepareResult.0 else { return prepareResult }
         guard !Task.isCancelled else {
@@ -182,27 +195,8 @@ actor EZRWorkerSupervisorController {
             )
         }
 
-        let currentProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-        if currentProbe.ready {
-            let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
-            switch await existingGatewayDisposition(for: record, listeningPID: currentPID) {
-            case .adopt(let pid):
-                record.isRunning = true
-                record.readyState = .ready
-                record.ownership = .adopted
-                record.pid = pid
-                record.lastProbeAt = Date()
-                record.lastError = nil
-                return (true, nil)
-            case .relaunch:
-                break
-            case .fail(let message):
-                record.lastError = message
-                record.readyState = .failed
-                record.isRunning = false
-                record.ownership = .none
-                return (false, message)
-            }
+        if let existingGatewayResult = await adoptExistingHealthyGatewayIfAvailable(for: record) {
+            return existingGatewayResult
         }
 
         if let occupiedPID = gatewayPIDListening(onPort: record.resolution.resolvedPort) {
@@ -276,6 +270,42 @@ actor EZRWorkerSupervisorController {
         )
     }
 
+    private func adoptExistingHealthyGatewayIfAvailable(
+        for record: SupervisorRecord
+    ) async -> (Bool, String?)? {
+        let currentProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        guard currentProbe.alive else { return nil }
+
+        let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+        switch await healthyGatewayDisposition(for: record, listeningPID: currentPID) {
+        case .adopt(let pid):
+            record.lastProbeAt = Date()
+            if currentProbe.ready {
+                record.isPrepared = true
+                record.isRunning = true
+                record.readyState = .ready
+                record.ownership = .adopted
+                record.pid = pid
+                record.lastError = nil
+                return (true, nil)
+            }
+            return await waitForGatewayReady(
+                record: record,
+                pid: pid,
+                ownership: .adopted,
+                requireSameListeningPID: pid != nil
+            )
+        case .relaunch:
+            return nil
+        case .fail(let message):
+            record.lastError = message
+            record.readyState = .failed
+            record.isRunning = false
+            record.ownership = .none
+            return (false, message)
+        }
+    }
+
     private func waitForGatewayReady(
         record: SupervisorRecord,
         pid: Int32?,
@@ -330,6 +360,7 @@ actor EZRWorkerSupervisorController {
             let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
             record.lastProbeAt = Date()
             if probe.ready {
+                record.isPrepared = true
                 record.readyState = .ready
                 record.isRunning = true
                 record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
@@ -342,6 +373,7 @@ actor EZRWorkerSupervisorController {
         let finalProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
         record.lastProbeAt = Date()
         if finalProbe.ready {
+            record.isPrepared = true
             record.readyState = .ready
             record.isRunning = true
             record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
@@ -480,6 +512,7 @@ actor EZRWorkerSupervisorController {
         var removedRecords: [SupervisorRecord] = []
         for recordID in Array(records.keys) where !knownIDs.contains(recordID) {
             if let record = records.removeValue(forKey: recordID) {
+                restartHandoffTimestamps.removeValue(forKey: recordID)
                 removedRecords.append(record)
             }
         }
@@ -536,10 +569,46 @@ actor EZRWorkerSupervisorController {
         record.lastProbeAt = Date()
         if probe.ready {
             record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            record.isPrepared = true
             record.isRunning = true
             record.ownership = .adopted
             record.readyState = .ready
             record.lastError = nil
+            return
+        }
+        if probe.alive {
+            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            record.isRunning = true
+            record.ownership = .adopted
+            record.readyState = .starting
+            record.lastError = nil
+
+            Task { [profileID] in
+                _ = await self.startProfile(profileID: profileID)
+            }
+            return
+        }
+
+        if record.readyState != .stopped,
+           isSupervisorRestartHandoff(exitCode: exitCode, output: capturedOutput) {
+            guard recordRestartHandoff(for: profileID) else {
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .failed
+                record.lastError = Self.gatewayRestartHandoffLimitMessage
+                return
+            }
+
+            record.pid = nil
+            record.isRunning = false
+            record.ownership = .none
+            record.readyState = .starting
+            record.lastError = nil
+
+            Task { [profileID] in
+                _ = await self.startProfile(profileID: profileID)
+            }
             return
         }
 
@@ -552,6 +621,22 @@ actor EZRWorkerSupervisorController {
                 extractStartupFailureMessage(from: capturedOutput)
                 ?? "Gateway 异常退出 (exit \(exitCode))"
         }
+    }
+
+    private func isSupervisorRestartHandoff(exitCode: Int32, output: String?) -> Bool {
+        guard exitCode == 0, let output else { return false }
+        return Self.isSupervisorRestartHandoffMessage(Self.stripANSIEscapeCodes(from: output))
+    }
+
+    private func recordRestartHandoff(for profileID: UUID, now: Date = Date()) -> Bool {
+        let cutoff = now.addingTimeInterval(-Self.gatewayRestartHandoffWindow)
+        let recent = (restartHandoffTimestamps[profileID] ?? []).filter { $0 >= cutoff }
+        guard recent.count < Self.maxGatewayRestartHandoffsInWindow else {
+            restartHandoffTimestamps[profileID] = recent
+            return false
+        }
+        restartHandoffTimestamps[profileID] = recent + [now]
+        return true
     }
 
     private func ensureProfileDirectories(_ resolution: GatewayProfileResolution) throws {
@@ -787,6 +872,7 @@ actor EZRWorkerSupervisorController {
             .map(Self.stripANSIEscapeCodes)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+            .filter { !Self.isSupervisorRestartHandoffMessage($0) }
 
         for line in lines.reversed() where !line.localizedCaseInsensitiveContains("OpenClaw") {
             if line.localizedCaseInsensitiveContains("Gateway failed to start:") {
@@ -797,7 +883,30 @@ actor EZRWorkerSupervisorController {
             }
         }
 
-        return lines.last
+        return lines.reversed().first(where: { !Self.isBenignStartupProgressLine($0) })
+    }
+
+    private static func isSupervisorRestartHandoffMessage(_ text: String) -> Bool {
+        text.localizedCaseInsensitiveContains("restart mode:")
+            && text.localizedCaseInsensitiveContains("full process restart")
+            && text.localizedCaseInsensitiveContains("supervisor restart")
+    }
+
+    private static func isBenignStartupProgressLine(_ text: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return true }
+        return normalized.contains("[gateway] loading configuration")
+            || normalized.contains("[gateway] resolving authentication")
+            || normalized.contains("[gateway] starting")
+            || normalized.contains("[gateway] log file:")
+            || normalized.contains("[canvas] host mounted")
+            || normalized.contains("[health-monitor] started")
+            || normalized.contains("[heartbeat] started")
+            || normalized.hasPrefix("config ok:")
+            || normalized.hasPrefix("workspace ok:")
+            || normalized.hasPrefix("sessions ok:")
+            || normalized.hasPrefix("wrote ")
+            || normalized.hasPrefix("config overwrite:")
     }
 
     private func configToken(at url: URL) -> String? {
@@ -850,6 +959,39 @@ actor EZRWorkerSupervisorController {
         }
 
         return .fail("端口 \(record.resolution.resolvedPort) 上存在无法接管的旧 Gateway 进程")
+    }
+
+    private func healthyGatewayDisposition(
+        for record: SupervisorRecord,
+        listeningPID: Int32?
+    ) async -> ExistingGatewayDisposition {
+        guard record.profile.sourceKind == .managed else {
+            return .adopt(listeningPID)
+        }
+
+        guard let listeningPID else {
+            return .adopt(nil)
+        }
+
+        let ownedByRecord =
+            (record.process?.isRunning == true && record.process?.processIdentifier == listeningPID)
+            || record.pid == listeningPID
+        if ownedByRecord {
+            return .adopt(listeningPID)
+        }
+
+        guard let commandLine = processCommandLine(pid: listeningPID),
+              looksLikeGatewayProcess(commandLine)
+        else {
+            return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用")
+        }
+
+        clearRuntimeStateForGateway(
+            pid: listeningPID,
+            port: record.resolution.resolvedPort,
+            excluding: record.profile.id
+        )
+        return .adopt(listeningPID)
     }
 
     private func clearRuntimeStateForGateway(pid: Int32, port: Int, excluding profileID: UUID) {

@@ -13,7 +13,7 @@ final class SupervisorClient {
     private static let xpcTimeout: Duration = .seconds(20)
     private static let profilePrepareTimeout: Duration = .seconds(30)
     private static let profileStopTimeout: Duration = .seconds(30)
-    private static let profileStartTimeout: Duration = .seconds(120)
+    private static let profileStartTimeout: Duration = .seconds(300)
     private static let pingTimeoutNanoseconds: UInt64 = 1_000_000_000
 
     func connect() {
