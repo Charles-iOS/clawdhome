@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct AppRootGateView: View {
@@ -74,6 +75,26 @@ struct AuthenticatedAppShell: View {
             Task {
                 await bootstrapCoordinator.startIfNeeded()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            recoverGateway(trigger: .appActivated)
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)) { _ in
+            recoverGateway(trigger: .systemWake)
+        }
+        .onReceive(
+            DistributedNotificationCenter.default().publisher(
+                for: NSNotification.Name("com.apple.screenIsUnlocked")
+            )
+        ) { _ in
+            recoverGateway(trigger: .screenUnlocked)
+        }
+    }
+
+    private func recoverGateway(trigger: AppBootstrapCoordinator.RecoveryTrigger) {
+        guard profileStore.canBootstrap else { return }
+        Task {
+            await bootstrapCoordinator.recoverGatewayAfterInterruption(trigger: trigger)
         }
     }
 }

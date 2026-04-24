@@ -11,6 +11,13 @@ final class AppBootstrapCoordinator {
         case failed(String)
     }
 
+    enum RecoveryTrigger: String {
+        case reconnectLoop = "reconnect-loop"
+        case appActivated = "app-activated"
+        case systemWake = "system-wake"
+        case screenUnlocked = "screen-unlocked"
+    }
+
     private(set) var state: State = .idle
 
     @ObservationIgnored private let processManager: GatewayProcessManager
@@ -25,6 +32,8 @@ final class AppBootstrapCoordinator {
 
     @ObservationIgnored
     private var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored
+    private var recoveryTask: Task<Void, Never>?
     @ObservationIgnored
     private var gatewayDependentStartupCompleted = false
 
@@ -83,6 +92,8 @@ final class AppBootstrapCoordinator {
 
     func prepareForAppTermination() {
         stopReconnectLoop()
+        recoveryTask?.cancel()
+        recoveryTask = nil
         processManager.prepareForAppTermination()
         gatewayService.prepareForAppTermination()
         agentStore.markGatewayDisconnected()
@@ -184,12 +195,9 @@ final class AppBootstrapCoordinator {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 8_000_000_000)
                 guard !Task.isCancelled else { return }
-                if self.processManager.isRunning && !self.gatewayService.isConnected {
-                    await self.processManager.refreshRuntimeState()
-                    if await Self.connectGatewayService(gatewayService: self.gatewayService) {
-                        await self.completeGatewayDependentStartup(currentUsername: NSUserName())
-                    }
-                } else if self.gatewayService.isConnected {
+                if !self.gatewayService.isConnected {
+                    await self.recoverGatewayAfterInterruption(trigger: .reconnectLoop)
+                } else {
                     await self.completeGatewayDependentStartup(currentUsername: NSUserName())
                 }
             }
@@ -199,6 +207,125 @@ final class AppBootstrapCoordinator {
     private func stopReconnectLoop() {
         reconnectTask?.cancel()
         reconnectTask = nil
+    }
+
+    func recoverGatewayAfterInterruption(trigger: RecoveryTrigger) async {
+        if let recoveryTask {
+            await recoveryTask.value
+            return
+        }
+
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performGatewayRecovery(trigger: trigger)
+        }
+        recoveryTask = task
+        await task.value
+        recoveryTask = nil
+    }
+
+    private func performGatewayRecovery(trigger: RecoveryTrigger) async {
+        if trigger != .reconnectLoop {
+            appLog("bootstrap: recovery triggered by \(trigger.rawValue)")
+        }
+
+        await profileStore.loadIfNeeded()
+        guard profileStore.canBootstrap else {
+            if trigger != .reconnectLoop {
+                appLog("bootstrap: recovery skipped; profile store is not bootstrappable", level: .warn)
+            }
+            return
+        }
+
+        switch state {
+        case .idle, .failed:
+            await startIfNeeded()
+            return
+        case .starting:
+            return
+        case .started:
+            break
+        }
+
+        guard let selectedProfile = profileStore.selectedProfile,
+              let selectedResolution = profileStore.selectedResolution else {
+            return
+        }
+
+        guard await ensureSupervisorConnected() else {
+            appLog("bootstrap: recovery failed; supervisor is not connected", level: .error)
+            return
+        }
+
+        _ = await supervisorClient.reloadProfiles()
+        var runtime = await selectedRuntime(profileID: selectedProfile.id)
+        var resolvedPort = runtime?.resolvedPort ?? selectedResolution.resolvedPort
+
+        let probe = await GatewayClient.httpProbe(port: resolvedPort)
+        if !probe.alive {
+            await gatewayService.disconnect()
+            agentStore.markGatewayDisconnected()
+            gatewayDependentStartupCompleted = false
+
+            do {
+                if runtime?.isRunning == true || runtime?.readyState == .ready || runtime?.readyState == .starting {
+                    appLog("bootstrap: recovery restarting current gateway on port \(resolvedPort)")
+                    try await supervisorClient.restartProfile(profileID: selectedProfile.id)
+                } else {
+                    appLog("bootstrap: recovery starting current gateway on port \(resolvedPort)")
+                    try await supervisorClient.startProfile(profileID: selectedProfile.id)
+                }
+            } catch {
+                await processManager.refreshRuntimeState()
+                appLog("bootstrap: recovery lifecycle operation failed: \(error.localizedDescription)", level: .error)
+                return
+            }
+
+            runtime = await selectedRuntime(profileID: selectedProfile.id)
+            resolvedPort = runtime?.resolvedPort ?? resolvedPort
+        }
+
+        guard let token = await Self.waitForGatewayToken(configURLs: selectedResolution.localPaths.configSnapshotURLs) else {
+            appLog("bootstrap: recovery failed; gateway token is unavailable", level: .error)
+            return
+        }
+
+        await gatewayService.reconfigure(port: resolvedPort, token: token)
+
+        if gatewayService.isConnected {
+            do {
+                _ = try await gatewayService.request(method: "health")
+                await completeGatewayDependentStartup(currentUsername: NSUserName())
+                await processManager.refreshRuntimeState()
+                return
+            } catch {
+                appLog("bootstrap: recovery detected stale gateway socket: \(error.localizedDescription)", level: .warn)
+                await gatewayService.disconnect()
+                agentStore.markGatewayDisconnected()
+                gatewayDependentStartupCompleted = false
+            }
+        }
+
+        if await Self.connectGatewayService(gatewayService: gatewayService, logFailure: trigger != .reconnectLoop) {
+            await completeGatewayDependentStartup(currentUsername: NSUserName())
+        } else {
+            agentStore.markGatewayDisconnected()
+        }
+        await processManager.refreshRuntimeState()
+    }
+
+    private func ensureSupervisorConnected() async -> Bool {
+        if supervisorClient.isConnected, await supervisorClient.ping() {
+            return true
+        }
+
+        supervisorClient.connect()
+        return await supervisorClient.waitUntilConnected()
+    }
+
+    private func selectedRuntime(profileID: UUID) async -> SupervisorProfileRuntime? {
+        let runtimes = (try? await supervisorClient.listProfilesRuntime()) ?? []
+        return runtimes.first(where: { $0.profileID == profileID })
     }
 
     private func completeGatewayDependentStartup(currentUsername: String) async {
@@ -221,7 +348,8 @@ final class AppBootstrapCoordinator {
     }
 
     private static func connectGatewayService(
-        gatewayService: GatewayService
+        gatewayService: GatewayService,
+        logFailure: Bool = true
     ) async -> Bool {
         for attempt in 1...3 {
             await gatewayService.connect()
@@ -233,7 +361,9 @@ final class AppBootstrapCoordinator {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
-        appLog("bootstrap: failed to connect current profile gateway", level: .error)
+        if logFailure {
+            appLog("bootstrap: failed to connect current profile gateway", level: .error)
+        }
         return false
     }
 
