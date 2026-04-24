@@ -156,9 +156,6 @@ struct AgentGridView: View {
     private var agentGrid: some View {
         let columns = [GridItem(.adaptive(minimum: 300, maximum: 360), spacing: 20)]
         LazyVGrid(columns: columns, spacing: 20) {
-            if segment == .myAgents {
-                createAgentCard
-            }
             ForEach(filteredAgents) { agent in
                 if segment == .myAgents {
                     NavigationLink(value: agent.id) {
@@ -173,6 +170,9 @@ struct AgentGridView: View {
                 } else {
                     presetCard(agent)
                 }
+            }
+            if segment == .myAgents {
+                createAgentCard
             }
         }
         .id(gridRefreshKey)
