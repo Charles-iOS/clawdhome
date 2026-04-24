@@ -324,26 +324,17 @@ final class SupervisorClient {
         connect()
     }
 
-    private static var shouldAlwaysRefreshEmbeddedSupervisor: Bool {
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
-    }
-
     private static func shouldRefreshEmbeddedSupervisor() -> Bool {
         guard let current = currentEmbeddedSupervisorFingerprint() else {
             return false
-        }
-        if shouldAlwaysRefreshEmbeddedSupervisor {
-            return true
         }
         guard let installed = installedEmbeddedSupervisorFingerprint() else {
             return true
         }
         return installed.executablePath != current.executablePath
             || installed.versionStamp != current.versionStamp
+            || installed.executableModifiedAt != current.executableModifiedAt
+            || installed.executableSize != current.executableSize
     }
 
     private static func currentEmbeddedSupervisorFingerprint() -> EmbeddedSupervisorFingerprint? {
@@ -353,9 +344,17 @@ final class SupervisorClient {
         guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
             return nil
         }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: executableURL.path)
+        let modifiedAt = (attributes?[.modificationDate] as? Date)
+            .map { String(Int($0.timeIntervalSince1970)) }
+        let size = (attributes?[.size] as? NSNumber)
+            .map { String($0.uint64Value) }
+
         return EmbeddedSupervisorFingerprint(
             executablePath: executableURL.path,
-            versionStamp: embeddedSupervisorVersionStamp()
+            versionStamp: embeddedSupervisorVersionStamp(),
+            executableModifiedAt: modifiedAt ?? "",
+            executableSize: size ?? ""
         )
     }
 
@@ -372,13 +371,17 @@ final class SupervisorClient {
         let executablePath = (plist["ProgramArguments"] as? [String])?.first
         let environment = plist["EnvironmentVariables"] as? [String: Any]
         let versionStamp = environment?["EZRWORKER_SUPERVISOR_VERSION"] as? String
+        let executableModifiedAt = environment?["EZRWORKER_SUPERVISOR_EXECUTABLE_MTIME"] as? String ?? ""
+        let executableSize = environment?["EZRWORKER_SUPERVISOR_EXECUTABLE_SIZE"] as? String ?? ""
         guard let executablePath, !executablePath.isEmpty else {
             return nil
         }
 
         return EmbeddedSupervisorFingerprint(
             executablePath: executablePath,
-            versionStamp: versionStamp
+            versionStamp: versionStamp,
+            executableModifiedAt: executableModifiedAt,
+            executableSize: executableSize
         )
     }
 
@@ -430,6 +433,10 @@ final class SupervisorClient {
             <dict>
                 <key>EZRWORKER_SUPERVISOR_VERSION</key>
                 <string>\(fingerprint.versionStamp ?? embeddedSupervisorVersionStamp())</string>
+                <key>EZRWORKER_SUPERVISOR_EXECUTABLE_MTIME</key>
+                <string>\(fingerprint.executableModifiedAt)</string>
+                <key>EZRWORKER_SUPERVISOR_EXECUTABLE_SIZE</key>
+                <string>\(fingerprint.executableSize)</string>
             </dict>
             <key>MachServices</key>
             <dict>
@@ -533,6 +540,8 @@ private struct EmbeddedLaunchAgentContext {
 private struct EmbeddedSupervisorFingerprint {
     let executablePath: String
     let versionStamp: String?
+    let executableModifiedAt: String
+    let executableSize: String
 }
 
 private struct ProcessResult {
