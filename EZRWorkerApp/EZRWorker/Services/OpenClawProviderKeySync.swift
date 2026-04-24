@@ -50,4 +50,93 @@ enum OpenClawProviderKeySync {
             try await gateway.configSet(path: path, value: clear ? "" : trimmed)
         }
     }
+
+    @MainActor
+    static func syncProvider(
+        gateway: GatewayService,
+        provider: ProviderTemplate,
+        secret: String?
+    ) async throws {
+        let (_, baseHash) = try await gateway.configGetFull()
+        let payload = providerPayload(for: provider, secret: secret)
+
+        try await gateway.configPatch(
+            patch: [
+                "models": [
+                    "mode": "merge",
+                    "providers": [
+                        provider.providerGroupId: payload
+                    ]
+                ]
+            ],
+            baseHash: baseHash,
+            note: "同步 Provider \(provider.providerGroupId)"
+        )
+    }
+
+    @MainActor
+    static func removeProvider(
+        gateway: GatewayService,
+        providerId: String
+    ) async throws {
+        let (_, baseHash) = try await gateway.configGetFull()
+        try await gateway.configPatch(
+            patch: [
+                "models": [
+                    "providers": [
+                        providerId: NSNull()
+                    ]
+                ]
+            ],
+            baseHash: baseHash,
+            note: "移除 Provider \(providerId)"
+        )
+    }
+
+    private static func providerPayload(
+        for provider: ProviderTemplate,
+        secret: String?
+    ) -> [String: Any] {
+        let providerTypeId = provider.editorProviderId
+        if providerTypeId == "openai-compatible" {
+            let compatibleConfig = ProviderKeyConfig(
+                id: provider.providerGroupId,
+                displayName: provider.displayName,
+                configPath: "models.providers.\(provider.providerGroupId).apiKey",
+                placeholder: "sk-...",
+                isUrlConfig: false,
+                supportsOAuth: false,
+                sideConfigs: [
+                    ("models.providers.\(provider.providerGroupId).api", .string(provider.apiType.isEmpty ? "openai-completions" : provider.apiType)),
+                ]
+            )
+
+            var payload = compatibleConfig.makeProviderPayload(
+                secret: secret,
+                modelIds: provider.normalizedModelIDs,
+                labels: provider.modelLabels
+            )
+
+            let trimmedBaseURL = provider.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedBaseURL.isEmpty {
+                payload["baseUrl"] = trimmedBaseURL
+            }
+            return payload
+        }
+
+        let config = staticConfig(for: providerTypeId) ?? ProviderKeyConfig(
+            id: provider.providerGroupId,
+            displayName: provider.providerDisplayName,
+            configPath: "models.providers.\(provider.providerGroupId).apiKey",
+            placeholder: "sk-...",
+            isUrlConfig: false,
+            supportsOAuth: false
+        )
+
+        return config.makeProviderPayload(
+            secret: secret,
+            modelIds: provider.normalizedModelIDs,
+            labels: provider.modelLabels
+        )
+    }
 }

@@ -332,7 +332,7 @@ final class AppBootstrapCoordinator {
         guard gatewayService.isConnected, !gatewayDependentStartupCompleted else { return }
         gatewayDependentStartupCompleted = true
 
-        await Self.provisionDefaultMiniMaxModelIfNeeded(
+        await Self.provisionMiniMaxCatalogIfNeeded(
             gatewayService: gatewayService,
             keychainStore: keychainStore
         )
@@ -400,7 +400,7 @@ final class AppBootstrapCoordinator {
         return nil
     }
 
-    private static func provisionDefaultMiniMaxModelIfNeeded(
+    private static func provisionMiniMaxCatalogIfNeeded(
         gatewayService: GatewayService,
         keychainStore: ProviderKeychainStore
     ) async {
@@ -411,39 +411,47 @@ final class AppBootstrapCoordinator {
 
             let models = config["models"] as? [String: Any]
             let providers = models?["providers"] as? [String: Any]
-            let minimax = providers?["minimax"] as? [String: Any]
-            let existingModels = minimax?["models"] as? [[String: Any]] ?? []
+            let candidateProviderIds = ["minimax-cn", "minimax"]
+            var providerPatches: [String: Any] = [:]
 
-            let hasDefaultModel = existingModels.contains { entry in
-                (entry["id"] as? String) == "MiniMax-Text-01"
+            for providerId in candidateProviderIds {
+                guard let provider = providers?[providerId] as? [String: Any] else { continue }
+                guard miniMaxCatalogNeedsProvisioning(provider) else { continue }
+                guard let providerConfig = OpenClawProviderKeySync.staticConfig(for: providerId) else { continue }
+
+                let modelIds = suggestedModelsForProvider(providerId).map(\.id)
+                guard !modelIds.isEmpty else { continue }
+
+                providerPatches[providerId] = providerConfig.makeProviderPayload(
+                    secret: keychainStore.read(forProvider: providerId),
+                    modelIds: modelIds
+                )
             }
 
-            if !hasDefaultModel {
-                var updatedProviders = providers ?? [:]
-                updatedProviders["minimax"] = [
-                    "enabled": true,
-                    "apiKey": keychainStore.read(forProvider: "minimax") ?? "",
-                    "models": [
-                        [
-                            "id": "MiniMax-Text-01",
-                            "name": "MiniMax-Text-01",
-                        ]
-                    ]
-                ]
-
-                let patch: [String: Any] = [
-                    "models": [
-                        "providers": updatedProviders
-                    ]
-                ]
+            if !providerPatches.isEmpty {
                 _ = try await gatewayService.configPatch(
-                    patch: patch,
+                    patch: [
+                        "models": [
+                            "mode": "merge",
+                            "providers": providerPatches
+                        ]
+                    ],
                     baseHash: baseHash,
-                    note: "初始化默认 MiniMax 模型"
+                    note: "补齐 MiniMax provider 模型目录"
                 )
             }
         } catch {
-            appLog("bootstrap: provision default model failed: \(error)", level: .warn)
+            appLog("bootstrap: provision MiniMax catalog failed: \(error)", level: .warn)
         }
+    }
+
+    private static func miniMaxCatalogNeedsProvisioning(_ provider: [String: Any]) -> Bool {
+        let existingModels = provider["models"] as? [[String: Any]] ?? []
+        if existingModels.isEmpty {
+            return true
+        }
+
+        let ids = Set(existingModels.compactMap { $0["id"] as? String })
+        return ids == Set(["MiniMax-Text-01"])
     }
 }
