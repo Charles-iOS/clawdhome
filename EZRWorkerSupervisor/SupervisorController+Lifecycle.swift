@@ -91,7 +91,7 @@ extension EZRWorkerSupervisorController {
                 record: record,
                 pid: process.processIdentifier,
                 ownership: .supervised,
-                requireSameListeningPID: false
+                requireSameListeningPID: true
             )
         }
 
@@ -165,7 +165,7 @@ extension EZRWorkerSupervisorController {
             record: record,
             pid: process.processIdentifier,
             ownership: .supervised,
-            requireSameListeningPID: false,
+            requireSameListeningPID: true,
             startupOutput: startupOutput
         )
     }
@@ -193,7 +193,8 @@ extension EZRWorkerSupervisorController {
             }
         } else if let pid = gatewayPIDListening(onPort: record.resolution.resolvedPort),
                   let commandLine = processCommandLine(pid: pid),
-                  looksLikeGatewayProcess(commandLine) {
+                  looksLikeGatewayProcess(commandLine),
+                  record.profile.sourceKind != .managed || record.pid == pid || gatewayProcessMatches(record: record, pid: pid) {
             kill(pid, SIGTERM)
             for _ in 0..<12 {
                 if gatewayPIDListening(onPort: record.resolution.resolvedPort) == nil {

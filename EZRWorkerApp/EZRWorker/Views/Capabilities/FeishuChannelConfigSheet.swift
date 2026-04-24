@@ -202,6 +202,27 @@ enum ChannelPairingDataLoader {
     ) -> [String] {
         approvedPeers(for: channel, localPaths: localPaths).map(\.id)
     }
+
+    static func storeAllowFromPeerIDs(
+        for channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) -> [String] {
+        guard let localPaths else { return [] }
+        var peersByID: [String: PairingPeer] = [:]
+
+        for credentialsDirectory in localPaths.credentialsDirectoryCandidates {
+            let storePeers = channel == .feishu
+                ? loadFeishuApprovedPeers(credentialsDirectory: credentialsDirectory)
+                : loadStoreApprovedPeers(for: channel, credentialsDirectory: credentialsDirectory)
+
+            for peer in storePeers {
+                merge(peer, into: &peersByID)
+            }
+        }
+
+        return peersByID.values.map(\.id).sorted()
+    }
+
     private static let defaultFeishuAccountID = "default"
 
     private static func loadStoreApprovedPeers(
@@ -469,27 +490,45 @@ enum ChannelConfigSupport {
 
 @MainActor
 enum ChannelPairingMutationSupport {
+    @discardableResult
+    static func rejectPendingRequest(
+        code: String,
+        channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) throws -> Bool {
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCode.isEmpty else { return false }
+        guard let localPaths else {
+            throw ChannelConfigValidationError(message: "当前未选择 profile，无法修改本地配对请求。")
+        }
+
+        var removedAny = false
+        for fileURL in localPaths.credentialFileCandidates(named: "\(channel.rawValue)-pairing.json")
+            where FileManager.default.fileExists(atPath: fileURL.path) {
+            removedAny = try removePendingRequest(trimmedCode, fileURL: fileURL) || removedAny
+        }
+        return removedAny
+    }
+
     static func removeApprovedPeer(
         _ peer: PairingPeer,
         channel: ChannelType,
         gateway: GatewayService,
-        profile: GatewayProfileResolution?,
         localPaths: GatewayProfileLocalPaths?
     ) async throws -> Bool {
         var removedAny = false
         var errors: [String] = []
 
         if peer.isStoreBacked {
-            guard let profile else {
-                throw ChannelConfigValidationError(message: "当前未选择 profile，无法修改本地配对 store。")
-            }
-            let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: [
-                "pairing", "remove", channel.rawValue, peer.id
-            ], profile: profile)
-            if ok {
-                removedAny = true
-            } else {
-                errors.append(output.isEmpty ? "pairing store 移除失败" : output)
+            do {
+                let changed = try removeStoreAllowFromPeer(
+                    peer.id,
+                    channel: channel,
+                    localPaths: localPaths
+                )
+                removedAny = removedAny || changed
+            } catch {
+                errors.append(error.localizedDescription)
             }
         }
 
@@ -512,6 +551,113 @@ enum ChannelPairingMutationSupport {
         }
 
         return removedAny
+    }
+
+    private static func removePendingRequest(
+        _ code: String,
+        fileURL: URL
+    ) throws -> Bool {
+        guard let data = FileManager.default.contents(atPath: fileURL.path),
+              var json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let requests = json["requests"] as? [[String: Any]] else {
+            return false
+        }
+
+        let updatedRequests = requests.filter { request in
+            let requestCode = (request["code"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return requestCode != code
+        }
+        guard updatedRequests.count != requests.count else {
+            return false
+        }
+
+        json["version"] = json["version"] ?? 1
+        json["requests"] = updatedRequests
+
+        guard JSONSerialization.isValidJSONObject(json) else {
+            throw ChannelConfigValidationError(message: "配对请求 store 不是合法 JSON，无法更新。")
+        }
+
+        let output = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+        try output.write(to: fileURL, options: .atomic)
+        return true
+    }
+
+    private static func removeStoreAllowFromPeer(
+        _ peerID: String,
+        channel: ChannelType,
+        localPaths: GatewayProfileLocalPaths?
+    ) throws -> Bool {
+        guard let localPaths else {
+            throw ChannelConfigValidationError(message: "当前未选择 profile，无法修改本地配对 store。")
+        }
+
+        var removedAny = false
+        for credentialsDirectory in localPaths.credentialsDirectoryCandidates {
+            for fileURL in storeAllowFromFileCandidates(
+                channel: channel,
+                credentialsDirectory: credentialsDirectory
+            ) where FileManager.default.fileExists(atPath: fileURL.path) {
+                removedAny = try removePeerFromAllowFromFile(peerID, fileURL: fileURL) || removedAny
+            }
+        }
+        return removedAny
+    }
+
+    private static func storeAllowFromFileCandidates(
+        channel: ChannelType,
+        credentialsDirectory: URL
+    ) -> [URL] {
+        if channel == .feishu {
+            return [
+                credentialsDirectory.appendingPathComponent("feishu-default-allowFrom.json"),
+                credentialsDirectory.appendingPathComponent("feishu-allowFrom.json"),
+            ]
+        }
+
+        let prefix = "\(channel.rawValue)-"
+        let suffix = "-allowFrom.json"
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: credentialsDirectory.path) else {
+            return []
+        }
+
+        return entries
+            .filter { $0.hasPrefix(prefix) && $0.hasSuffix(suffix) }
+            .map { credentialsDirectory.appendingPathComponent($0) }
+    }
+
+    private static func removePeerFromAllowFromFile(
+        _ peerID: String,
+        fileURL: URL
+    ) throws -> Bool {
+        guard let data = FileManager.default.contents(atPath: fileURL.path),
+              var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+
+        let currentAllowFrom = ChannelConfigSupport.normalizeStringArray(
+            from: json["allowFrom"],
+            allowWildcard: true
+        )
+        let updatedAllowFrom = currentAllowFrom.filter {
+            $0.caseInsensitiveCompare(peerID) != .orderedSame
+        }
+
+        guard updatedAllowFrom.count != currentAllowFrom.count else {
+            return false
+        }
+
+        json["version"] = json["version"] ?? 1
+        json["allowFrom"] = updatedAllowFrom
+
+        guard JSONSerialization.isValidJSONObject(json) else {
+            throw ChannelConfigValidationError(message: "配对 store 不是合法 JSON，无法更新。")
+        }
+
+        let output = try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+        try output.write(to: fileURL, options: .atomic)
+        return true
     }
 
     private static func removeConfigAllowFromPeer(
@@ -1476,17 +1622,17 @@ struct ChannelPairingManagerSection: View {
         errorMessage = nil
         successMessage = nil
 
-        guard let selectedResolution else {
-            errorMessage = "当前未选择 profile，无法执行配对拒绝"
-            return
-        }
-
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(args: [
-            "pairing", "reject", channelType.rawValue, code
-        ], profile: selectedResolution)
-
-        if ok {
-            pendingRequests.removeAll { $0.code == code }
+        do {
+            let changed = try ChannelPairingMutationSupport.rejectPendingRequest(
+                code: code,
+                channel: channelType,
+                localPaths: selectedLocalPaths
+            )
+            guard changed else {
+                errorMessage = "未找到配对码 \(code)"
+                return
+            }
+            await loadAll()
             if let onChanged {
                 await onChanged()
             }
@@ -1496,8 +1642,8 @@ struct ChannelPairingManagerSection: View {
                     successMessage = nil
                 }
             }
-        } else {
-            errorMessage = "拒绝失败：\(output)"
+        } catch {
+            errorMessage = "拒绝失败：\(error.localizedDescription)"
         }
     }
 
@@ -1510,7 +1656,6 @@ struct ChannelPairingManagerSection: View {
                 peer,
                 channel: channelType,
                 gateway: gateway,
-                profile: selectedResolution,
                 localPaths: selectedLocalPaths
             )
             if changed {

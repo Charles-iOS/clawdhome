@@ -34,6 +34,7 @@ enum OpenClawProviderKeySync {
         secret: String?
     ) async throws {
         let trimmed = (secret ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isRedactedSecret(trimmed) else { return }
         let clear = trimmed.isEmpty
 
         if let cfg = staticConfig(for: providerId) {
@@ -138,5 +139,9 @@ enum OpenClawProviderKeySync {
             modelIds: provider.normalizedModelIDs,
             labels: provider.modelLabels
         )
+    }
+
+    private static func isRedactedSecret(_ value: String) -> Bool {
+        value.count >= 3 && value.allSatisfy { $0 == "*" }
     }
 }

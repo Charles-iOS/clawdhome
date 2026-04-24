@@ -6,12 +6,10 @@
 //   2. bot owner 在此界面审批（approve）或拒绝（reject）
 //   3. 审批通过后用户即可正常对话
 //
-// 底层命令：
+// 底层实现：
 //   openclaw pairing list <channel> --json
 //   openclaw pairing approve <channel> <code>
-//   openclaw pairing reject <channel> <code>
-//   openclaw pairing add <channel> <peerId> [--kind group]
-//   openclaw pairing remove <channel> <peerId>
+//   reject / remove 直接更新当前 profile 的 credentials JSON store
 
 import SwiftUI
 
@@ -471,26 +469,25 @@ struct ChannelPairingSheet: View {
         errorMessage = nil
         successMessage = nil
 
-        guard let selectedResolution else {
-            errorMessage = "当前未选择 profile，无法执行配对拒绝"
-            return
-        }
-
-        let (ok, output) = await GatewayProcessManager.runOpenclawLocally(
-            args: ["pairing"] + ["reject", channelType.rawValue, code],
-            profile: selectedResolution
-        )
-
-        if ok {
-            pendingRequests.removeAll { $0.code == code }
+        do {
+            let changed = try ChannelPairingMutationSupport.rejectPendingRequest(
+                code: code,
+                channel: channelType,
+                localPaths: selectedLocalPaths
+            )
+            guard changed else {
+                errorMessage = "未找到配对码 \(code)"
+                return
+            }
+            await loadAll()
             successMessage = "已拒绝配对码 \(code)"
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 if successMessage?.contains(code) == true {
                     successMessage = nil
                 }
             }
-        } else {
-            errorMessage = "拒绝失败：\(output)"
+        } catch {
+            errorMessage = "拒绝失败：\(error.localizedDescription)"
         }
     }
 
@@ -504,7 +501,6 @@ struct ChannelPairingSheet: View {
                 peer,
                 channel: channelType,
                 gateway: gateway,
-                profile: selectedResolution,
                 localPaths: selectedLocalPaths
             )
             if changed {

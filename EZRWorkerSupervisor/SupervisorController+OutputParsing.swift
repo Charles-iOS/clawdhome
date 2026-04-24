@@ -16,8 +16,22 @@ extension EZRWorkerSupervisorController {
             .filter { !$0.isEmpty }
             .filter { !Self.isSupervisorRestartHandoffMessage($0) }
 
+        if let configInvalidIndex = lines.firstIndex(where: {
+            $0.localizedCaseInsensitiveContains("Config invalid")
+        }) {
+            let problem = lines[(configInvalidIndex + 1)...]
+                .first(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix("- ") })
+            if let problem {
+                return "Config invalid: \(problem)"
+            }
+            return "Config invalid"
+        }
+
         for line in lines.reversed() where !line.localizedCaseInsensitiveContains("OpenClaw") {
             if line.localizedCaseInsensitiveContains("Gateway failed to start:") {
+                return line
+            }
+            if line.localizedCaseInsensitiveContains("gateway startup failed:") {
                 return line
             }
             if line.localizedCaseInsensitiveContains("error:") {
@@ -26,6 +40,16 @@ extension EZRWorkerSupervisorController {
         }
 
         return lines.reversed().first(where: { !Self.isBenignStartupProgressLine($0) })
+    }
+
+    static func isTerminalStartupFailureOutput(_ output: String?) -> Bool {
+        guard let output else { return false }
+        let normalized = stripANSIEscapeCodes(from: output).lowercased()
+        return normalized.contains("config invalid")
+            || normalized.contains("gateway failed to start:")
+            || normalized.contains("gateway startup failed:")
+            || normalized.contains("process will stay alive; fix the issue and restart")
+            || normalized.contains("refusing to bind gateway")
     }
 
     static func isSupervisorRestartHandoffMessage(_ text: String) -> Bool {

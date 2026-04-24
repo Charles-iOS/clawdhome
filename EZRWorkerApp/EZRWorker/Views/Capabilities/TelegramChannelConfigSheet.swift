@@ -397,18 +397,34 @@ struct TelegramChannelConfigSheet: View {
             }
         }
 
-        draft = makeDraft(from: telegramConfig, isReadOnly: readOnly)
+        draft = makeDraft(
+            from: telegramConfig,
+            isReadOnly: readOnly,
+            localPaths: selectedLocalPaths
+        )
         validateGroupsJSON()
     }
 
-    private func makeDraft(from telegramConfig: [String: Any], isReadOnly: Bool) -> TelegramChannelConfigDraft {
+    private func makeDraft(
+        from telegramConfig: [String: Any],
+        isReadOnly: Bool,
+        localPaths: GatewayProfileLocalPaths?
+    ) -> TelegramChannelConfigDraft {
         let status = TelegramChannelConfigSupport.accessStatus(for: telegramConfig)
         let groupsObject = telegramConfig["groups"] as? [String: Any] ?? [:]
+        let configuredAllowFrom = ChannelConfigSupport.normalizeStringArray(
+            from: telegramConfig["allowFrom"],
+            allowWildcard: true
+        )
+        let pairedAllowFrom = ChannelPairingDataLoader.storeAllowFromPeerIDs(
+            for: .telegram,
+            localPaths: localPaths
+        )
         return TelegramChannelConfigDraft(
             isEnabled: telegramConfig["enabled"] as? Bool ?? true,
             dmPolicy: ChannelDmPolicy(rawValue: (telegramConfig["dmPolicy"] as? String)?.lowercased() ?? "") ?? .pairing,
             allowFromText: ChannelConfigSupport.lineSeparatedText(
-                from: ChannelConfigSupport.normalizeStringArray(from: telegramConfig["allowFrom"], allowWildcard: true)
+                from: mergedAllowFromEntries(configuredAllowFrom + pairedAllowFrom)
             ),
             groupPolicy: ChannelGroupPolicy(rawValue: (telegramConfig["groupPolicy"] as? String)?.lowercased() ?? "") ?? .allowlist,
             groupAllowFromText: ChannelConfigSupport.lineSeparatedText(
@@ -420,6 +436,19 @@ struct TelegramChannelConfigSheet: View {
             isReadOnly: isReadOnly,
             validationError: nil
         )
+    }
+
+    private func mergedAllowFromEntries(_ entries: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for entry in entries {
+            let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let key = trimmed.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            result.append(trimmed)
+        }
+        return result
     }
 
     private func validateGroupsJSON() {
