@@ -1,6 +1,62 @@
 import Foundation
 
 extension EZRWorkerSupervisorController {
+    func refreshLegacyRuntimeSnapshotsBeforeListing() async {
+        for profileID in profileOrder {
+            guard let record = records[profileID],
+                  record.profile.sourceKind == .legacyReuse
+            else {
+                continue
+            }
+
+            await refreshLegacyRuntimeSnapshot(record)
+        }
+    }
+
+    private func refreshLegacyRuntimeSnapshot(_ record: SupervisorRecord) async {
+        let configExists = FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath)
+        let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+        record.lastProbeAt = Date()
+
+        if probe.alive {
+            record.isPrepared = configExists
+            record.isRunning = true
+            record.pid = listeningPID
+            record.readyState = probe.ready ? .ready : .starting
+            if record.process?.isRunning == true,
+               record.process?.processIdentifier == listeningPID {
+                record.ownership = .supervised
+            } else {
+                record.process = nil
+                record.ownership = .adopted
+            }
+            record.lastError = nil
+            return
+        }
+
+        record.isPrepared = configExists
+
+        if record.process?.isRunning == true,
+           record.readyState == .starting || record.readyState == .preparing {
+            return
+        }
+
+        if record.process?.isRunning != true {
+            record.process = nil
+        }
+
+        record.isRunning = false
+        record.pid = nil
+        record.ownership = .none
+        if configExists {
+            record.readyState = .stopped
+            record.lastError = nil
+        } else if record.readyState != .failed {
+            record.readyState = .stopped
+        }
+    }
+
     func adoptExistingHealthyGatewayIfAvailable(
         for record: SupervisorRecord
     ) async -> (Bool, String?)? {
@@ -69,6 +125,20 @@ extension EZRWorkerSupervisorController {
                     record.lastError
                     ?? extractStartupFailureMessage(from: startupOutput?.output)
                     ?? "Gateway 异常退出"
+                record.readyState = .failed
+                record.isRunning = false
+                record.ownership = .none
+                record.lastError = message
+                return (false, message)
+            }
+
+            if ownership == .supervised,
+               Self.isTerminalStartupFailureOutput(startupOutput?.output) {
+                let capturedOutput = startupOutput?.output
+                let message =
+                    extractStartupFailureMessage(from: capturedOutput)
+                    ?? "Gateway 启动失败"
+                _ = await stopRecord(record)
                 record.readyState = .failed
                 record.isRunning = false
                 record.ownership = .none
@@ -155,23 +225,62 @@ extension EZRWorkerSupervisorController {
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
         record.lastProbeAt = Date()
         if probe.ready {
-            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort)
-            record.isPrepared = true
-            record.isRunning = true
-            record.ownership = .adopted
-            record.readyState = .ready
-            record.lastError = nil
-            return
+            let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            switch await healthyGatewayDisposition(for: record, listeningPID: currentPID) {
+            case .adopt(let pid):
+                record.pid = pid
+                record.isPrepared = true
+                record.isRunning = true
+                record.ownership = .adopted
+                record.readyState = .ready
+                record.lastError = nil
+                return
+            case .relaunch:
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .starting
+                record.lastError = nil
+                Task { [profileID] in
+                    _ = await self.startProfile(profileID: profileID)
+                }
+                return
+            case .fail(let message):
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .failed
+                record.lastError = message
+                return
+            }
         }
         if probe.alive {
-            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort)
-            record.isRunning = true
-            record.ownership = .adopted
-            record.readyState = .starting
-            record.lastError = nil
-
-            Task { [profileID] in
-                _ = await self.startProfile(profileID: profileID)
+            let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            switch await healthyGatewayDisposition(for: record, listeningPID: currentPID) {
+            case .adopt(let pid):
+                record.pid = pid
+                record.isRunning = true
+                record.ownership = .adopted
+                record.readyState = .starting
+                record.lastError = nil
+                Task { [profileID] in
+                    _ = await self.startProfile(profileID: profileID)
+                }
+            case .relaunch:
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .starting
+                record.lastError = nil
+                Task { [profileID] in
+                    _ = await self.startProfile(profileID: profileID)
+                }
+            case .fail(let message):
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .failed
+                record.lastError = message
             }
             return
         }

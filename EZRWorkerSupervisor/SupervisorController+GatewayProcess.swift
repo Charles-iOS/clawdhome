@@ -28,13 +28,19 @@ extension EZRWorkerSupervisorController {
             return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用")
         }
 
-        clearRuntimeStateForGateway(
-            pid: listeningPID,
-            port: record.resolution.resolvedPort,
-            excluding: record.profile.id
-        )
+        let matchingProfileID = managedProfileIDForGatewayProcess(pid: listeningPID)
+        guard matchingProfileID == record.profile.id else {
+            let suffix = matchingProfileID.flatMap { profiles[$0]?.displayName }
+                .map { "（\($0)）" } ?? ""
+            return .fail("端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程\(suffix)占用")
+        }
 
         if await terminateGatewayProcess(pid: listeningPID, port: record.resolution.resolvedPort) {
+            clearRuntimeStateForGateway(
+                pid: listeningPID,
+                port: record.resolution.resolvedPort,
+                excluding: record.profile.id
+            )
             return .relaunch
         }
 
@@ -64,6 +70,13 @@ extension EZRWorkerSupervisorController {
               looksLikeGatewayProcess(commandLine)
         else {
             return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用")
+        }
+
+        let matchingProfileID = managedProfileIDForGatewayProcess(pid: listeningPID)
+        guard matchingProfileID == record.profile.id else {
+            let suffix = matchingProfileID.flatMap { profiles[$0]?.displayName }
+                .map { "（\($0)）" } ?? ""
+            return .fail("端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程\(suffix)占用")
         }
 
         clearRuntimeStateForGateway(
@@ -132,6 +145,57 @@ extension EZRWorkerSupervisorController {
     func looksLikeGatewayProcess(_ commandLine: String) -> Bool {
         let normalized = commandLine.lowercased()
         return normalized.contains("openclaw") && normalized.contains("gateway")
+    }
+
+    func gatewayProcessMatches(record: SupervisorRecord, pid: Int32) -> Bool {
+        gatewayProcessOpenFileNames(pid: pid)
+            .contains(where: { gatewayOpenFile($0, matches: record.resolution) })
+    }
+
+    private func managedProfileIDForGatewayProcess(pid: Int32) -> UUID? {
+        let openFileNames = gatewayProcessOpenFileNames(pid: pid)
+        for profileID in profileOrder {
+            guard let record = records[profileID],
+                  record.profile.sourceKind == .managed,
+                  openFileNames.contains(where: { gatewayOpenFile($0, matches: record.resolution) })
+            else {
+                continue
+            }
+            return profileID
+        }
+        return nil
+    }
+
+    private func gatewayOpenFile(_ rawPath: String, matches resolution: GatewayProfileResolution) -> Bool {
+        let path = normalizedPath(rawPath)
+        let configPath = normalizedPath(resolution.resolvedConfigPath)
+        let runtimeConfigPath = normalizedPath(resolution.runtimeConfigURL.path)
+        let stateDir = normalizedPath(resolution.resolvedStateDir)
+
+        return path == configPath
+            || path == runtimeConfigPath
+            || path.hasPrefix(stateDir + "/")
+    }
+
+    private func gatewayProcessOpenFileNames(pid: Int32) -> [String] {
+        guard let output = runLocalCommand("/usr/sbin/lsof", arguments: ["-Fn", "-p", "\(pid)"]) else {
+            return []
+        }
+
+        return output
+            .split(whereSeparator: \.isNewline)
+            .compactMap { line -> String? in
+                guard line.first == "n" else { return nil }
+                let path = String(line.dropFirst())
+                guard path.hasPrefix("/") else { return nil }
+                return path
+            }
+    }
+
+    private func normalizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
+            .standardizedFileURL
+            .path
     }
 
     private func runLocalCommand(_ executable: String, arguments: [String]) -> String? {

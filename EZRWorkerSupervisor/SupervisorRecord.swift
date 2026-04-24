@@ -15,11 +15,23 @@ final class SupervisorRecord {
     init(profile: GatewayProfile) {
         self.profile = profile
         self.resolution = GatewayProfileResolver.resolve(profile)
+        syncLegacyPreparationState()
     }
 
     func apply(profile: GatewayProfile) {
         self.profile = profile
         self.resolution = GatewayProfileResolver.resolve(profile)
+        syncLegacyPreparationState()
+    }
+
+    private func syncLegacyPreparationState() {
+        guard profile.sourceKind == .legacyReuse,
+              readyState == .stopped
+        else {
+            return
+        }
+
+        isPrepared = FileManager.default.fileExists(atPath: resolution.resolvedConfigPath)
     }
 
     func snapshot() -> SupervisorProfileRuntime {

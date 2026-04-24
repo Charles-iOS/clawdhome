@@ -1,5 +1,6 @@
 // EZRWorkerApp/Views/Settings/SettingsView.swift
 
+import AppKit
 import SwiftUI
 
 struct AppSettingsView: View {
@@ -19,27 +20,21 @@ struct AppSettingsView: View {
     @State private var profileErrorMessage: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            PageHeroHeader(
-                title: L10n.k("settings.title", fallback: "设置"),
-                subtitle: L10n.k("settings.hero.subtitle", fallback: "Gateway、运行环境与版本信息。")
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 8)
-
-            Form {
-                accountSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                heroSection
+                statusOverviewGrid
                 profilesSection
-                gatewaySection
-                terminalSection
-                environmentSection
-                aboutSection
+                toolGrid
+                systemInfoGrid
             }
-            .formStyle(.grouped)
+            .padding(.horizontal, 28)
+            .padding(.top, 24)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showCreateProfileSheet) {
             CreateProfileSheet()
                 .environment(profileStore)
@@ -94,162 +89,228 @@ struct AppSettingsView: View {
     }
 
     @ViewBuilder
-    private var accountSection: some View {
-        Section(L10n.k("auth.settings.section", fallback: "账户")) {
-            LabeledContent(
-                L10n.k("auth.settings.phone", fallback: "当前登录手机号"),
-                value: authStore.currentUser.map { displayMainlandChinaPhone($0.phone) } ?? "—"
-            )
-            LabeledContent(
-                L10n.k("auth.settings.display_name", fallback: "显示名称"),
-                value: authStore.currentUser?.displayName ?? "—"
-            )
+    private var heroSection: some View {
+        PageHeroHeader(
+            title: L10n.k("settings.title", fallback: "设置"),
+            subtitle: L10n.k("settings.hero.subtitle", fallback: "Profile、运行环境与版本信息。")
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            Button(role: .destructive) {
-                Task {
-                    await authStore.signOut()
-                }
-            } label: {
-                Text(L10n.k("auth.settings.sign_out", fallback: "退出登录"))
-            }
+    @ViewBuilder
+    private var statusOverviewGrid: some View {
+        LazyVGrid(columns: overviewColumns, alignment: .leading, spacing: 16) {
+            SettingsOverviewCard(
+                icon: "person.crop.circle",
+                title: "当前 Profile",
+                value: profileStore.selectedProfile?.displayName ?? "未选择",
+                subtitle: profileStore.selectedProfile?.slug ?? "等待 profile 准备",
+                tint: .accentColor
+            )
+            SettingsOverviewCard(
+                icon: "wave.3.right.circle.fill",
+                title: L10n.k("dashboard.gateway_status", fallback: "WebSocket"),
+                value: gatewayService.isConnected
+                    ? L10n.k("dashboard.connected", fallback: "已连接")
+                    : L10n.k("dashboard.disconnected", fallback: "未连接"),
+                subtitle: gatewayService.isConnected ? "业务通道可用" : "等待连接恢复",
+                tint: gatewayService.isConnected ? .green : .secondary
+            )
+            SettingsOverviewCard(
+                icon: "shippingbox.circle.fill",
+                title: L10n.k("settings.environment", fallback: "环境"),
+                value: environmentStatusValue,
+                subtitle: environmentStatusSubtitle,
+                tint: environmentStatusColor
+            )
         }
     }
 
     @ViewBuilder
-    private var gatewaySection: some View {
-        Section(L10n.k("settings.gateway", fallback: "Gateway")) {
-            if let selectedProfile = profileStore.selectedProfile {
-                LabeledContent("当前 Profile", value: selectedProfile.displayName)
-            }
+    private var toolGrid: some View {
+        HStack(alignment: .top, spacing: 20) {
+            terminalSection
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            environmentSection
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
 
-            LabeledContent(
-                L10n.k("settings.port", fallback: "端口"),
-                value: "\(processManager.gatewayPort)"
-            )
-            LabeledContent(
-                L10n.k("settings.state", fallback: "状态"),
-                value: stateLabel
-            )
-            LabeledContent(
-                L10n.k("dashboard.gateway_status", fallback: "WebSocket"),
-                value: gatewayService.isConnected
-                    ? L10n.k("dashboard.connected", fallback: "已连接")
-                    : L10n.k("dashboard.disconnected", fallback: "未连接")
-            )
+    @ViewBuilder
+    private var systemInfoGrid: some View {
+        responsiveTwoColumnRow {
+            accountSection
+        } trailing: {
+            aboutSection
+        }
+    }
 
-            HStack(spacing: 12) {
-                Button(L10n.k("user.detail.auto.start_action", fallback: "启动")) {
-                    processManager.start()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(processManager.state == .starting || processManager.state == .running)
+    @ViewBuilder
+    private var accountSection: some View {
+        SettingsSectionCard(
+            L10n.k("auth.settings.section", fallback: "账户"),
+            minHeight: SettingsLayout.systemCardMinHeight
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsInfoRow(
+                    L10n.k("auth.settings.phone", fallback: "当前登录手机号"),
+                    value: authStore.currentUser.map { displayMainlandChinaPhone($0.phone) } ?? "—"
+                )
+                SettingsInfoRow(
+                    L10n.k("auth.settings.display_name", fallback: "显示名称"),
+                    value: authStore.currentUser?.displayName ?? "—"
+                )
 
-                Button(L10n.k("user.detail.auto.restart", fallback: "重启")) {
-                    processManager.restart()
+                Divider()
+                    .padding(.vertical, 2)
+
+                Button(role: .destructive) {
+                    Task {
+                        await authStore.signOut()
+                    }
+                } label: {
+                    Text(L10n.k("auth.settings.sign_out", fallback: "退出登录"))
+                        .font(.system(size: SettingsFont.action, weight: .semibold))
                 }
                 .buttonStyle(.bordered)
-                .disabled(processManager.state == .starting || processManager.state == .stopping)
-
-                Button(L10n.k("user.detail.auto.stop", fallback: "停止")) {
-                    processManager.stop()
-                }
-                .buttonStyle(.bordered)
-                .disabled(processManager.state == .stopped || processManager.state == .stopping)
+                .controlSize(.large)
             }
-
-            Text(gatewayActionHint)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 
     @ViewBuilder
     private var terminalSection: some View {
-        Section("OpenClaw 终端") {
-            if let selectedProfile = profileStore.selectedProfile,
-               let selectedResolution = profileStore.selectedResolution {
-                LabeledContent("当前 Profile", value: "\(selectedProfile.displayName) (\(selectedProfile.slug))")
-                LabeledContent("工作目录", value: selectedResolution.resolvedWorkspaceRoot)
+        SettingsSectionCard(
+            "OpenClaw 终端",
+            subtitle: "进入当前 Profile 的命令行环境。",
+            minHeight: SettingsLayout.operationCardMinHeight
+        ) {
+            VStack(alignment: .leading, spacing: 16) {
+                if let selectedProfile = profileStore.selectedProfile,
+                   let selectedResolution = profileStore.selectedResolution {
+                    SettingsInfoRow("当前 Profile", value: "\(selectedProfile.displayName) (\(selectedProfile.slug))")
+                    SettingsPathBlock(title: "工作目录", path: selectedResolution.resolvedWorkspaceRoot)
 
-                Button {
-                    openWindow(id: "profile-terminal", value: selectedProfile.id.uuidString)
-                } label: {
+                    Button {
+                        openWindow(id: "profile-terminal", value: selectedProfile.id.uuidString)
+                    } label: {
+                        Label("打开内嵌终端", systemImage: "terminal")
+                            .font(.system(size: SettingsFont.action, weight: .semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Text("终端会自动进入当前 profile 环境，可执行 openclaw configure --section model、openclaw agents list 等命令。openclaw gateway 会被保护，避免重复启动 Gateway。")
+                        .font(.system(size: SettingsFont.detail))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("当前没有可用 profile，暂时无法打开 OpenClaw 终端。")
+                        .font(.system(size: SettingsFont.body))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
                     Label("打开内嵌终端", systemImage: "terminal")
+                        .font(.system(size: SettingsFont.action, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .background(Color.secondary.opacity(0.08), in: Capsule())
                 }
-                .buttonStyle(.borderedProminent)
-
-                Text("终端会自动进入当前 profile 环境，可执行 openclaw configure --section model、openclaw agents list 等命令。openclaw gateway 会被保护，避免重复启动 Gateway。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("当前没有可用 profile，暂时无法打开 OpenClaw 终端。")
-                    .foregroundStyle(.secondary)
             }
         }
     }
 
     @ViewBuilder
     private var profilesSection: some View {
-        Section("Profiles") {
-            if profileStore.profiles.isEmpty {
-                Text("当前还没有可用 profile")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("当前 Profile", selection: Binding(
-                    get: { profileStore.selectedProfileID ?? profileStore.profiles.first?.id ?? UUID() },
-                    set: { profileStore.selectProfile(id: $0) }
-                )) {
-                    ForEach(profileStore.profiles) { profile in
-                        Text("\(profile.displayName) (\(profile.slug))")
-                            .tag(profile.id)
-                    }
-                }
-
-                Text("当前选中的 profile 会接入完整业务上下文；其他 profile 只展示 Supervisor 提供的轻量运行态。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 12) {
-                    Button("新建 Gateway/Profile") {
-                        showCreateProfileSheet = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isAnyProfileOperationInFlight)
-
-                    if !profileStore.hasImportedLegacyProfile &&
-                        FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
-                        Button("导入 ~/.openclaw") {
-                            importLegacyProfile()
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isAnyProfileOperationInFlight)
-                    }
-
-                    Button("刷新运行态") {
-                        Task {
-                            await refreshProfilesRuntime(reloadProfiles: true)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isAnyProfileOperationInFlight)
-                }
-
-                if isRefreshingProfiles {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("正在同步 Profiles 运行态…")
-                            .font(.caption)
+        SettingsSectionCard(
+            "Profiles",
+            subtitle: "管理当前 App 可用的 Gateway/Profile 与轻量运行态。"
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                if profileStore.profiles.isEmpty {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("当前还没有可用 profile")
+                            .font(.system(size: SettingsFont.body))
                             .foregroundStyle(.secondary)
-                    }
-                }
 
-                ForEach(profileStore.profiles) { profile in
-                    profileCard(for: profile)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        profileToolbarActions
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) {
+                            profileToolbarActions
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            profileToolbarActions
+                        }
+                    }
+
+                    Text("当前：\(profileStore.selectedProfile?.displayName ?? "未选择")。左右滑动查看更多 Profile；点击卡片里的“切换到此 Profile”切换上下文。")
+                        .font(.system(size: SettingsFont.detail))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if isRefreshingProfiles {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("正在同步 Profiles 运行态…")
+                                .font(.system(size: SettingsFont.detail))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    profileGrid
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var profileGrid: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: 16) {
+                ForEach(profileStore.profiles) { profile in
+                    profileCard(for: profile)
+                        .frame(width: SettingsLayout.profileCardWidth)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.visible)
+        .frame(height: SettingsLayout.profileCarouselHeight)
+    }
+
+    @ViewBuilder
+    private var profileToolbarActions: some View {
+        Button("新建 Gateway/Profile") {
+            showCreateProfileSheet = true
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(isAnyProfileOperationInFlight)
+
+        if !profileStore.hasImportedLegacyProfile &&
+            FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
+            Button("导入 ~/.openclaw") {
+                importLegacyProfile()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isAnyProfileOperationInFlight)
+        }
+
+        Button("刷新运行态") {
+            Task {
+                await refreshProfilesRuntime(reloadProfiles: true)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(isAnyProfileOperationInFlight)
     }
 
     @ViewBuilder
@@ -259,23 +320,28 @@ struct AppSettingsView: View {
         let isSelected = profileStore.selectedProfile?.id == profile.id
         let isBusy = isAnyProfileOperationInFlight
 
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Text(profile.displayName)
-                            .font(.headline)
+                            .font(.system(size: SettingsFont.cardTitle, weight: .semibold))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
                         if isSelected {
                             profileBadge("当前", tint: .accentColor)
                         }
 
                         profileBadge(profileSourceLabel(for: profile), tint: profileSourceColor(for: profile))
-                        profileBadge(profileRuntimeLabel(for: runtime), tint: profileRuntimeColor(for: runtime))
+                        profileBadge(
+                            profileRuntimeLabel(for: profile, runtime: runtime, resolution: resolution),
+                            tint: profileRuntimeColor(for: profile, runtime: runtime, resolution: resolution)
+                        )
                     }
 
                     Text(profile.slug)
-                        .font(.caption.monospaced())
+                        .font(.system(size: SettingsFont.meta, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
 
@@ -295,140 +361,289 @@ struct AppSettingsView: View {
                     updateAutoStart(enabled: newValue, for: profile.id)
                 }
             ))
+            .font(.system(size: SettingsFont.body))
+            .controlSize(.large)
             .disabled(isBusy)
 
+            LazyVGrid(columns: profileMetricColumns, alignment: .leading, spacing: 6) {
+                profileMetric("端口", "\(runtime?.resolvedPort ?? resolution.resolvedPort)")
+                profileMetric("配置", profileConfigurationLabel(for: profile, runtime: runtime, resolution: resolution))
+                profileMetric("PID", runtime?.pid.map(String.init) ?? "—")
+                profileMetric("探测", probeTimeLabel(for: runtime?.lastProbeAt))
+            }
+
+            profileRuntimeStatusRow(for: profile, runtime: runtime, resolution: resolution)
+
             VStack(alignment: .leading, spacing: 6) {
-                profileInfoRow("端口", "\(runtime?.resolvedPort ?? resolution.resolvedPort)")
-                profileInfoRow("配置已准备", runtime?.isPrepared == true ? "是" : "否")
-                profileInfoRow("运行权属", profileOwnershipLabel(for: runtime))
-                profileInfoRow("PID", runtime?.pid.map(String.init) ?? "—")
-                profileInfoRow("最近探测", probeTimeLabel(for: runtime?.lastProbeAt))
+                profileCompactPathRow(title: "Config", path: resolution.resolvedConfigPath)
+                profileCompactPathRow(title: "Workspace", path: resolution.resolvedWorkspaceRoot)
             }
 
-            if let runtime,
-               let lastError = runtime.lastError,
-               !lastError.isEmpty {
-                Text(lastError)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            profilePathBlock(title: "Config", path: resolution.resolvedConfigPath)
-            profilePathBlock(title: "State", path: resolution.resolvedStateDir)
-            profilePathBlock(title: "Workspace", path: resolution.resolvedWorkspaceRoot)
-
-            HStack(spacing: 8) {
-                if !isSelected {
-                    Button("切换到此 Profile") {
-                        profileStore.selectProfile(id: profile.id)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isBusy)
-                }
-
-                if shouldShowPrepareAction(for: runtime) {
-                    Button(prepareActionTitle(for: runtime)) {
-                        Task {
-                            await runProfileAction(.prepare, profile: profile)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
-                }
-
-                if runtime?.isRunning == true {
-                    Button("停止") {
-                        Task {
-                            await runProfileAction(.stop, profile: profile)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
-
-                    Button("重启") {
-                        Task {
-                            await runProfileAction(.restart, profile: profile)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
-                } else {
-                    Button("启动") {
-                        Task {
-                            await runProfileAction(.start, profile: profile)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isBusy || profileRuntimeIsTransitional(runtime))
-                }
-
-                Button(role: .destructive) {
-                    pendingDeletionProfile = profile
-                } label: {
-                    Text("删除")
-                }
-                .buttonStyle(.bordered)
-                .disabled(isBusy)
-            }
+            profileActionButtons(
+                profile: profile,
+                runtime: runtime,
+                isSelected: isSelected,
+                isBusy: isBusy
+            )
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: SettingsLayout.profileCardHeight,
+            maxHeight: SettingsLayout.profileCardHeight,
+            alignment: .topLeading
+        )
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.7))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.72))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(
-                    isSelected ? Color.accentColor.opacity(0.35) : Color.primary.opacity(0.08),
-                    lineWidth: 1
+                    isSelected ? Color.accentColor.opacity(0.42) : Color.primary.opacity(0.08),
+                    lineWidth: isSelected ? 1.4 : 1
                 )
+        )
+        .shadow(color: Color.black.opacity(isSelected ? 0.06 : 0.03), radius: 12, y: 4)
+    }
+
+    @ViewBuilder
+    private func profileMetric(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: SettingsFont.badge, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(size: SettingsFont.detail, weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.54))
         )
     }
 
     @ViewBuilder
-    private var environmentSection: some View {
-        Section(L10n.k("settings.environment", fallback: "环境")) {
-            LabeledContent(
-                "Node.js",
-                value: GatewayProcessManager.bundledNodeURL.path
+    private func profileRuntimeStatusRow(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> some View {
+        let message = profileRuntimeStatusMessage(for: profile, runtime: runtime, resolution: resolution)
+        let color = profileRuntimeStatusColor(for: profile, runtime: runtime, resolution: resolution)
+        let icon = profileRuntimeStatusIcon(for: profile, runtime: runtime, resolution: resolution)
+
+        Label(message, systemImage: icon)
+            .font(.system(size: SettingsFont.detail, weight: .medium))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 30, maxHeight: 30, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(color.opacity(0.10))
             )
-            LabeledContent(
-                "OpenClaw",
-                value: GatewayProcessManager.bundledOpenClawEntry.path
-            )
-            switch envChecker.status {
-            case .ready:
-                LabeledContent(
-                    L10n.k("settings.env_status", fallback: "环境状态"),
-                    value: L10n.k("settings.env_ready", fallback: "就绪")
-                )
-            case .missing(let msg):
-                LabeledContent(
-                    L10n.k("settings.env_status", fallback: "环境状态"),
-                    value: msg
-                )
-            default:
-                EmptyView()
+            .help(message)
+    }
+
+    @ViewBuilder
+    private func profileCompactPathRow(title: String, path: String) -> some View {
+        SettingsCompactPathRow(title: title, path: path)
+    }
+
+    @ViewBuilder
+    private func profileActionButtons(
+        profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        isSelected: Bool,
+        isBusy: Bool
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                profileActionButtonGroup(profile: profile, runtime: runtime, isSelected: isSelected, isBusy: isBusy)
             }
-            Button(L10n.k("settings.recheck", fallback: "重新检查")) {
-                Task { await envChecker.check() }
+
+            VStack(alignment: .leading, spacing: 10) {
+                profileActionButtonGroup(profile: profile, runtime: runtime, isSelected: isSelected, isBusy: isBusy)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func profileActionButtonGroup(
+        profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        isSelected: Bool,
+        isBusy: Bool
+    ) -> some View {
+        if !isSelected {
+            Button("切换到此 Profile") {
+                profileStore.selectProfile(id: profile.id)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isBusy)
+        }
+
+        if shouldShowPrepareAction(for: profile, runtime: runtime) {
+            Button(prepareActionTitle(for: profile, runtime: runtime)) {
+                Task {
+                    await runProfileAction(.prepare, profile: profile)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+        }
+
+        if runtime?.isRunning == true {
+            Button("停止") {
+                Task {
+                    await runProfileAction(.stop, profile: profile)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+
+            Button("重启") {
+                Task {
+                    await runProfileAction(.restart, profile: profile)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+        } else {
+            Button("启动") {
+                Task {
+                    await runProfileAction(.start, profile: profile)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+        }
+
+        Button(role: .destructive) {
+            pendingDeletionProfile = profile
+        } label: {
+            Text("删除")
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(isBusy)
+    }
+
+    @ViewBuilder
+    private var environmentSection: some View {
+        SettingsSectionCard(
+            L10n.k("settings.environment", fallback: "环境"),
+            subtitle: "检查 App 内置 Node.js 与 OpenClaw 运行文件。",
+            minHeight: SettingsLayout.systemCardMinHeight
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsPathBlock(title: "Node.js", path: GatewayProcessManager.bundledNodeURL.path)
+                SettingsPathBlock(title: "OpenClaw", path: GatewayProcessManager.bundledOpenClawEntry.path)
+
+                switch envChecker.status {
+                case .ready:
+                    SettingsInfoRow(
+                        L10n.k("settings.env_status", fallback: "环境状态"),
+                        value: L10n.k("settings.env_ready", fallback: "就绪")
+                    )
+                case .missing(let msg):
+                    SettingsInfoRow(
+                        L10n.k("settings.env_status", fallback: "环境状态"),
+                        value: msg,
+                        allowsWrapping: true
+                    )
+                case .checking:
+                    SettingsInfoRow(L10n.k("settings.env_status", fallback: "环境状态"), value: "检查中")
+                case .unchecked:
+                    SettingsInfoRow(L10n.k("settings.env_status", fallback: "环境状态"), value: "未检查")
+                }
+
+                Button(L10n.k("settings.recheck", fallback: "重新检查")) {
+                    Task { await envChecker.check() }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
         }
     }
 
     @ViewBuilder
     private var aboutSection: some View {
-        Section(L10n.k("settings.about", fallback: "关于")) {
-            LabeledContent(
-                L10n.k("settings.version", fallback: "版本"),
-                value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
-            )
-            LabeledContent(
-                L10n.k("settings.build", fallback: "构建号"),
-                value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
-            )
+        SettingsSectionCard(
+            L10n.k("settings.about", fallback: "关于"),
+            minHeight: SettingsLayout.systemCardMinHeight
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsInfoRow(
+                    L10n.k("settings.version", fallback: "版本"),
+                    value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                )
+                SettingsInfoRow(
+                    L10n.k("settings.build", fallback: "构建号"),
+                    value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                )
+            }
+        }
+    }
+
+    private var overviewColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 190, maximum: 280), spacing: 16)]
+    }
+
+    private var profileMetricColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8)
+        ]
+    }
+
+    private var environmentStatusValue: String {
+        switch envChecker.status {
+        case .unchecked:
+            return "未检查"
+        case .checking:
+            return "检查中"
+        case .ready:
+            return L10n.k("settings.env_ready", fallback: "就绪")
+        case .missing:
+            return "异常"
+        }
+    }
+
+    private var environmentStatusSubtitle: String {
+        switch envChecker.status {
+        case .unchecked:
+            return "等待环境检查"
+        case .checking:
+            return "正在检查运行文件"
+        case .ready:
+            return "内置运行环境可用"
+        case .missing(let msg):
+            return msg
+        }
+    }
+
+    private var environmentStatusColor: Color {
+        switch envChecker.status {
+        case .ready:
+            return .green
+        case .checking:
+            return .orange
+        case .missing:
+            return .red
+        case .unchecked:
+            return .secondary
         }
     }
 
@@ -436,35 +651,36 @@ struct AppSettingsView: View {
         isDeletingProfile || isRefreshingProfiles || profileActionProfileID != nil
     }
 
-    private var stateLabel: String {
-        switch processManager.state {
-        case .running: return L10n.k("dashboard.running", fallback: "运行中")
-        case .stopping: return L10n.k("dashboard.stopping", fallback: "正在停止…")
-        case .starting: return L10n.k("dashboard.starting", fallback: "正在启动…")
-        case .stopped: return L10n.k("dashboard.stopped", fallback: "已停止")
-        case .failed(let msg): return msg
-        }
-    }
-
-    private var gatewayActionHint: String {
-        switch processManager.state {
-        case .running:
-            return gatewayService.isConnected
-                ? "Gateway 正在运行，可在这里重启或停止。"
-                : "Gateway 进程已启动，正在等待连接恢复。"
-        case .starting:
-            return "Gateway 正在启动中，请稍候。"
-        case .stopping:
-            return "Gateway 正在停止中，请稍候。"
-        case .stopped:
-            return "Gateway 当前已停止，可在这里重新启动。"
-        case .failed:
-            return "Gateway 当前处于异常状态，建议尝试重启。"
-        }
-    }
-
     private func runtime(for profile: GatewayProfile) -> SupervisorProfileRuntime? {
         supervisorClient.runtimes.first(where: { $0.profileID == profile.id })
+    }
+
+    @ViewBuilder
+    private func responsiveTwoColumnRow<Leading: View, Trailing: View>(
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 20) {
+                leading()
+                    .frame(
+                        minWidth: SettingsLayout.twoColumnCardMinimumWidth,
+                        maxWidth: .infinity,
+                        alignment: .topLeading
+                    )
+                trailing()
+                    .frame(
+                        minWidth: SettingsLayout.twoColumnCardMinimumWidth,
+                        maxWidth: .infinity,
+                        alignment: .topLeading
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 20) {
+                leading()
+                trailing()
+            }
+        }
     }
 
     private func profileSourceLabel(for profile: GatewayProfile) -> String {
@@ -485,13 +701,31 @@ struct AppSettingsView: View {
         }
     }
 
-    private func profileRuntimeLabel(for runtime: SupervisorProfileRuntime?) -> String {
+    private func profileConfigurationLabel(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> String {
+        if profile.sourceKind == .legacyReuse {
+            return legacyConfigExists(for: resolution) ? "可复用" : "缺配置"
+        }
+
+        return runtime?.isPrepared == true ? "已准备" : "未准备"
+    }
+
+    private func profileRuntimeLabel(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> String {
+        let legacyConfigIsReusable = profile.sourceKind == .legacyReuse && legacyConfigExists(for: resolution)
         guard let runtime else { return "未同步" }
 
         switch runtime.readyState {
         case .unknown:
             return runtime.isRunning ? "运行中" : "未知"
         case .stopped:
+            if legacyConfigIsReusable { return "可复用" }
             return runtime.isPrepared ? "已停止" : "未准备"
         case .preparing:
             return "准备中"
@@ -504,7 +738,12 @@ struct AppSettingsView: View {
         }
     }
 
-    private func profileRuntimeColor(for runtime: SupervisorProfileRuntime?) -> Color {
+    private func profileRuntimeColor(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> Color {
+        let legacyConfigIsReusable = profile.sourceKind == .legacyReuse && legacyConfigExists(for: resolution)
         guard let runtime else { return .secondary }
 
         switch runtime.readyState {
@@ -514,9 +753,80 @@ struct AppSettingsView: View {
             return .orange
         case .failed:
             return .red
-        case .stopped, .unknown:
+        case .stopped:
+            return legacyConfigIsReusable && !runtime.isPrepared ? .blue : .secondary
+        case .unknown:
             return .secondary
         }
+    }
+
+    private func profileRuntimeStatusMessage(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> String {
+        guard let runtime else {
+            return "运行态未同步，点击刷新运行态获取最新状态。"
+        }
+
+        if let lastError = runtime.lastError,
+           !lastError.isEmpty {
+            return "运行异常：\(lastError)"
+        }
+
+        return "运行态：\(profileRuntimeLabel(for: profile, runtime: runtime, resolution: resolution))"
+    }
+
+    private func profileRuntimeStatusColor(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> Color {
+        guard let runtime else { return .secondary }
+
+        if let lastError = runtime.lastError,
+           !lastError.isEmpty {
+            return .red
+        }
+
+        return profileRuntimeColor(for: profile, runtime: runtime, resolution: resolution)
+    }
+
+    private func profileRuntimeStatusIcon(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?,
+        resolution: GatewayProfileResolution
+    ) -> String {
+        guard let runtime else { return "clock" }
+
+        if let lastError = runtime.lastError,
+           !lastError.isEmpty {
+            return "exclamationmark.triangle.fill"
+        }
+
+        if profile.sourceKind == .legacyReuse,
+           legacyConfigExists(for: resolution),
+           runtime.readyState == .stopped,
+           !runtime.isPrepared {
+            return "checkmark.circle"
+        }
+
+        switch runtime.readyState {
+        case .ready:
+            return runtime.isRunning ? "checkmark.circle.fill" : "checkmark.circle"
+        case .preparing, .starting:
+            return "arrow.triangle.2.circlepath"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        case .stopped:
+            return "pause.circle"
+        case .unknown:
+            return "questionmark.circle"
+        }
+    }
+
+    private func legacyConfigExists(for resolution: GatewayProfileResolution) -> Bool {
+        FileManager.default.fileExists(atPath: resolution.resolvedConfigPath)
     }
 
     private func profileOwnershipLabel(for runtime: SupervisorProfileRuntime?) -> String {
@@ -547,12 +857,16 @@ struct AppSettingsView: View {
         }
     }
 
-    private func shouldShowPrepareAction(for runtime: SupervisorProfileRuntime?) -> Bool {
+    private func shouldShowPrepareAction(for _: GatewayProfile, runtime: SupervisorProfileRuntime?) -> Bool {
         runtime?.isRunning != true
     }
 
-    private func prepareActionTitle(for runtime: SupervisorProfileRuntime?) -> String {
-        runtime?.isPrepared == true ? "重新准备配置" : "准备配置"
+    private func prepareActionTitle(for profile: GatewayProfile, runtime: SupervisorProfileRuntime?) -> String {
+        if profile.sourceKind == .legacyReuse {
+            return runtime?.isPrepared == true ? "重新检查配置" : "检查配置"
+        }
+
+        return runtime?.isPrepared == true ? "重新准备配置" : "准备配置"
     }
 
     private func updateAutoStart(enabled: Bool, for profileID: UUID) {
@@ -681,15 +995,330 @@ private enum ProfileLifecycleAction {
     case restart
 }
 
-private struct ProfileBadge: View {
+private enum SettingsFont {
+    static let cardTitle: CGFloat = 20
+    static let cardSubtitle: CGFloat = 15
+    static let body: CGFloat = 16
+    static let detail: CGFloat = 15
+    static let meta: CGFloat = 14
+    static let badge: CGFloat = 13
+    static let path: CGFloat = 13
+    static let action: CGFloat = 16
+}
+
+private enum SettingsLayout {
+    static let operationCardMinHeight: CGFloat = 320
+    static let systemCardMinHeight: CGFloat = 320
+    static let twoColumnCardMinimumWidth: CGFloat = 360
+    static let profileCardWidth: CGFloat = 420
+    static let profileCardHeight: CGFloat = 392
+    static let profileCarouselHeight: CGFloat = 408
+    static let pathBlockHeight: CGFloat = 60
+    static let pathTextBoxMinHeight: CGFloat = 34
+    static let pathLineLimit = 1
+}
+
+private struct SettingsSectionCard<Content: View>: View {
+    let title: String
+    let subtitle: String?
+    let minHeight: CGFloat?
+    let content: Content
+
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        minHeight: CGFloat? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.minHeight = minHeight
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: SettingsFont.cardTitle, weight: .semibold))
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: SettingsFont.cardSubtitle))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            content
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.03), radius: 14, y: 6)
+        )
+    }
+}
+
+private struct SettingsOverviewCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let subtitle: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.system(size: SettingsFont.meta, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+
+            Text(value)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Text(subtitle)
+                .font(.system(size: SettingsFont.meta))
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(tint.opacity(0.16), lineWidth: 1)
+                )
+        )
+    }
+}
+
+private struct SettingsInfoRow: View {
+    let title: String
+    let value: String
+    let isMonospaced: Bool
+    let allowsWrapping: Bool
+
+    init(
+        _ title: String,
+        value: String,
+        isMonospaced: Bool = false,
+        allowsWrapping: Bool = false
+    ) {
+        self.title = title
+        self.value = value
+        self.isMonospaced = isMonospaced
+        self.allowsWrapping = allowsWrapping
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
+            Text(title)
+                .font(.system(size: SettingsFont.detail))
+                .foregroundStyle(.secondary)
+                .frame(width: 112, alignment: .leading)
+
+            valueText
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var valueText: some View {
+        if allowsWrapping {
+            Text(value)
+                .font(valueFont)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(value)
+                .font(valueFont)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+        }
+    }
+
+    private var valueFont: Font {
+        isMonospaced
+            ? .system(size: SettingsFont.path, design: .monospaced)
+            : .system(size: SettingsFont.body, weight: .medium)
+    }
+}
+
+private struct SettingsPathBlock: View {
+    let title: String
+    let path: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: SettingsFont.meta, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            SettingsPathDisclosure(
+                path: path,
+                fill: Color(nsColor: .windowBackgroundColor).opacity(0.72),
+                height: SettingsLayout.pathTextBoxMinHeight
+            )
+        }
+        .frame(maxWidth: .infinity, minHeight: SettingsLayout.pathBlockHeight, alignment: .topLeading)
+    }
+}
+
+private struct SettingsCompactPathRow: View {
+    let title: String
+    let path: String
+    @State private var isShowingFullPath = false
+
+    var body: some View {
+        Button {
+            isShowingFullPath.toggle()
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
+                Text(title)
+                    .font(.system(size: SettingsFont.meta, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 76, alignment: .leading)
+
+                Text(displayPath)
+                    .font(.system(size: SettingsFont.path, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(SettingsLayout.pathLineLimit)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
+
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 34, maxHeight: 34, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.54))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .popover(isPresented: $isShowingFullPath, arrowEdge: .bottom) {
+            SettingsFullPathPopover(title: title, path: path)
+        }
+        .help("点击查看完整路径：\(path)")
+    }
+
+    private var displayPath: String {
+        NSString(string: path).abbreviatingWithTildeInPath
+    }
+}
+
+private struct SettingsPathDisclosure: View {
+    let path: String
+    let fill: Color
+    let height: CGFloat
+    @State private var isShowingFullPath = false
+
+    var body: some View {
+        Button {
+            isShowingFullPath.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                Text(displayPath)
+                    .font(.system(size: SettingsFont.path, design: .monospaced))
+                    .foregroundStyle(.primary)
+                    .lineLimit(SettingsLayout.pathLineLimit)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .clipped()
+
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(fill)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .popover(isPresented: $isShowingFullPath, arrowEdge: .bottom) {
+            SettingsFullPathPopover(title: "完整路径", path: path)
+        }
+        .help("点击查看完整路径：\(path)")
+    }
+
+    private var displayPath: String {
+        NSString(string: path).abbreviatingWithTildeInPath
+    }
+}
+
+private struct SettingsFullPathPopover: View {
+    let title: String
+    let path: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.system(size: SettingsFont.body, weight: .semibold))
+
+            Text(path)
+                .font(.system(size: SettingsFont.path, design: .monospaced))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color(nsColor: .textBackgroundColor).opacity(0.70))
+                )
+
+            Button("复制路径") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(path, forType: .string)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+        }
+        .padding(16)
+        .frame(width: 560, alignment: .leading)
+    }
+}
+
+private struct SettingsStatusPill: View {
     let title: String
     let tint: Color
 
     var body: some View {
         Text(title)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .font(.system(size: SettingsFont.badge, weight: .semibold))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
             .background(tint.opacity(0.12), in: Capsule())
             .foregroundStyle(tint)
     }
@@ -697,29 +1326,14 @@ private struct ProfileBadge: View {
 
 private extension AppSettingsView {
     func profileBadge(_ title: String, tint: Color) -> some View {
-        ProfileBadge(title: title, tint: tint)
+        SettingsStatusPill(title: title, tint: tint)
     }
 
     func profileInfoRow(_ title: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 72, alignment: .leading)
-            Text(value)
-                .font(.caption)
-        }
+        SettingsInfoRow(title, value: value)
     }
 
     func profilePathBlock(title: String, path: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(path)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        SettingsPathBlock(title: title, path: path)
     }
 }
