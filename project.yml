@@ -64,7 +64,11 @@ targets:
           DEST_BIN="${CODESIGNING_FOLDER_PATH}/Contents/MacOS"
           DEST_AGENT="${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchAgents"
           mkdir -p "$DEST_BIN" "$DEST_AGENT"
-          cp "${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor" "$DEST_BIN/EZRWorkerSupervisor"
+          SRC_SUPERVISOR="${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor"
+          DEST_SUPERVISOR="$DEST_BIN/EZRWorkerSupervisor"
+          if [ ! -f "$DEST_SUPERVISOR" ] || ! cmp -s "$SRC_SUPERVISOR" "$DEST_SUPERVISOR"; then
+            cp "$SRC_SUPERVISOR" "$DEST_SUPERVISOR"
+          fi
           chmod +x "$DEST_BIN/EZRWorkerSupervisor"
           cp "${SRCROOT}/Resources/ai.ezrworker.mac.supervisor.plist" "$DEST_AGENT/"
         basedOnDependencyAnalysis: false

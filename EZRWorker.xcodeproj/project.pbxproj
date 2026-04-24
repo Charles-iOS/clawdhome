@@ -1228,7 +1228,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "DEST_BIN=\"${CODESIGNING_FOLDER_PATH}/Contents/MacOS\"\nDEST_AGENT=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchAgents\"\nmkdir -p \"$DEST_BIN\" \"$DEST_AGENT\"\ncp \"${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor\" \"$DEST_BIN/EZRWorkerSupervisor\"\nchmod +x \"$DEST_BIN/EZRWorkerSupervisor\"\ncp \"${SRCROOT}/Resources/ai.ezrworker.mac.supervisor.plist\" \"$DEST_AGENT/\"\n";
+			shellScript = "DEST_BIN=\"${CODESIGNING_FOLDER_PATH}/Contents/MacOS\"\nDEST_AGENT=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchAgents\"\nmkdir -p \"$DEST_BIN\" \"$DEST_AGENT\"\nSRC_SUPERVISOR=\"${BUILT_PRODUCTS_DIR}/EZRWorkerSupervisor\"\nDEST_SUPERVISOR=\"$DEST_BIN/EZRWorkerSupervisor\"\nif [ ! -f \"$DEST_SUPERVISOR\" ] || ! cmp -s \"$SRC_SUPERVISOR\" \"$DEST_SUPERVISOR\"; then\n  cp \"$SRC_SUPERVISOR\" \"$DEST_SUPERVISOR\"\nfi\nchmod +x \"$DEST_BIN/EZRWorkerSupervisor\"\ncp \"${SRCROOT}/Resources/ai.ezrworker.mac.supervisor.plist\" \"$DEST_AGENT/\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
