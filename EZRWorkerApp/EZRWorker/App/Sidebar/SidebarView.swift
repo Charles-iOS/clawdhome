@@ -7,6 +7,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
     case cron
     case skills
     case channels
+    case models
     case settings
 
     var id: String { rawValue }
@@ -17,6 +18,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
         case .cron:      return L10n.k("sidebar.cron", fallback: "定时任务")
         case .skills:    return L10n.k("sidebar.skills", fallback: "技能")
         case .channels:  return L10n.k("sidebar.channels", fallback: "消息渠道")
+        case .models:    return L10n.k("sidebar.models", fallback: "模型")
         case .settings:  return L10n.k("sidebar.settings", fallback: "设置")
         }
     }
@@ -27,6 +29,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
         case .cron:      return "clock.fill"
         case .skills:    return "wrench.and.screwdriver.fill"
         case .channels:  return "bubble.left.and.bubble.right.fill"
+        case .models:    return "cpu.fill"
         case .settings:  return "gearshape.fill"
         }
     }
@@ -34,7 +37,7 @@ enum SidebarDestination: String, Hashable, CaseIterable, Identifiable {
     var section: SidebarSection {
         switch self {
         case .agents: return .configuration
-        case .cron, .skills, .channels: return .capabilities
+        case .cron, .skills, .channels, .models: return .capabilities
         case .settings: return .system
         }
     }

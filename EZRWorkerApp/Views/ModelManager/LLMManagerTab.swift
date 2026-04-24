@@ -5,6 +5,7 @@ import SwiftUI
 
 struct LLMManagerTab: View {
     @Environment(GlobalModelStore.self) private var modelStore
+    @Environment(ProviderKeychainStore.self) private var keychainStore
     @State private var showAddSheet = false
     @State private var editingProvider: ProviderTemplate? = nil
     @State private var deleteConfirmId: UUID? = nil
@@ -66,7 +67,11 @@ struct LLMManagerTab: View {
                    set: { if !$0 { deleteConfirmId = nil } }
                )) {
             Button(L10n.k("views.model_manager.llmmanager_tab.delete", fallback: "删除"), role: .destructive) {
-                if let id = deleteConfirmId { modelStore.removeProvider(id: id) }
+                if let id = deleteConfirmId,
+                   let provider = modelStore.providers.first(where: { $0.id == id }) {
+                    keychainStore.delete(forProvider: provider.providerGroupId)
+                    modelStore.removeProvider(id: id)
+                }
                 deleteConfirmId = nil
             }
             Button(L10n.k("views.model_manager.llmmanager_tab.cancel", fallback: "取消"), role: .cancel) { deleteConfirmId = nil }
@@ -81,13 +86,13 @@ struct LLMManagerTab: View {
             VStack(alignment: .leading, spacing: 8) {
                 // 型号列表
                 ForEach(provider.modelIds, id: \.self) { modelId in
-                    let entry = builtInModelGroups.flatMap(\.models).first { $0.id == modelId }
+                    let label = provider.modelLabels[modelId] ?? modelDisplayLabel(for: modelId)
                     HStack(spacing: 6) {
                         Image(systemName: "circle.fill")
                             .font(.system(size: 6))
                             .foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(entry?.label ?? modelId)
+                            Text(label)
                                 .font(.callout)
                             Text(modelId)
                                 .font(.system(.caption2, design: .monospaced))
@@ -108,7 +113,7 @@ struct LLMManagerTab: View {
                 Text(L10n.f("views.model_manager.llmmanager_tab.text_498748aa", fallback: "· %@ 个型号", String(describing: provider.modelIds.count)))
                     .font(.caption).foregroundStyle(.secondary)
                 // 凭据状态
-                let hasKey = AccountKeychain.hasCredential(for: provider.id)
+                let hasKey = keychainStore.hasKey(forProvider: provider.providerGroupId)
                 Image(systemName: hasKey ? "key.fill" : "key")
                     .font(.caption2)
                     .foregroundStyle(hasKey ? Color.accentColor : Color.secondary.opacity(0.4))

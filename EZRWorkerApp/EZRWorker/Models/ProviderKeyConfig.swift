@@ -121,6 +121,15 @@ let supportedProviderKeys: [ProviderKeyConfig] = [
         placeholder: "sk-proj-...",
         isUrlConfig: false, supportsOAuth: true),   // OpenAI Codex (ChatGPT OAuth)
     ProviderKeyConfig(
+        id: "openai-compatible",
+        displayName: "OpenAI-compatible",
+        configPath: "models.providers.openai-compatible.apiKey",
+        placeholder: "sk-...",
+        isUrlConfig: false, supportsOAuth: false,
+        sideConfigs: [
+            ("models.providers.openai-compatible.api", .string("openai-completions")),
+        ]),
+    ProviderKeyConfig(
         id: "google",
         displayName: "Google Gemini",
         configPath: "models.providers.google.apiKey",
@@ -156,6 +165,7 @@ let supportedProviderKeys: [ProviderKeyConfig] = [
             ("models.providers.minimax.api", .string("anthropic-messages")),
             ("models.providers.minimax.baseUrl", .string("https://api.minimaxi.com/anthropic")),
             ("models.providers.minimax.authHeader", .bool(true)),
+            ("models.providers.minimax.models", .jsonArray(minimaxOpenClawModelCatalog)),
         ]),
     ProviderKeyConfig(
         id: "minimax-cn",
@@ -194,3 +204,195 @@ let supportedProviderKeys: [ProviderKeyConfig] = [
         placeholder: "http://localhost:11434",
         isUrlConfig: true, supportsOAuth: false),
 ]
+
+private func providerConfigJSONValue(_ value: ProviderConfigValue) -> Any {
+    switch value {
+    case .string(let s): return s
+    case .bool(let b): return b
+    case .jsonArray(let rows): return rows
+    }
+}
+
+func providerDisplayNameForID(_ providerId: String) -> String {
+    supportedProviderKeys.first(where: { $0.id == providerId })?.displayName ?? providerId
+}
+
+func normalizedModelID(_ rawModelId: String, providerId: String) -> String {
+    let trimmed = rawModelId.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return "" }
+    if trimmed.hasPrefix("\(providerId)/") {
+        return trimmed
+    }
+    return "\(providerId)/\(trimmed)"
+}
+
+func modelDisplayLabel(
+    for modelId: String,
+    labels: [String: String] = [:]
+) -> String {
+    if let explicit = labels[modelId], !explicit.isEmpty {
+        return explicit
+    }
+    if let builtIn = builtInModelGroups
+        .flatMap(\.models)
+        .first(where: { $0.id == modelId }) {
+        return builtIn.label
+    }
+
+    let components = modelId.split(separator: "/", omittingEmptySubsequences: true)
+    if components.count >= 2 {
+        return String(components.dropFirst().joined(separator: "/"))
+    }
+    return modelId
+}
+
+func suggestedModelsForProvider(_ providerId: String) -> [ModelEntry] {
+    switch providerId {
+    case "minimax", "minimax-cn":
+        return minimaxOpenClawModelCatalog.compactMap { row in
+            guard let rawID = row["id"] as? String else { return nil }
+            let name = row["name"] as? String ?? rawID
+            return ModelEntry(
+                id: normalizedModelID(rawID, providerId: providerId),
+                label: name
+            )
+        }
+    default:
+        return []
+    }
+}
+
+extension ProviderKeyConfig {
+    var defaultBaseURL: String? {
+        switch id {
+        case "openai":
+            return "https://api.openai.com/v1"
+        case "openrouter":
+            return "https://openrouter.ai/api/v1"
+        case "moonshot":
+            return "https://api.moonshot.cn/v1"
+        case "zai":
+            return "https://open.bigmodel.cn/api/paas/v4"
+        case "ollama":
+            return "http://localhost:11434/v1"
+        default:
+            return sideConfigs.first(where: { $0.key.hasSuffix(".baseUrl") }).flatMap { entry in
+                if case .string(let value) = entry.value {
+                    return value
+                }
+                return nil
+            }
+        }
+    }
+
+    var requiresBaseURLInput: Bool {
+        id == "openai-compatible"
+    }
+
+    var allowsCustomProviderID: Bool {
+        id == "openai-compatible"
+    }
+
+    var defaultAPIType: String {
+        switch id {
+        case "openai-compatible":
+            return "openai-completions"
+        default:
+            return sideConfigs.first(where: { $0.key.hasSuffix(".api") }).flatMap { entry in
+                if case .string(let value) = entry.value {
+                    return value
+                }
+                return nil
+            } ?? "openai-completions"
+        }
+    }
+
+    var supportsRemoteModelDiscovery: Bool {
+        switch id {
+        case "openai", "openai-compatible", "openrouter", "moonshot", "zai":
+            return true
+        default:
+            return false
+        }
+    }
+
+    var suggestedModels: [ModelEntry] {
+        suggestedModelsForProvider(id)
+    }
+
+    func makeModelCatalog(
+        modelIds: [String],
+        labels: [String: String] = [:]
+    ) -> [[String: Any]] {
+        let normalizedIDs = modelIds
+            .map { normalizedModelID($0, providerId: id) }
+            .filter { !$0.isEmpty }
+
+        switch id {
+        case "minimax", "minimax-cn":
+            return normalizedIDs.compactMap { fullID in
+                let rawID = String(fullID.dropFirst("\(id)/".count))
+                if let builtIn = minimaxOpenClawModelCatalog.first(where: { ($0["id"] as? String) == rawID }) {
+                    return builtIn
+                }
+                return [
+                    "id": rawID,
+                    "name": modelDisplayLabel(for: fullID, labels: labels),
+                    "reasoning": true,
+                    "input": ["text"],
+                    "cost": ["input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0],
+                    "contextWindow": 200_000,
+                    "maxTokens": 8192,
+                ]
+            }
+        default:
+            return normalizedIDs.map { fullID in
+                let rawID = fullID.hasPrefix("\(id)/")
+                    ? String(fullID.dropFirst("\(id)/".count))
+                    : fullID.components(separatedBy: "/").dropFirst().joined(separator: "/")
+                return [
+                    "id": rawID,
+                    "name": modelDisplayLabel(for: fullID, labels: labels),
+                    "input": ["text"],
+                    "contextWindow": 128_000,
+                    "maxTokens": 8192,
+                ]
+            }
+        }
+    }
+
+    func makeProviderPayload(
+        secret: String?,
+        modelIds: [String],
+        labels: [String: String] = [:]
+    ) -> [String: Any] {
+        let trimmedSecret = (secret ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasWritableSecret = !trimmedSecret.isEmpty && !isRedactedProviderSecret(trimmedSecret)
+        var payload: [String: Any] = [:]
+
+        for entry in sideConfigs {
+            payload[entry.key.components(separatedBy: ".").last ?? entry.key] = providerConfigJSONValue(entry.value)
+        }
+
+        if isUrlConfig {
+            if hasWritableSecret {
+                payload["baseUrl"] = trimmedSecret
+            } else if let defaultBaseURL {
+                payload["baseUrl"] = defaultBaseURL
+            }
+        } else if hasWritableSecret {
+            payload["apiKey"] = trimmedSecret
+        }
+
+        let catalog = makeModelCatalog(modelIds: modelIds, labels: labels)
+        if !catalog.isEmpty {
+            payload["models"] = catalog
+        }
+
+        return payload
+    }
+
+    private func isRedactedProviderSecret(_ value: String) -> Bool {
+        value.count >= 3 && value.allSatisfy { $0 == "*" }
+    }
+}

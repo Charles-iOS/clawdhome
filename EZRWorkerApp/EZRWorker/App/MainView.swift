@@ -30,6 +30,8 @@ struct MainView: View {
             SkillsView()
         case .channels:
             ChannelView()
+        case .models:
+            ModelConfigView()
         case .settings:
             AppSettingsView()
         case nil:

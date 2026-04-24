@@ -2,14 +2,107 @@
 import Foundation
 import Observation
 
-/// 全局模型池条目：一个命名的账户配置
-/// 同一 Provider 可以添加多个账户（如「Anthropic 主账号」「Anthropic 备用」）
+/// 当前新主线按 provider 粒度管理模型配置。
+/// `name` 仍保留作为展示名，便于兼容旧数据。
 struct ProviderTemplate: Codable, Identifiable {
-    var id: UUID = UUID()          // 唯一标识（非 provider 类型）
-    var name: String               // 用户自定义名称，如「Anthropic 主账号」
-    var providerGroupId: String    // provider 类型，如 "anthropic"
-    var providerDisplayName: String// 对应的内置显示名，如 "Anthropic"
-    var modelIds: [String]         // 该账户下已选的模型 ID
+    var id: UUID = UUID()
+    var name: String
+    var providerGroupId: String
+    var providerTypeId: String
+    var providerDisplayName: String
+    var modelIds: [String]
+    var modelLabels: [String: String]
+    var baseURL: String
+    var apiType: String
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        providerGroupId: String,
+        providerTypeId: String? = nil,
+        providerDisplayName: String,
+        modelIds: [String],
+        modelLabels: [String: String] = [:],
+        baseURL: String = "",
+        apiType: String = ""
+    ) {
+        self.id = id
+        self.name = name
+        self.providerGroupId = providerGroupId
+        self.providerTypeId = providerTypeId ?? providerGroupId
+        self.providerDisplayName = providerDisplayName
+        self.modelIds = modelIds
+        self.modelLabels = modelLabels
+        self.baseURL = baseURL
+        self.apiType = apiType
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case providerGroupId
+        case providerTypeId
+        case providerDisplayName
+        case modelIds
+        case modelLabels
+        case baseURL
+        case apiType
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        providerGroupId = try c.decode(String.self, forKey: .providerGroupId)
+        providerTypeId = try c.decodeIfPresent(String.self, forKey: .providerTypeId) ?? providerGroupId
+        providerDisplayName = try c.decodeIfPresent(String.self, forKey: .providerDisplayName)
+            ?? providerDisplayNameForID(providerTypeId)
+        modelIds = try c.decodeIfPresent([String].self, forKey: .modelIds) ?? []
+        modelLabels = try c.decodeIfPresent([String: String].self, forKey: .modelLabels) ?? [:]
+        baseURL = try c.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+        apiType = try c.decodeIfPresent(String.self, forKey: .apiType) ?? ""
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(providerGroupId, forKey: .providerGroupId)
+        try c.encode(providerTypeId, forKey: .providerTypeId)
+        try c.encode(providerDisplayName, forKey: .providerDisplayName)
+        try c.encode(modelIds, forKey: .modelIds)
+        try c.encode(modelLabels, forKey: .modelLabels)
+        try c.encode(baseURL, forKey: .baseURL)
+        try c.encode(apiType, forKey: .apiType)
+    }
+
+    var displayName: String {
+        name.isEmpty ? providerDisplayName : name
+    }
+
+    var editorProviderId: String {
+        providerTypeId.isEmpty ? providerGroupId : providerTypeId
+    }
+
+    var normalizedModelIDs: [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for rawID in modelIds {
+            let normalized = normalizedModelID(rawID, providerId: providerGroupId)
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { continue }
+            ordered.append(normalized)
+        }
+        return ordered
+    }
+
+    func modelEntries() -> [ModelEntry] {
+        normalizedModelIDs.map { modelID in
+            ModelEntry(
+                id: modelID,
+                label: modelDisplayLabel(for: modelID, labels: modelLabels)
+            )
+        }
+    }
 }
 
 private struct PersistedState: Codable {
@@ -25,18 +118,32 @@ final class GlobalModelStore {
 
     /// 所有账户下已选模型的平铺列表
     var allTemplateModels: [ModelEntry] {
-        let builtIn = builtInModelGroups.flatMap(\.models)
-        return providers.flatMap { p in
-            p.modelIds.map { id in
-                builtIn.first { $0.id == id } ?? ModelEntry(id: id, label: id)
+        var seen = Set<String>()
+        var output: [ModelEntry] = []
+        for provider in providers {
+            for entry in provider.modelEntries() where seen.insert(entry.id).inserted {
+                output.append(entry)
             }
         }
+        return output
+    }
+
+    func provider(for providerId: String) -> ProviderTemplate? {
+        providers.first(where: { $0.providerGroupId == providerId })
+    }
+
+    func modelEntries(for providerId: String) -> [ModelEntry] {
+        provider(for: providerId)?.modelEntries() ?? []
     }
 
     // MARK: - 编辑
 
     func addProvider(_ entry: ProviderTemplate) {
-        providers.append(entry)
+        if let idx = providers.firstIndex(where: { $0.providerGroupId == entry.providerGroupId }) {
+            providers[idx] = entry
+        } else {
+            providers.append(entry)
+        }
         save()
     }
 
@@ -47,11 +154,6 @@ final class GlobalModelStore {
     }
 
     func removeProvider(id: UUID) {
-        if let provider = providers.first(where: { $0.id == id }) {
-            // 删除账户时同步清理对应的 secrets 条目
-            let secretKey = "\(provider.providerGroupId):\(provider.name)"
-            GlobalSecretsStore.shared.delete(secretKey: secretKey)
-        }
         providers.removeAll { $0.id == id }
         save()
     }

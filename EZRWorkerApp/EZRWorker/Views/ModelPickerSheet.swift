@@ -24,12 +24,9 @@ struct ModelPickerSheet: View {
     private var displayGroups: [ModelGroup] {
         if modelStore.hasTemplate {
             return modelStore.providers.compactMap { p in
-                let models = p.modelIds.compactMap { id in
-                    builtInModelGroups.flatMap(\.models).first { $0.id == id }
-                        ?? ModelEntry(id: id, label: id)
-                }
+                let models = p.modelEntries()
                 return models.isEmpty ? nil
-                    : ModelGroup(id: p.id.uuidString, provider: p.name, models: models)
+                    : ModelGroup(id: p.id.uuidString, provider: p.displayName, models: models)
             }
         }
         return builtInModelGroups
