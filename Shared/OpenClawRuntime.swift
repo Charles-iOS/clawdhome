@@ -47,18 +47,8 @@ enum OpenClawRuntime {
         }
         environment["EZRWORKER_SUPERVISOR_CHILD"] = "1"
         environment["OPENCLAW_NO_RESPAWN"] = "1"
-        // EZRWorker talks to local gateways directly; mDNS advertisement can
-        // stall startup on some macOS networks when ciao gets stuck probing.
-        environment["OPENCLAW_DISABLE_BONJOUR"] = "1"
-        // Defer model catalog/provider warmup until the user actually runs a
-        // model-backed request. Startup should not block on provider I/O.
-        environment["OPENCLAW_SKIP_STARTUP_PREWARM"] = "1"
-        environment["OPENCLAW_SKIP_STARTUP_INTERNAL_HOOKS"] = "1"
-        environment["OPENCLAW_SKIP_STARTUP_UPDATE_CHECK"] = "1"
-        environment["OPENCLAW_SKIP_STARTUP_MEMORY_BACKEND"] = "1"
-        environment["OPENCLAW_SKIP_STARTUP_ORPHAN_RECOVERY"] = "1"
-        environment["OPENCLAW_SKIP_STARTUP_PLUGINS"] = "1"
-        environment["OPENCLAW_SKIP_INACTIVE_CHANNEL_PLUGINS"] = "1"
+        // Avoid blocking gateway readiness on Codex app-server live model discovery.
+        environment["OPENCLAW_CODEX_DISCOVERY_LIVE"] = "0"
 
         if let profile {
             environment["OPENCLAW_CONFIG_PATH"] = profile.resolvedConfigPath

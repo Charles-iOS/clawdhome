@@ -110,9 +110,6 @@ if [ -f "$OPENCLAW_PKG_DIR/scripts/postinstall-bundled-plugins.mjs" ]; then
   }
 fi
 
-log "应用 EZRWorker OpenClaw runtime 补丁..."
-"$BUILD_NODE_ABS" "$SCRIPT_DIR/patch-openclaw-runtime.mjs" "$OPENCLAW_PKG_DIR"
-
 OPENCLAW_ENTRY="$OPENCLAW_PREFIX/lib/node_modules/openclaw/openclaw.mjs"
 [ -f "$OPENCLAW_ENTRY" ] || fail "OpenClaw 入口不存在: $OPENCLAW_ENTRY"
 
