@@ -25,8 +25,12 @@ struct CronAddSheet: View {
     @State private var isSaving = false
     @State private var errorText: String?
 
-    private let mutedFill = Color(red: 0.95, green: 0.95, blue: 0.95)
-    private let borderColor = Color.black.opacity(0.10)
+    private var sheetFill: Color { Color(nsColor: .windowBackgroundColor) }
+    private var mutedFill: Color { Color(nsColor: .controlBackgroundColor) }
+    private var fieldFill: Color { Color(nsColor: .textBackgroundColor) }
+    private var borderColor: Color { Color.primary.opacity(0.10) }
+    private var primaryActionFill: Color { Color(nsColor: .labelColor) }
+    private var primaryActionForeground: Color { Color(nsColor: .windowBackgroundColor) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,14 +43,13 @@ struct CronAddSheet: View {
         .frame(width: 1080, height: 820)
         .background(
             Rectangle()
-                .fill(Color.white)
+                .fill(sheetFill)
                 .shadow(color: Color.black.opacity(0.12), radius: 24, y: 10)
         )
         .overlay(
             Rectangle()
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-        .environment(\.colorScheme, .light)
         .interactiveDismissDisabled(isSaving)
         .task {
             await loadAvailableSessions()
@@ -221,17 +224,17 @@ struct CronAddSheet: View {
             } label: {
                 if isSaving {
                     ProgressView()
-                        .tint(.white)
+                        .tint(primaryActionForeground)
                         .frame(width: 108, height: 54)
                 } else {
                     Text(L10n.k("common.create", fallback: "创建"))
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryActionForeground)
                         .frame(width: 108, height: 54)
                 }
             }
             .buttonStyle(.plain)
-            .background(Capsule().fill(Color.black))
+            .background(Capsule().fill(primaryActionFill))
             .disabled(!canCreate || isSaving || !gateway.isConnected)
             .opacity((!canCreate || isSaving || !gateway.isConnected) ? 0.55 : 1)
         }
@@ -243,7 +246,7 @@ struct CronAddSheet: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: deliveryOutcomeIcon)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.black.opacity(0.70))
+                .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -283,7 +286,7 @@ struct CronAddSheet: View {
                         .frame(height: 58)
                         .background(
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(isSelected ? Color.white : Color.clear)
+                                .fill(isSelected ? sheetFill : Color.clear)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                                         .stroke(isSelected ? borderColor : .clear, lineWidth: 1)
@@ -354,15 +357,15 @@ struct CronAddSheet: View {
                 } label: {
                     Text(day.shortLabel)
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(isSelected ? Color.white : Color.secondary)
+                        .foregroundStyle(isSelected ? primaryActionForeground : Color.secondary)
                         .frame(width: 48, height: 48)
                         .background(
                             Circle()
-                                .fill(isSelected ? Color.black : Color.clear)
+                                .fill(isSelected ? primaryActionFill : Color.clear)
                         )
                         .overlay(
                             Circle()
-                                .stroke(Color.black.opacity(isSelected ? 0 : 0.12), lineWidth: 1)
+                                .stroke(Color.primary.opacity(isSelected ? 0 : 0.12), lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -400,7 +403,7 @@ struct CronAddSheet: View {
         HStack {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.58))
+                .foregroundStyle(.secondary)
 
             Text(text)
                 .font(.system(size: 20, weight: .medium))
@@ -410,7 +413,7 @@ struct CronAddSheet: View {
 
             Image(systemName: "chevron.down")
                 .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.30))
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 20)
         .frame(width: width, height: 62)
@@ -441,7 +444,7 @@ struct CronAddSheet: View {
         }
         .padding(20)
         .frame(width: 300)
-        .background(Color.white)
+        .background(sheetFill)
     }
 
     private var timePopoverContent: some View {
@@ -482,7 +485,7 @@ struct CronAddSheet: View {
         }
         .padding(20)
         .frame(width: 280)
-        .background(Color.white)
+        .background(sheetFill)
     }
 
     private func selectionMenuLabel(text: String, width: CGFloat?) -> some View {
@@ -496,7 +499,7 @@ struct CronAddSheet: View {
 
             Image(systemName: "chevron.down")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.black.opacity(0.30))
+                .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 20)
         .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
@@ -506,7 +509,7 @@ struct CronAddSheet: View {
 
     private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Color.white)
+            .fill(fieldFill)
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(borderColor, lineWidth: 1.2)
@@ -531,7 +534,7 @@ struct CronAddSheet: View {
         }
         .padding(22)
         .frame(width: 620)
-        .background(Color.white)
+        .background(sheetFill)
     }
 
     private func templateCard(_ template: CronTemplate) -> some View {
@@ -571,7 +574,7 @@ struct CronAddSheet: View {
                     .fill(Color(nsColor: .controlBackgroundColor))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
             )
         }
@@ -1275,7 +1278,7 @@ private struct CronGhostButtonStyle: ButtonStyle {
                     .fill(Color(nsColor: .windowBackgroundColor))
                     .overlay(
                         Capsule()
-                            .stroke(Color.black.opacity(0.10), lineWidth: 1)
+                            .stroke(Color.primary.opacity(0.10), lineWidth: 1)
                     )
             )
             .opacity(configuration.isPressed ? 0.85 : 1)

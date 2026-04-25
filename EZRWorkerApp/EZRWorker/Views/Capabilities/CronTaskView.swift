@@ -64,10 +64,10 @@ struct CronTaskView: View {
                     .labelStyle(.titleAndIcon)
                     .padding(.horizontal, 22)
                     .frame(height: 56)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                     .background(
                         Capsule()
-                            .fill(Color.black)
+                            .fill(Color(nsColor: .labelColor))
                     )
             }
             .buttonStyle(.plain)
@@ -171,7 +171,7 @@ private struct CronTaskCard: View {
                 .fill(Color(nsColor: .controlBackgroundColor))
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.03), radius: 14, y: 6)
         )
@@ -195,7 +195,7 @@ private struct CronTaskCard: View {
     private func statusSwitch(isOn: Bool) -> some View {
         ZStack(alignment: isOn ? .trailing : .leading) {
             Capsule()
-                .fill(isOn ? Color.green : Color.black.opacity(0.10))
+                .fill(isOn ? Color.green : Color.primary.opacity(0.12))
                 .frame(width: 52, height: 32)
 
             Circle()

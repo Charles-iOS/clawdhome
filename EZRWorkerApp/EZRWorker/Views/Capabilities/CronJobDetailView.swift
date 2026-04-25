@@ -43,7 +43,7 @@ struct CronJobDetailView: View {
             .padding(28)
             .frame(maxWidth: 860, alignment: .leading)
         }
-        .background(Color.white)
+        .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .topTrailing) {
             floatingHeaderActions
                 .padding(.top, 20)
@@ -98,9 +98,9 @@ struct CronJobDetailView: View {
                 .buttonStyle(.plain)
                 .background(
                     Capsule()
-                        .fill(Color.black)
+                        .fill(Color(nsColor: .labelColor))
                 )
-                .foregroundStyle(.white)
+                .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                 .disabled(isRunning)
             }
         }
@@ -117,7 +117,7 @@ struct CronJobDetailView: View {
                     .frame(width: 40, height: 40)
                     .background(
                         Circle()
-                            .fill(Color.white.opacity(0.98))
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.98))
                     )
                     .overlay(
                         Circle()
@@ -135,11 +135,11 @@ struct CronJobDetailView: View {
                     .frame(width: 40, height: 40)
                     .background(
                         Circle()
-                            .fill(Color.white.opacity(0.98))
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.98))
                     )
                     .overlay(
                         Circle()
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                     )
             }
             .buttonStyle(.plain)
@@ -162,7 +162,7 @@ struct CronJobDetailView: View {
     private func statusSwitch(isOn: Bool) -> some View {
         ZStack(alignment: isOn ? .trailing : .leading) {
             Capsule()
-                .fill(isOn ? Color.green : Color.black.opacity(0.10))
+                .fill(isOn ? Color.green : Color.primary.opacity(0.12))
                 .frame(width: 52, height: 32)
 
             Circle()
@@ -468,7 +468,7 @@ struct CronJobDetailView: View {
                 .fill(Color(nsColor: .controlBackgroundColor))
                 .overlay(
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 )
         )
     }
