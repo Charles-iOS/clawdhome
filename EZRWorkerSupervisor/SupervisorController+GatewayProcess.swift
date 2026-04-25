@@ -198,13 +198,21 @@ extension EZRWorkerSupervisorController {
             .path
     }
 
-    private func runLocalCommand(_ executable: String, arguments: [String]) -> String? {
+    private func runLocalCommand(
+        _ executable: String,
+        arguments: [String],
+        timeout: TimeInterval = 1.5
+    ) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
+        let finished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in
+            finished.signal()
+        }
 
         do {
             try process.run()
@@ -212,7 +220,20 @@ extension EZRWorkerSupervisorController {
             return nil
         }
 
-        process.waitUntilExit()
+        if finished.wait(timeout: .now() + timeout) == .timedOut {
+            if process.isRunning {
+                process.terminate()
+            }
+            if finished.wait(timeout: .now() + 0.2) == .timedOut,
+               process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
+                _ = finished.wait(timeout: .now() + 0.2)
+            }
+            process.terminationHandler = nil
+            return nil
+        }
+
+        process.terminationHandler = nil
         guard process.terminationStatus == 0 else { return nil }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8)

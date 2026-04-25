@@ -16,7 +16,7 @@ extension EZRWorkerSupervisorController {
     private func refreshLegacyRuntimeSnapshot(_ record: SupervisorRecord) async {
         let configExists = FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath)
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-        let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
         record.lastProbeAt = Date()
 
         if probe.alive {
@@ -113,9 +113,16 @@ extension EZRWorkerSupervisorController {
             }
 
             if ownership == .supervised,
-               record.process == nil,
-               record.readyState == .failed {
-                return (false, record.lastError ?? "Gateway 异常退出")
+               record.process == nil {
+                let message =
+                    record.lastError
+                    ?? extractStartupFailureMessage(from: startupOutput?.output)
+                    ?? "Gateway 异常退出"
+                record.readyState = .failed
+                record.isRunning = false
+                record.ownership = .none
+                record.lastError = message
+                return (false, message)
             }
 
             if ownership == .supervised,
@@ -146,9 +153,18 @@ extension EZRWorkerSupervisorController {
                 return (false, message)
             }
 
-            if requireSameListeningPID,
+            let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+            record.lastProbeAt = Date()
+            let currentPID: Int32?
+            if probe.alive {
+                currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            } else {
+                currentPID = nil
+            }
+            if probe.alive,
+               requireSameListeningPID,
                let pid,
-               let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort),
+               let currentPID,
                currentPID != pid {
                 let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
                 record.readyState = .failed
@@ -158,13 +174,11 @@ extension EZRWorkerSupervisorController {
                 return (false, message)
             }
 
-            let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-            record.lastProbeAt = Date()
             if probe.ready {
                 record.isPrepared = true
                 record.readyState = .ready
                 record.isRunning = true
-                record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
+                record.pid = currentPID ?? pid
                 record.lastError = nil
                 return (true, nil)
             }

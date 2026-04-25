@@ -57,6 +57,8 @@ enum OpenClawRuntime {
         environment["OPENCLAW_SKIP_STARTUP_UPDATE_CHECK"] = "1"
         environment["OPENCLAW_SKIP_STARTUP_MEMORY_BACKEND"] = "1"
         environment["OPENCLAW_SKIP_STARTUP_ORPHAN_RECOVERY"] = "1"
+        environment["OPENCLAW_SKIP_STARTUP_PLUGINS"] = "1"
+        environment["OPENCLAW_SKIP_INACTIVE_CHANNEL_PLUGINS"] = "1"
 
         if let profile {
             environment["OPENCLAW_CONFIG_PATH"] = profile.resolvedConfigPath

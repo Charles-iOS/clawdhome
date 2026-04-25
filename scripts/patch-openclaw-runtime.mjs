@@ -107,9 +107,178 @@ if (changed) {
 const serverImplFiles = fs
   .readdirSync(distDir)
   .filter((name) => /^server\.impl-.+\.js$/.test(name));
+const depsFiles = fs
+  .readdirSync(distDir)
+  .filter((name) => /^deps-.+\.js$/.test(name));
+const netFiles = fs
+  .readdirSync(distDir)
+  .filter((name) => /^net-.+\.js$/.test(name));
+const ioFiles = fs
+  .readdirSync(distDir)
+  .filter((name) => /^io-.+\.js$/.test(name));
+const pluginAutoEnableFiles = fs
+  .readdirSync(distDir)
+  .filter((name) => /^plugin-auto-enable-.+\.js$/.test(name));
 
 if (serverImplFiles.length === 0) {
   throw new Error(`server impl bundle not found in ${distDir}`);
+}
+if (depsFiles.length === 0) {
+  throw new Error(`deps bundle not found in ${distDir}`);
+}
+if (netFiles.length === 0) {
+  throw new Error(`net bundle not found in ${distDir}`);
+}
+if (ioFiles.length === 0) {
+  throw new Error(`io bundle not found in ${distDir}`);
+}
+if (pluginAutoEnableFiles.length === 0) {
+  throw new Error(`plugin auto-enable bundle not found in ${distDir}`);
+}
+
+for (const netFile of netFiles) {
+  const netPath = path.join(distDir, netFile);
+  source = fs.readFileSync(netPath, "utf8");
+  changed = false;
+
+  const oldLoopbackBindFallback = `\tif (mode === "loopback") {
+\t\tif (await canBindToHost("127.0.0.1")) return "127.0.0.1";
+\t\treturn "0.0.0.0";
+\t}`;
+  const newLoopbackBindFallback = `\tif (mode === "loopback") return "127.0.0.1";`;
+  if (source.includes(oldLoopbackBindFallback)) {
+    source = source.replace(oldLoopbackBindFallback, newLoopbackBindFallback);
+    changed = true;
+  } else if (!source.includes(newLoopbackBindFallback)) {
+    throw new Error(`loopback bind fallback shape changed in ${netPath}`);
+  }
+
+  if (changed) {
+    fs.writeFileSync(netPath, source);
+    console.log(`patched ${netPath}`);
+  } else {
+    console.log(`already patched ${netPath}`);
+  }
+}
+
+for (const pluginAutoEnableFile of pluginAutoEnableFiles) {
+  const pluginAutoEnablePath = path.join(distDir, pluginAutoEnableFile);
+  source = fs.readFileSync(pluginAutoEnablePath, "utf8");
+  changed = false;
+
+  const oldApplyPluginAutoEnable = `function applyPluginAutoEnable(params) {
+\tconst candidates = detectPluginAutoEnableCandidates(params);`;
+  const newApplyPluginAutoEnable = `function applyPluginAutoEnable(params) {
+\tconst env = params.env ?? process.env;
+\tconst skipStartupPlugins = ["1", "true", "yes", "on"].includes(String(env.OPENCLAW_SKIP_STARTUP_PLUGINS ?? "").trim().toLowerCase());
+\tif (skipStartupPlugins || params.config?.plugins?.enabled === false) return {
+\t\tconfig: params.config,
+\t\tchanges: [],
+\t\tautoEnabledReasons: {}
+\t};
+\tconst candidates = detectPluginAutoEnableCandidates(params);`;
+  if (source.includes(oldApplyPluginAutoEnable)) {
+    source = source.replace(oldApplyPluginAutoEnable, newApplyPluginAutoEnable);
+    changed = true;
+  } else if (!source.includes(newApplyPluginAutoEnable)) {
+    throw new Error(`plugin auto-enable shape changed in ${pluginAutoEnablePath}`);
+  }
+
+  if (changed) {
+    fs.writeFileSync(pluginAutoEnablePath, source);
+    console.log(`patched ${pluginAutoEnablePath}`);
+  } else {
+    console.log(`already patched ${pluginAutoEnablePath}`);
+  }
+}
+
+for (const ioFile of ioFiles) {
+  const ioPath = path.join(distDir, ioFile);
+  source = fs.readFileSync(ioPath, "utf8");
+  changed = false;
+  if (!source.includes("function validateConfigObjectWithPluginsBase")) {
+    console.log(`skipping ${ioPath}`);
+    continue;
+  }
+
+  const oldPluginValidationState = `\tconst config = base.config;
+\tconst issues = [];
+\tconst warnings = [];`;
+  const newPluginValidationState = `\tconst config = base.config;
+\tconst startupPluginsDisabled = ["1", "true", "yes", "on"].includes(String(opts.env?.OPENCLAW_SKIP_STARTUP_PLUGINS ?? "").trim().toLowerCase()) || config.plugins?.enabled === false;
+\tconst isDisabledExternalChannelConfig = (value) => value === false || value && typeof value === "object" && value.enabled === false;
+\tconst issues = [];
+\tconst warnings = [];`;
+  if (source.includes(oldPluginValidationState)) {
+    source = source.replace(oldPluginValidationState, newPluginValidationState);
+    changed = true;
+  } else if (!source.includes(newPluginValidationState)) {
+    throw new Error(`plugin validation state shape changed in ${ioPath}`);
+  }
+
+  const oldUnknownChannelRegistry = `\t\tif (!allowedChannels.has(trimmed)) {
+\t\t\tconst { registry } = ensureRegistry();
+\t\t\tfor (const record of registry.plugins) for (const channelId of record.channels) allowedChannels.add(channelId);
+\t\t}
+\t\tif (!allowedChannels.has(trimmed)) {
+\t\t\tissues.push({`;
+  const newUnknownChannelRegistry = `\t\tif (!allowedChannels.has(trimmed)) {
+\t\t\tif (!startupPluginsDisabled) {
+\t\t\t\tconst { registry } = ensureRegistry();
+\t\t\t\tfor (const record of registry.plugins) for (const channelId of record.channels) allowedChannels.add(channelId);
+\t\t\t}
+\t\t}
+\t\tif (!allowedChannels.has(trimmed)) {
+\t\t\tif (startupPluginsDisabled && isDisabledExternalChannelConfig(config.channels[trimmed])) continue;
+\t\t\tissues.push({`;
+  if (source.includes(oldUnknownChannelRegistry)) {
+    source = source.replace(oldUnknownChannelRegistry, newUnknownChannelRegistry);
+    changed = true;
+  } else if (!source.includes("isDisabledExternalChannelConfig(config.channels[trimmed])")) {
+    throw new Error(`unknown channel registry shape changed in ${ioPath}`);
+  }
+
+  const oldExplicitPluginConfigGate = `\tif (!hasExplicitPluginsConfig) {`;
+  const newExplicitPluginConfigGate = `\tif (!hasExplicitPluginsConfig || startupPluginsDisabled) {`;
+  if (source.includes(oldExplicitPluginConfigGate)) {
+    source = source.replace(oldExplicitPluginConfigGate, newExplicitPluginConfigGate);
+    changed = true;
+  } else if (!source.includes(newExplicitPluginConfigGate)) {
+    throw new Error(`explicit plugin config gate shape changed in ${ioPath}`);
+  }
+
+  if (changed) {
+    fs.writeFileSync(ioPath, source);
+    console.log(`patched ${ioPath}`);
+  } else {
+    console.log(`already patched ${ioPath}`);
+  }
+}
+
+for (const depsFile of depsFiles) {
+  const depsPath = path.join(distDir, depsFile);
+  source = fs.readFileSync(depsPath, "utf8");
+  changed = false;
+
+  const oldCreateDefaultDeps = `function createDefaultDeps() {
+\tconst deps = {};
+\tfor (const plugin of listChannelPlugins()) deps[plugin.id] = createLazySender(plugin.id, async () => ({ runtimeSend: createChannelOutboundRuntimeSend({`;
+  const newCreateDefaultDeps = `function createDefaultDeps(channelPlugins) {
+\tconst deps = {};
+\tfor (const plugin of channelPlugins ?? listChannelPlugins()) deps[plugin.id] = createLazySender(plugin.id, async () => ({ runtimeSend: createChannelOutboundRuntimeSend({`;
+  if (source.includes(oldCreateDefaultDeps)) {
+    source = source.replace(oldCreateDefaultDeps, newCreateDefaultDeps);
+    changed = true;
+  } else if (!source.includes(newCreateDefaultDeps)) {
+    throw new Error(`createDefaultDeps shape changed in ${depsPath}`);
+  }
+
+  if (changed) {
+    fs.writeFileSync(depsPath, source);
+    console.log(`patched ${depsPath}`);
+  } else {
+    console.log(`already patched ${depsPath}`);
+  }
 }
 
 for (const serverImplFile of serverImplFiles) {
@@ -223,6 +392,122 @@ for (const serverImplFile of serverImplFiles) {
     changed = true;
   } else if (!source.includes(newPluginLoadGate)) {
     throw new Error(`startup plugin load gate shape changed in ${serverImplPath}`);
+  }
+
+  const oldChannelManagerStart = `function createChannelManager(opts) {
+\tconst { loadConfig, channelLogs, channelRuntimeEnvs, channelRuntime, resolveChannelRuntime } = opts;
+\tconst channelStores = /* @__PURE__ */ new Map();`;
+  const newChannelManagerStart = `function createChannelManager(opts) {
+\tconst { loadConfig, channelLogs, channelRuntimeEnvs, channelRuntime, resolveChannelRuntime, listStartupChannelPlugins } = opts;
+\tconst channelStores = /* @__PURE__ */ new Map();`;
+  if (source.includes(oldChannelManagerStart)) {
+    source = source.replace(oldChannelManagerStart, newChannelManagerStart);
+    changed = true;
+  } else if (!source.includes(newChannelManagerStart)) {
+    throw new Error(`channel manager options shape changed in ${serverImplPath}`);
+  }
+
+  const oldManagedChannelAnchor = `\tconst manuallyStopped = /* @__PURE__ */ new Set();
+\tconst restartKey = (channelId, accountId) => \`\${channelId}:\${accountId}\`;`;
+  const newManagedChannelAnchor = `\tconst manuallyStopped = /* @__PURE__ */ new Set();
+\tconst listManagedChannelPlugins = () => listStartupChannelPlugins?.() ?? listChannelPlugins();
+\tconst restartKey = (channelId, accountId) => \`\${channelId}:\${accountId}\`;`;
+  if (source.includes(oldManagedChannelAnchor)) {
+    source = source.replace(oldManagedChannelAnchor, newManagedChannelAnchor);
+    changed = true;
+  } else if (!source.includes(newManagedChannelAnchor)) {
+    throw new Error(`channel manager plugin list anchor changed in ${serverImplPath}`);
+  }
+
+  const oldStartChannelsLoop = `\tconst startChannels = async () => {
+\t\tfor (const plugin of listChannelPlugins()) try {`;
+  const newStartChannelsLoop = `\tconst startChannels = async () => {
+\t\tfor (const plugin of listManagedChannelPlugins()) try {`;
+  if (source.includes(oldStartChannelsLoop)) {
+    source = source.replace(oldStartChannelsLoop, newStartChannelsLoop);
+    changed = true;
+  } else if (!source.includes(newStartChannelsLoop)) {
+    throw new Error(`startChannels loop shape changed in ${serverImplPath}`);
+  }
+
+  const oldRuntimeSnapshotLoop = `\t\tfor (const plugin of listChannelPlugins()) {
+\t\t\tconst store = getStore(plugin.id);`;
+  const newRuntimeSnapshotLoop = `\t\tfor (const plugin of listManagedChannelPlugins()) {
+\t\t\tconst store = getStore(plugin.id);`;
+  if (source.includes(oldRuntimeSnapshotLoop)) {
+    source = source.replace(oldRuntimeSnapshotLoop, newRuntimeSnapshotLoop);
+    changed = true;
+  } else if (!source.includes(newRuntimeSnapshotLoop)) {
+    throw new Error(`runtime snapshot channel loop shape changed in ${serverImplPath}`);
+  }
+
+  const oldStartGatewayServer = `async function startGatewayServer(port = 18789, opts = {}) {`;
+  const newStartGatewayServer = `function shouldLimitGatewayStartupChannelPlugins() {
+\treturn isTruthyEnvValue(process.env.OPENCLAW_SKIP_INACTIVE_CHANNEL_PLUGINS);
+}
+function listGatewayStartupChannelPlugins(cfg) {
+\tif (!shouldLimitGatewayStartupChannelPlugins()) return listChannelPlugins();
+\tconst channels = cfg?.channels;
+\tif (!channels || typeof channels !== "object") return [];
+\tconst plugins = [];
+\tconst seen = /* @__PURE__ */ new Set();
+\tfor (const [id, value] of Object.entries(channels)) {
+\t\tif (id === "defaults" || value === false) continue;
+\t\tif (value && typeof value === "object" && value.enabled === false) continue;
+\t\tif (!(value === true || value && typeof value === "object")) continue;
+\t\tconst plugin = getChannelPlugin(id);
+\t\tif (!plugin || seen.has(plugin.id)) continue;
+\t\tseen.add(plugin.id);
+\t\tplugins.push(plugin);
+\t}
+\treturn plugins;
+}
+async function startGatewayServer(port = 18789, opts = {}) {`;
+  if (source.includes(newStartGatewayServer)) {
+    // Already patched.
+  } else if (source.includes(oldStartGatewayServer)) {
+    source = source.replace(oldStartGatewayServer, newStartGatewayServer);
+    changed = true;
+  } else {
+    throw new Error(`startGatewayServer shape changed in ${serverImplPath}`);
+  }
+
+  const oldStartupChannelLogs = `\tconst channelLogs = Object.fromEntries(listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]));
+\tconst channelRuntimeEnvs = Object.fromEntries(Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]));
+\tconst listActiveGatewayMethods = (nextBaseGatewayMethods) => Array.from(new Set([...nextBaseGatewayMethods, ...listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? [])]));`;
+  const newStartupChannelLogs = `\tconst startupChannelPlugins = listGatewayStartupChannelPlugins(cfgAtStart);
+\tconst listGatewayRuntimeChannelPlugins = () => shouldLimitGatewayStartupChannelPlugins() ? startupChannelPlugins : listChannelPlugins();
+\tconst channelLogs = Object.fromEntries(startupChannelPlugins.map((plugin) => [plugin.id, logChannels.child(plugin.id)]));
+\tconst channelRuntimeEnvs = Object.fromEntries(Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]));
+\tconst listActiveGatewayMethods = (nextBaseGatewayMethods) => Array.from(new Set([...nextBaseGatewayMethods, ...listGatewayRuntimeChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? [])]));`;
+  if (source.includes(oldStartupChannelLogs)) {
+    source = source.replace(oldStartupChannelLogs, newStartupChannelLogs);
+    changed = true;
+  } else if (!source.includes(newStartupChannelLogs)) {
+    throw new Error(`startup channel logs shape changed in ${serverImplPath}`);
+  }
+
+  const oldDefaultDeps = `\tconst deps = createDefaultDeps();`;
+  const newDefaultDeps = `\tconst deps = shouldLimitGatewayStartupChannelPlugins() ? createDefaultDeps(startupChannelPlugins) : createDefaultDeps();`;
+  if (source.includes(oldDefaultDeps)) {
+    source = source.replace(oldDefaultDeps, newDefaultDeps);
+    changed = true;
+  } else if (!source.includes(newDefaultDeps)) {
+    throw new Error(`startup deps shape changed in ${serverImplPath}`);
+  }
+
+  const oldChannelManagerOptions = `\t\tchannelLogs,
+\t\tchannelRuntimeEnvs,
+\t\tresolveChannelRuntime: getChannelRuntime`;
+  const newChannelManagerOptions = `\t\tchannelLogs,
+\t\tchannelRuntimeEnvs,
+\t\tlistStartupChannelPlugins: listGatewayRuntimeChannelPlugins,
+\t\tresolveChannelRuntime: getChannelRuntime`;
+  if (source.includes(oldChannelManagerOptions)) {
+    source = source.replace(oldChannelManagerOptions, newChannelManagerOptions);
+    changed = true;
+  } else if (!source.includes("listStartupChannelPlugins: listGatewayRuntimeChannelPlugins")) {
+    throw new Error(`channel manager startup plugin option shape changed in ${serverImplPath}`);
   }
 
   const oldUpdateCheck = `function scheduleGatewayUpdateCheck(params) {
