@@ -9,7 +9,7 @@ struct MemoryChunkResult: Codable, Identifiable {
     let text: String   // 匹配的文本片段
 }
 
-struct FileEntry: Codable, Identifiable, Hashable {
+struct FileEntry: Codable, Identifiable, Hashable, Sendable {
     var id: String { path }
     let name: String
     /// 相对于 /Users/<username>/ 的路径（根目录为空字符串 ""）

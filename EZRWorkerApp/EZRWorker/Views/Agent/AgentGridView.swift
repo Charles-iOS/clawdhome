@@ -12,7 +12,7 @@ struct AgentGridView: View {
     @State private var deletingAgentId: String?
     @State private var deleteError: String?
 
-    private let runtimeRefreshIntervalNanoseconds: UInt64 = 8_000_000_000
+    private let runtimeRefreshIntervalNanoseconds: UInt64 = 30_000_000_000
 
     private var filteredAgents: [Agent] {
         var results: [Agent]
@@ -36,21 +36,6 @@ struct AgentGridView: View {
             }
         }
         return results
-    }
-
-    private var gridRefreshKey: String {
-        store.agents.map {
-            [
-                $0.id,
-                $0.status.rawValue,
-                String($0.sessionCount),
-                String($0.boundBindings.count),
-                $0.lastActiveAt?.ISO8601Format() ?? "",
-                $0.name,
-                $0.description
-            ].joined(separator: "|")
-        }
-        .joined(separator: "||")
     }
 
     var body: some View {
@@ -175,7 +160,6 @@ struct AgentGridView: View {
                 createAgentCard
             }
         }
-        .id(gridRefreshKey)
     }
 
     @ViewBuilder

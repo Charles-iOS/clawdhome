@@ -71,6 +71,38 @@ final class AgentStore {
         await refreshWorkspaceStatus()
     }
 
+    /// 仅刷新单个智能体运行态，避免详情页进入时全量扫描所有 workspace / sessions。
+    func refreshRuntimeState(for agentId: String) async {
+        guard let workspaceManager else { return }
+        guard let idx = agents.firstIndex(where: { $0.id == agentId }) else { return }
+
+        var updated = agents[idx]
+        switch await workspaceManager.probeWorkspace(agentId: updated.id) {
+        case .exists:
+            updated.status = .idle
+            updated.sessionCount = 0
+            updated.lastActiveAt = nil
+            do {
+                let stats = try await workspaceManager.sessionStats(agentId: updated.id)
+                updated.sessionCount = stats.count
+                updated.lastActiveAt = stats.lastModifiedAt
+                if stats.count > 0 {
+                    updated.status = .active
+                }
+            } catch {
+                // sessions 目录可能不存在，忽略
+            }
+        case .missing:
+            updated.status = .uninitialized
+            updated.sessionCount = 0
+            updated.lastActiveAt = nil
+        case .indeterminate(let reason):
+            appLog("AgentStore: workspace 探测失败，保留当前状态 id=\(updated.id): \(reason)", level: .warn)
+        }
+
+        agents[idx] = updated
+    }
+
     /// 确保默认 main 智能体存在于 gateway 配置中，且 workspace 已初始化
     /// 在新安装场景下，该方法负责完成首次初始化：
     ///   1. 若 gateway 配置中没有 main，追加到 agents.list
@@ -723,10 +755,10 @@ final class AgentStore {
                 updatedAgents[i].lastActiveAt = nil
                 // 只要存在任意会话文件，就视为运行中。
                 do {
-                    let sessions = try await workspaceManager.listSessions(agentId: updatedAgents[i].id)
-                    updatedAgents[i].sessionCount = sessions.count
-                    updatedAgents[i].lastActiveAt = sessions.compactMap(\.modifiedAt).max()
-                    if !sessions.isEmpty {
+                    let stats = try await workspaceManager.sessionStats(agentId: updatedAgents[i].id)
+                    updatedAgents[i].sessionCount = stats.count
+                    updatedAgents[i].lastActiveAt = stats.lastModifiedAt
+                    if stats.count > 0 {
                         updatedAgents[i].status = .active
                     }
                 } catch {

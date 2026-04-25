@@ -3,6 +3,14 @@
 
 import SwiftUI
 
+private enum AgentBindingsFont {
+    static let title: CGFloat = 20
+    static let body: CGFloat = 16
+    static let detail: CGFloat = 15
+    static let meta: CGFloat = 14
+    static let badge: CGFloat = 13
+}
+
 struct AgentBindingsView: View {
     let agentId: String
 
@@ -15,73 +23,112 @@ struct AgentBindingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 工具栏
-            HStack {
-                Text(L10n.k("agent.bindings.title", fallback: "渠道绑定"))
-                    .font(.headline)
-                Spacer()
-                Button {
-                    showAddSheet = true
-                } label: {
-                    Label(L10n.k("agent.bindings.add", fallback: "添加绑定"), systemImage: "plus")
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                header
 
-            Divider()
-
-            if agentBindings.isEmpty {
-                ContentUnavailableView {
-                    Label(L10n.k("agent.bindings.empty", fallback: "暂无绑定"), systemImage: "arrow.triangle.branch")
-                } description: {
-                    Text(L10n.k("agent.bindings.empty_desc", fallback: "添加渠道绑定后，入站消息将路由到此智能体"))
-                }
-            } else {
-                List {
-                    ForEach(agentBindings) { binding in
-                        bindingRow(binding)
-                    }
-                    .onDelete { indexSet in
-                        Task {
-                            for index in indexSet {
-                                do {
-                                    try await store.removeBinding(agentBindings[index])
-                                    await restartGatewayAfterBindingMutation()
-                                } catch {
-                                    appLog("[binding] 移除绑定失败: \(error)", level: .error)
-                                }
-                            }
+                if agentBindings.isEmpty {
+                    emptyState
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(agentBindings) { binding in
+                            bindingRow(binding)
                         }
                     }
                 }
             }
+            .padding(.horizontal, 28)
+            .padding(.top, 20)
+            .padding(.bottom, 28)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
         .sheet(isPresented: $showAddSheet) {
             AddBindingSheet(agentId: agentId)
         }
     }
 
     @ViewBuilder
-    private func bindingRow(_ binding: AgentBinding) -> some View {
-        HStack(spacing: 10) {
-            // 使用 ChannelType 元数据获取正确图标和颜色
-            Image(systemName: binding.channelIcon)
-                .font(.title3)
-                .foregroundStyle(binding.channelType?.swiftUIColor ?? Color.accentColor)
-                .frame(width: 30)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(binding.channelType?.displayName ?? binding.channel.capitalized)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                Text(binding.summary)
-                    .font(.caption)
+    private var header: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(L10n.k("agent.bindings.title", fallback: "渠道绑定"))
+                    .font(.system(size: AgentBindingsFont.title, weight: .semibold))
+                Text(L10n.k("agent.bindings.empty_desc", fallback: "添加渠道绑定后，入站消息将路由到此智能体"))
+                    .font(.system(size: AgentBindingsFont.detail))
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
+
+            Button {
+                showAddSheet = true
+            } label: {
+                Label(L10n.k("agent.bindings.add", fallback: "添加绑定"), systemImage: "plus")
+                    .font(.system(size: AgentBindingsFont.body, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+    }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(L10n.k("agent.bindings.empty", fallback: "暂无绑定"), systemImage: "arrow.triangle.branch")
+        } description: {
+            Text(L10n.k("agent.bindings.empty_desc", fallback: "添加渠道绑定后，入站消息将路由到此智能体"))
+        } actions: {
+            Button {
+                showAddSheet = true
+            } label: {
+                Label(L10n.k("agent.bindings.add", fallback: "添加绑定"), systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, minHeight: 280)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
+    }
+
+    @ViewBuilder
+    private func bindingRow(_ binding: AgentBinding) -> some View {
+        let tint = binding.channelType?.swiftUIColor ?? Color.accentColor
+
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: binding.channelIcon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 44, height: 44)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(binding.channelType?.displayName ?? binding.channel.capitalized)
+                    .font(.system(size: AgentBindingsFont.body, weight: .semibold))
+                Text(binding.summary)
+                    .font(.system(size: AgentBindingsFont.detail))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+
+                FlowLayout(spacing: 6) {
+                    ForEach(bindingScopeBadges(binding), id: \.self) { badge in
+                        Text(badge)
+                            .font(.system(size: AgentBindingsFont.badge, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.secondary.opacity(0.10), in: Capsule())
+                    }
+                }
+            }
+
+            Spacer(minLength: 12)
 
             Button(role: .destructive) {
                 Task {
@@ -94,16 +141,53 @@ struct AgentBindingsView: View {
                 }
             } label: {
                 Image(systemName: "trash")
-                    .font(.caption)
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.red.opacity(0.82))
+            .background(.regularMaterial, in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(Color.red.opacity(0.18), lineWidth: 1)
+            }
+            .help(L10n.k("agent.bindings.delete", fallback: "删除绑定"))
         }
-        .padding(.vertical, 4)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                )
+        )
     }
 
     private func restartGatewayAfterBindingMutation() async {
         processManager.restart()
+    }
+
+    private func bindingScopeBadges(_ binding: AgentBinding) -> [String] {
+        var badges: [String] = []
+        if let accountId = binding.accountId, !accountId.isEmpty {
+            badges.append("account: \(accountId)")
+        }
+        if let peerId = binding.peerId, !peerId.isEmpty {
+            let kind = binding.peerKind ?? "peer"
+            badges.append("\(kind): \(peerId)")
+        }
+        if let guildId = binding.guildId, !guildId.isEmpty {
+            badges.append("guild: \(guildId)")
+        }
+        if let teamId = binding.teamId, !teamId.isEmpty {
+            badges.append("team: \(teamId)")
+        }
+        if badges.isEmpty {
+            badges.append(L10n.k("agent.bindings.default_route", fallback: "默认路由"))
+        }
+        return badges
     }
 }
 

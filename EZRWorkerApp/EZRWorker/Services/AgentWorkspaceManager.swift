@@ -1,10 +1,15 @@
 import Foundation
 import Observation
 
-enum WorkspaceProbeResult: Equatable {
+enum WorkspaceProbeResult: Equatable, Sendable {
     case exists
     case missing
     case indeterminate(String)
+}
+
+struct AgentSessionStats: Sendable {
+    var count: Int
+    var lastModifiedAt: Date?
 }
 
 @MainActor
@@ -104,19 +109,19 @@ final class AgentWorkspaceManager {
 
     func listWorkspaceFiles(agentId: String) async throws -> [FileEntry] {
         let resolution = try configuredResolution()
-        return try listDirectory(
+        return try await Self.listDirectoryOffMain(
             at: workspaceURL(for: agentId, resolution: resolution),
             showHidden: false,
-            resolution: resolution
+            stateDirPath: resolution.stateDirURL.path
         )
     }
 
     func listSessions(agentId: String) async throws -> [FileEntry] {
         let resolution = try configuredResolution()
-        return try listDirectory(
+        return try await Self.listDirectoryOffMain(
             at: sessionsDirURL(for: agentId, resolution: resolution),
             showHidden: false,
-            resolution: resolution
+            stateDirPath: resolution.stateDirURL.path
         )
             .filter { entry in
                 guard !entry.isDirectory else { return false }
@@ -125,21 +130,24 @@ final class AgentWorkspaceManager {
             }
     }
 
+    func sessionStats(agentId: String) async throws -> AgentSessionStats {
+        let resolution = try configuredResolution()
+        return try await Self.sessionStatsOffMain(at: sessionsDirURL(for: agentId, resolution: resolution))
+    }
+
     func readRelativeFile(_ relativePath: String) async throws -> Data {
         let resolution = try configuredResolution()
-        return try Data(contentsOf: resolvedURL(relativeOrAbsolutePath: relativePath, resolution: resolution))
+        let url = resolvedURL(relativeOrAbsolutePath: relativePath, resolution: resolution)
+        return try await Task.detached(priority: .userInitiated) {
+            try Data(contentsOf: url)
+        }.value
     }
 
     func probeWorkspace(agentId: String) async -> WorkspaceProbeResult {
         do {
             let resolution = try configuredResolution()
-            var isDirectory: ObjCBool = false
-            let exists = FileManager.default.fileExists(
-                atPath: workspaceURL(for: agentId, resolution: resolution).path,
-                isDirectory: &isDirectory
-            )
-            guard exists else { return .missing }
-            return isDirectory.boolValue ? .exists : .indeterminate("目标不是目录")
+            let path = workspaceURL(for: agentId, resolution: resolution).path
+            return await Self.probeDirectoryOffMain(path: path)
         } catch {
             return .indeterminate(error.localizedDescription)
         }
@@ -181,10 +189,65 @@ final class AgentWorkspaceManager {
         try data.write(to: url, options: .atomic)
     }
 
-    private func listDirectory(
+    nonisolated private static func listDirectoryOffMain(
         at url: URL,
         showHidden: Bool,
-        resolution: GatewayProfileResolution
+        stateDirPath: String
+    ) async throws -> [FileEntry] {
+        try await Task.detached(priority: .userInitiated) {
+            try listDirectory(at: url, showHidden: showHidden, stateDirPath: stateDirPath)
+        }.value
+    }
+
+    nonisolated private static func sessionStatsOffMain(at url: URL) async throws -> AgentSessionStats {
+        try await Task.detached(priority: .utility) {
+            let fm = FileManager.default
+            guard fm.fileExists(atPath: url.path) else {
+                return AgentSessionStats(count: 0, lastModifiedAt: nil)
+            }
+
+            let keys: [URLResourceKey] = [
+                .isDirectoryKey,
+                .contentModificationDateKey,
+            ]
+            let items = try fm.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles]
+            )
+
+            var count = 0
+            var lastModifiedAt: Date?
+            for itemURL in items {
+                guard itemURL.lastPathComponent != "sessions.json",
+                      itemURL.lastPathComponent.hasSuffix(".jsonl") else {
+                    continue
+                }
+                let values = try? itemURL.resourceValues(forKeys: Set(keys))
+                guard values?.isDirectory != true else { continue }
+                count += 1
+                if let modifiedAt = values?.contentModificationDate,
+                   lastModifiedAt == nil || modifiedAt > lastModifiedAt! {
+                    lastModifiedAt = modifiedAt
+                }
+            }
+            return AgentSessionStats(count: count, lastModifiedAt: lastModifiedAt)
+        }.value
+    }
+
+    nonisolated private static func probeDirectoryOffMain(path: String) async -> WorkspaceProbeResult {
+        await Task.detached(priority: .utility) {
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            guard exists else { return .missing }
+            return isDirectory.boolValue ? .exists : .indeterminate("目标不是目录")
+        }.value
+    }
+
+    nonisolated private static func listDirectory(
+        at url: URL,
+        showHidden: Bool,
+        stateDirPath: String
     ) throws -> [FileEntry] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: url.path) else { return [] }
@@ -202,7 +265,7 @@ final class AgentWorkspaceManager {
             let values = try? itemURL.resourceValues(forKeys: Set(keys))
             return FileEntry(
                 name: itemURL.lastPathComponent,
-                path: relativePath(forAbsolutePath: itemURL.path, resolution: resolution),
+                path: relativePath(forAbsolutePath: itemURL.path, stateDirPath: stateDirPath),
                 isDirectory: values?.isDirectory ?? false,
                 size: Int64(values?.fileSize ?? 0),
                 modifiedAt: values?.contentModificationDate,
@@ -214,6 +277,16 @@ final class AgentWorkspaceManager {
             if $0.isDirectory != $1.isDirectory { return $0.isDirectory }
             return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
+    }
+
+    nonisolated private static func relativePath(forAbsolutePath path: String, stateDirPath: String) -> String {
+        if path == stateDirPath {
+            return "."
+        }
+        if path.hasPrefix(stateDirPath + "/") {
+            return String(path.dropFirst(stateDirPath.count + 1))
+        }
+        return path
     }
 
     private func workspaceURL(for agentId: String, resolution: GatewayProfileResolution) -> URL {
