@@ -124,6 +124,8 @@ sudo bash scripts/install-helper-dev.sh install
 | 只构建 Helper | `make build-helper` |
 | 构建 Release 归档 | `make build-release` |
 | 生成本地未签名安装包 | `make pkg` |
+| 生成 Intel 安装包 | `make pkg-intel` |
+| 连续生成 Apple Silicon + Intel 安装包 | `make pkg-all` |
 | 生成本地验收用已签名安装包 | `make pkg-signed` |
 | 生成已签名且已公证安装包 | `make notarize-pkg` |
 | 执行完整发布流程 | `make release NOTARIZE=true` |
@@ -134,6 +136,8 @@ sudo bash scripts/install-helper-dev.sh install
 | 实时查看 App 日志 | `make log-app` |
 | 执行本地化检查 | `make i18n-check` |
 | 清理构建产物 | `make clean` |
+
+打包、版本更新、签名公证和 Intel / Apple Silicon 分发流程见：[docs/release-packaging.zh.md](docs/release-packaging.zh.md)。
 
 ## 故障排查
 
