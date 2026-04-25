@@ -14,14 +14,17 @@ extension EZRWorkerSupervisorController {
         do {
             try ensureProfileDirectories(record.resolution)
             try reconcileManagedConfigLayoutIfNeeded(record.resolution)
+            let configExists = FileManager.default.fileExists(
+                atPath: record.resolution.resolvedConfigPath
+            )
 
             if profile.sourceKind == .legacyReuse {
-                guard FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath) else {
+                guard configExists else {
                     throw NSError(domain: "EZRWorkerSupervisor", code: 404, userInfo: [
                         NSLocalizedDescriptionKey: "legacy profile 缺少 openclaw.json"
                     ])
                 }
-            } else {
+            } else if !configExists {
                 let (ok, output) = await OpenClawRuntime.runOpenClaw(
                     arguments: ["setup", "--workspace", record.resolution.resolvedWorkspaceRoot],
                     profile: record.resolution
