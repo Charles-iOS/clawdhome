@@ -260,13 +260,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		8259594DD1884CF58B228C84 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 7A21487F03D316AE90B4BDFB /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = E359B56798BC64BC260339AD;
-			remoteInfo = EZRWorkerHelper;
-		};
 		C8F2B87E934D8AE2586157CF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7A21487F03D316AE90B4BDFB /* Project object */;
@@ -1017,13 +1010,11 @@
 				E7A8268EFF39070E1C42C707 /* Resources */,
 				F17A874AB05928AAA58CE664 /* Frameworks */,
 				2DDCBC647F2E3ECBC6F54FB6 /* Inject Git Build Number */,
-				21CA9299924E667A83C56727 /* Embed Helper into App Bundle */,
 				4D5E7BFE106CDE9D4C291D3B /* Embed Supervisor into App Bundle */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				61BDCEB373F0CF5E0FDA053C /* PBXTargetDependency */,
 				9C3407BC215AB1024EC27DD8 /* PBXTargetDependency */,
 			);
 			name = EZRWorker;
@@ -1172,25 +1163,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "BUILD_NUM=\"${EZRWORKER_BUILD_NUMBER_OVERRIDE:-${CLAWDHOME_BUILD_NUMBER_OVERRIDE:-${CURRENT_PROJECT_VERSION:-}}}\"\nif [ -z \"$BUILD_NUM\" ]; then\n  BUILD_NUM=$(git -C \"${SRCROOT}\" rev-list --count HEAD 2>/dev/null || echo 0)\nfi\nMARKETING_VER=\"${EZRWORKER_MARKETING_VERSION_OVERRIDE:-${CLAWDHOME_MARKETING_VERSION_OVERRIDE:-${MARKETING_VERSION:-}}}\"\nif [ -z \"$MARKETING_VER\" ]; then\n  MARKETING_VER=$(/usr/libexec/PlistBuddy -c \"Print :CFBundleShortVersionString\" \"${SRCROOT}/EZRWorkerApp/Info.plist\" 2>/dev/null || true)\nfi\nif [ -n \"$MARKETING_VER\" ] && [ -n \"$BUILD_NUM\" ]; then\n  HELPER_VER=\"${MARKETING_VER} (${BUILD_NUM})\"\nelif [ -n \"$MARKETING_VER\" ]; then\n  HELPER_VER=\"${MARKETING_VER}\"\nelse\n  HELPER_VER=\"${BUILD_NUM}\"\nfi\nOUT=\"${SRCROOT}/EZRWorkerHelper/GeneratedVersion.swift\"\necho \"// Auto-generated — do not edit\" > \"$OUT\"\necho \"let kHelperVersion = \\\"${HELPER_VER}\\\"\" >> \"$OUT\"\n";
-		};
-		21CA9299924E667A83C56727 /* Embed Helper into App Bundle */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Embed Helper into App Bundle";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# DEBUG 模式下跳过嵌入 helper，避免 SMAppService 检测到 app bundle 中的\n# helper 变化后自动替换正在运行的 /Library/PrivilegedHelperTools/ 二进制。\n# 开发阶段使用 make install-helper 手动管理 helper。\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  echo \"⏭ DEBUG: skip embedding helper (use 'make install-helper' instead)\"\n  exit 0\nfi\nDEST=\"${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchDaemons\"\nmkdir -p \"$DEST\"\ncp \"${BUILT_PRODUCTS_DIR}/EZRWorkerHelper\" \"$DEST/EZRWorkerHelper\"\nchmod +x \"$DEST/EZRWorkerHelper\"\ncp \"${SRCROOT}/Resources/ai.ezrworker.mac.helper.plist\" \"$DEST/\"\n";
 		};
 		2DDCBC647F2E3ECBC6F54FB6 /* Inject Git Build Number */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1478,11 +1450,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		61BDCEB373F0CF5E0FDA053C /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = E359B56798BC64BC260339AD /* EZRWorkerHelper */;
-			targetProxy = 8259594DD1884CF58B228C84 /* PBXContainerItemProxy */;
-		};
 		9C3407BC215AB1024EC27DD8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = EFB0E2F70653FCB2A446D643 /* EZRWorkerSupervisor */;

@@ -27,7 +27,6 @@ PROJECT_NAME="EZRWorker"
 APP_NAME="EZRWorker"
 BUNDLE_ID="ai.ezrworker.mac"
 HELPER_LABEL="ai.ezrworker.mac.helper"
-LEGACY_HELPER_LABEL="ai.ezrworker.mac.helper"
 SUPERVISOR_LABEL="ai.ezrworker.mac.supervisor"
 SCHEME="EZRWorker"
 CONFIGURATION="Release"
@@ -307,42 +306,6 @@ mkdir -p "$PKG_SCRIPTS"
 # 拷贝 app（含嵌入的 Node.js + OpenClaw，保留符号链接）
 ditto "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
 
-# Helper 仍然按旧方式部署（过渡期保留，后续移除）
-HELPER_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchDaemons/EZRWorkerHelper"
-if [ -f "$HELPER_IN_BUNDLE" ]; then
-  mkdir -p "$PKG_ROOT/Library/PrivilegedHelperTools"
-  mkdir -p "$PKG_ROOT/Library/LaunchDaemons"
-  cp "$HELPER_IN_BUNDLE" "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
-  chmod 555 "$PKG_ROOT/Library/PrivilegedHelperTools/${HELPER_LABEL}"
-
-  cat > "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist" << DAEMON_PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${HELPER_LABEL}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/Library/PrivilegedHelperTools/${HELPER_LABEL}</string>
-    </array>
-    <key>MachServices</key>
-    <dict>
-        <key>${HELPER_LABEL}</key>
-        <true/>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-DAEMON_PLIST
-  chmod 644 "$PKG_ROOT/Library/LaunchDaemons/${HELPER_LABEL}.plist"
-  log "Helper daemon 已嵌入（过渡期保留）"
-else
-  log "未找到 Helper 二进制，跳过 daemon 部署"
-fi
-
 SUPERVISOR_PLIST_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
 SUPERVISOR_BINARY_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
 if [ -f "$SUPERVISOR_PLIST_IN_BUNDLE" ] && [ -f "$SUPERVISOR_BINARY_IN_BUNDLE" ]; then
@@ -389,18 +352,17 @@ cat > "$PKG_SCRIPTS/preinstall" << PREINSTALL
 #!/usr/bin/env bash
 # 关闭 app
 osascript -e 'tell application "${APP_NAME}" to quit' 2>/dev/null || true
-# 停止旧 Helper daemon（如果在运行）
+# 停止并移除旧 Helper daemon（新主线不再安装）
 if launchctl print "system/${HELPER_LABEL}" &>/dev/null 2>&1; then
   launchctl bootout "system/${HELPER_LABEL}" 2>/dev/null || true
 fi
-if launchctl print "system/${LEGACY_HELPER_LABEL}" &>/dev/null 2>&1; then
-  launchctl bootout "system/${LEGACY_HELPER_LABEL}" 2>/dev/null || true
-fi
-CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
-if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
-  CONSOLE_UID=$(id -u "$CONSOLE_USER" 2>/dev/null || echo "")
-  if [ -n "$CONSOLE_UID" ]; then
-    launchctl bootout "gui/${CONSOLE_UID}" "/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" 2>/dev/null || true
+rm -f "/Library/LaunchDaemons/${HELPER_LABEL}.plist"
+rm -f "/Library/PrivilegedHelperTools/${HELPER_LABEL}"
+CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
+if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
+  CONSOLE_UID=\$(id -u "\$CONSOLE_USER" 2>/dev/null || echo "")
+  if [ -n "\$CONSOLE_UID" ]; then
+    launchctl bootout "gui/\${CONSOLE_UID}" "/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" 2>/dev/null || true
   fi
 fi
 sleep 1
@@ -414,21 +376,10 @@ cat > "$PKG_SCRIPTS/postinstall" << POSTINSTALL
 set -euo pipefail
 
 APP_DIR="/Applications/${APP_NAME}.app"
-HELPER="/Library/PrivilegedHelperTools/${HELPER_LABEL}"
-PLIST="/Library/LaunchDaemons/${HELPER_LABEL}.plist"
 SUPERVISOR_PLIST="/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
 
 # 解除 app 隔离（允许未签名 app 运行，无弹框）
 xattr -cr "\$APP_DIR" 2>/dev/null || true
-
-# ── Helper daemon（过渡期保留）──
-if [ -f "\$HELPER" ] && [ -f "\$PLIST" ]; then
-  chmod 555 "\$HELPER"
-  chown root:wheel "\$HELPER"
-  chown root:wheel "\$PLIST"
-  chmod 644 "\$PLIST"
-  launchctl bootstrap system "\$PLIST" 2>/dev/null || true
-fi
 
 # ── 为当前登录用户安装并拉起 supervisor LaunchAgent ──
 CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")

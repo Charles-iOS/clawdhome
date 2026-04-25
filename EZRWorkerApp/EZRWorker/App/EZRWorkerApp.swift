@@ -27,7 +27,6 @@ struct EZRWorkerApp: App {
     @State private var agentStore: AgentStore
     @State private var workspaceManager: AgentWorkspaceManager
     @State private var keychainStore: ProviderKeychainStore
-    @State private var legacyCompatibility: LegacyCompatibilityContainer
     @State private var updater: UpdateChecker
     @State private var modelStore: GlobalModelStore
     @State private var lockStore: AppLockStore
@@ -48,7 +47,6 @@ struct EZRWorkerApp: App {
         let agentStore = AgentStore()
         let workspaceManager = AgentWorkspaceManager()
         let keychainStore = ProviderKeychainStore()
-        let legacyCompatibility = LegacyCompatibilityContainer()
         let updater = UpdateChecker()
         let modelStore = GlobalModelStore()
         let lockStore = AppLockStore()
@@ -74,7 +72,6 @@ struct EZRWorkerApp: App {
         _agentStore = State(initialValue: agentStore)
         _workspaceManager = State(initialValue: workspaceManager)
         _keychainStore = State(initialValue: keychainStore)
-        _legacyCompatibility = State(initialValue: legacyCompatibility)
         _updater = State(initialValue: updater)
         _modelStore = State(initialValue: modelStore)
         _lockStore = State(initialValue: lockStore)
@@ -108,7 +105,6 @@ struct EZRWorkerApp: App {
                 .task {
                     appDelegate.onWillTerminate = {
                         bootstrapCoordinator.prepareForAppTermination()
-                        legacyCompatibility.prepareForAppTermination()
                     }
                 }
         }
@@ -118,87 +114,6 @@ struct EZRWorkerApp: App {
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
-
-        WindowGroup(id: "claw-detail", for: String.self) { $username in
-            if let name = username {
-                AuthenticatedSceneGate {
-                    LegacyCompatibilityScene(
-                        container: legacyCompatibility,
-                        includeGatewayHub: true
-                    ) {
-                        ClawDetailWindow(username: name)
-                    }
-                }
-                .environment(updater)
-                .environment(modelStore)
-                .environment(keychainStore)
-                .environment(authStore)
-                .environment(maintenanceWindowRegistry)
-                .environment(\.locale, appLanguage.locale)
-                .background(ClawDetailWindowPositioner())
-            }
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.automatic)
-        .defaultSize(
-            width: UserDetailWindowLayout.mainWindowDefaultWidth,
-            height: UserDetailWindowLayout.detailWindowDefaultHeight
-        )
-
-        WindowGroup(id: "user-init-wizard", for: String.self) { $username in
-            if let name = username {
-                AuthenticatedSceneGate {
-                    LegacyCompatibilityScene(
-                        container: legacyCompatibility,
-                        includeGatewayHub: true
-                    ) {
-                        UserInitWizardWindow(username: name)
-                    }
-                }
-                .environment(updater)
-                .environment(modelStore)
-                .environment(keychainStore)
-                .environment(authStore)
-                .environment(maintenanceWindowRegistry)
-                .environment(\.locale, appLanguage.locale)
-                .background(UserInitWizardWindowPositioner())
-            }
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.automatic)
-        .defaultSize(width: 980, height: 720)
-
-        WindowGroup(id: "channel-onboarding", for: String.self) { $payload in
-            AuthenticatedSceneGate {
-                LegacyCompatibilityScene(container: legacyCompatibility) {
-                    ChannelOnboardingWindow(payload: payload)
-                }
-            }
-            .environment(updater)
-            .environment(modelStore)
-            .environment(keychainStore)
-            .environment(lockStore)
-            .environment(authStore)
-            .environment(maintenanceWindowRegistry)
-            .environment(\.locale, appLanguage.locale)
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.automatic)
-        .defaultSize(width: 980, height: 520)
-
-        WindowGroup(id: "maintenance-terminal", for: String.self) { $payload in
-            AuthenticatedSceneGate {
-                LegacyCompatibilityScene(container: legacyCompatibility) {
-                    MaintenanceTerminalWindow(payload: payload)
-                }
-            }
-            .environment(authStore)
-            .environment(maintenanceWindowRegistry)
-            .environment(\.locale, appLanguage.locale)
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.automatic)
-        .defaultSize(width: 860, height: 560)
 
         WindowGroup(id: "profile-terminal", for: String.self) { $profileID in
             if let profileID {
@@ -216,20 +131,5 @@ struct EZRWorkerApp: App {
         .windowStyle(.titleBar)
         .windowResizability(.automatic)
         .defaultSize(width: 940, height: 620)
-
-        WindowGroup(id: "clone-claw", for: String.self) { $sourceUsername in
-            if let username = sourceUsername {
-                AuthenticatedSceneGate {
-                    LegacyCompatibilityScene(container: legacyCompatibility) {
-                        CloneClawSheet(sourceUsername: username)
-                    }
-                }
-                .environment(authStore)
-                .environment(\.locale, appLanguage.locale)
-            }
-        }
-        .windowStyle(.titleBar)
-        .windowResizability(.automatic)
-        .defaultSize(width: 640, height: 560)
     }
 }

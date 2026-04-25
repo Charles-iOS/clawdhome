@@ -24,8 +24,6 @@ targets:
       - path: EZRWorkerApp
       - path: Shared
     dependencies:
-      - target: EZRWorkerHelper
-        embed: false
       - target: EZRWorkerSupervisor
         embed: false
       - framework: OpenDirectory.framework
@@ -43,21 +41,6 @@ targets:
             MARKETING_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${SRCROOT}/EZRWorkerApp/Info.plist" 2>/dev/null || echo "1.6.0")
           fi
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${MARKETING_VER}" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}" 2>/dev/null || true
-        basedOnDependencyAnalysis: false
-      - name: "Embed Helper into App Bundle"
-        script: |
-          # DEBUG 模式下跳过嵌入 helper，避免 SMAppService 检测到 app bundle 中的
-          # helper 变化后自动替换正在运行的 /Library/PrivilegedHelperTools/ 二进制。
-          # 开发阶段使用 make install-helper 手动管理 helper。
-          if [ "${CONFIGURATION}" = "Debug" ]; then
-            echo "⏭ DEBUG: skip embedding helper (use 'make install-helper' instead)"
-            exit 0
-          fi
-          DEST="${CODESIGNING_FOLDER_PATH}/Contents/Library/LaunchDaemons"
-          mkdir -p "$DEST"
-          cp "${BUILT_PRODUCTS_DIR}/EZRWorkerHelper" "$DEST/EZRWorkerHelper"
-          chmod +x "$DEST/EZRWorkerHelper"
-          cp "${SRCROOT}/Resources/ai.ezrworker.mac.helper.plist" "$DEST/"
         basedOnDependencyAnalysis: false
       - name: "Embed Supervisor into App Bundle"
         script: |
