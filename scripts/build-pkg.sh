@@ -131,6 +131,90 @@ if [ "$NOTARIZE" = true ] && [ -z "$NOTARY_PROFILE" ]; then
   fail "NOTARIZE=true 时必须提供 NOTARY_PROFILE（xcrun notarytool store-credentials 的 profile 名）"
 fi
 
+validate_app_sign_identity() {
+  [ "$SIGN_APP" = true ] || return 0
+  require_cmd security
+
+  if ! security find-identity -v -p codesigning 2>/dev/null | grep -F "$APP_SIGN_IDENTITY" >/dev/null; then
+    security find-identity -v -p codesigning 2>/dev/null || true
+    fail "未找到可用 App 签名证书：$APP_SIGN_IDENTITY。请安装 Developer ID Application 证书，或用 APP_SIGN_IDENTITY 覆盖为钥匙串中的完整证书名称。"
+  fi
+}
+
+print_notary_log_summary() {
+  local log_file="$1"
+  /usr/bin/python3 - "$log_file" <<'PY' 2>/dev/null || true
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+except Exception:
+    sys.exit(0)
+
+issues = data.get("issues") or []
+if not issues:
+    sys.exit(0)
+
+print("Apple 公证失败摘要：")
+for issue in issues[:20]:
+    message = issue.get("message", "Unknown issue")
+    path = issue.get("path", "")
+    arch = issue.get("architecture", "")
+    suffix = f" ({arch})" if arch else ""
+    print(f"- {message}{suffix}")
+    if path:
+        print(f"  {path}")
+if len(issues) > 20:
+    print(f"- 还有 {len(issues) - 20} 条，详见完整日志。")
+PY
+}
+
+is_macho_file() {
+  local path="$1"
+  /usr/bin/file -b "$path" 2>/dev/null | grep -q "Mach-O"
+}
+
+sign_app_bundle_for_distribution() {
+  [ "$SIGN_APP" = true ] || return 0
+  require_cmd codesign
+
+  local entitlements="$REPO_ROOT/EZRWorkerApp/EZRWorker.entitlements"
+  local signed_count_file="$REPO_ROOT/build/logs/codesign-native-count.txt"
+  mkdir -p "$(dirname "$signed_count_file")"
+  echo "0" > "$signed_count_file"
+
+  log "签名嵌入的原生运行时文件..."
+  while IFS= read -r -d '' path; do
+    if is_macho_file "$path"; then
+      if ! codesign --force \
+          --sign "$APP_SIGN_IDENTITY" \
+          --timestamp \
+          --options runtime \
+          "$path"; then
+        fail "原生文件签名失败：$path"
+      fi
+      echo $(( $(cat "$signed_count_file") + 1 )) > "$signed_count_file"
+    fi
+  done < <(find "$APP_BUNDLE" -type f -print0)
+  ok "原生运行时文件签名完成（$(cat "$signed_count_file") 个 Mach-O 文件）"
+
+  log "重签 app bundle..."
+  if ! codesign --force \
+      --sign "$APP_SIGN_IDENTITY" \
+      --timestamp \
+      --options runtime \
+      --entitlements "$entitlements" \
+      "$APP_BUNDLE"; then
+    fail "app bundle 重签失败：$APP_BUNDLE"
+  fi
+
+  log "校验 app 签名..."
+  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+  ok "app 签名校验通过"
+}
+
 read_source_plist() {
   local key="$1"
   /usr/libexec/PlistBuddy -c "Print :$key" "$SOURCE_INFO_PLIST" 2>/dev/null || true
@@ -181,6 +265,7 @@ compute_build_number() {
 
 BUILD_MARKETING_VERSION=$(compute_marketing_version)
 BUILD_NUMBER=$(compute_build_number)
+validate_app_sign_identity
 
 run_xcodebuild() {
   local log_file="$1"
@@ -277,13 +362,6 @@ APP_BUNDLE="$EXPORT_DIR/${APP_NAME}.app"
 APP_INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
 [ -f "$APP_INFO_PLIST" ] || fail "未找到 $APP_INFO_PLIST"
 
-if [ "$SIGN_APP" = true ]; then
-  require_cmd codesign
-  log "校验 app 签名..."
-  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
-  ok "app 签名校验通过"
-fi
-
 # 统一版本来源：始终以“构建产物 app 的 Info.plist”为准
 FULL_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_INFO_PLIST" 2>/dev/null || true)
 [ -n "$FULL_VERSION" ] || fail "无法从构建产物读取 CFBundleShortVersionString"
@@ -315,6 +393,8 @@ else
     fail "SKIP_BUNDLE_RUNTIME=true 但 app bundle 中未找到 node"
   fi
 fi
+
+sign_app_bundle_for_distribution
 
 # ── Step 2：准备 pkg 目录结构 ─────────────────────────────────────────────────
 
@@ -464,7 +544,48 @@ if [ "$NOTARIZE" = true ]; then
   require_cmd stapler
   require_cmd spctl
   log "提交 pkg 公证..."
-  xcrun notarytool submit "$PKG_OUTPUT" --keychain-profile "$NOTARY_PROFILE" --wait
+  NOTARY_SUBMIT_JSON="$REPO_ROOT/build/logs/notary-submit-${PKG_VERSION_LABEL}.json"
+  NOTARY_LOG_JSON="$REPO_ROOT/build/logs/notary-log-${PKG_VERSION_LABEL}.json"
+  mkdir -p "$REPO_ROOT/build/logs"
+  if ! xcrun notarytool submit "$PKG_OUTPUT" \
+      --keychain-profile "$NOTARY_PROFILE" \
+      --wait \
+      --output-format json > "$NOTARY_SUBMIT_JSON"; then
+    cat "$NOTARY_SUBMIT_JSON" >&2 || true
+    fail "pkg 公证提交失败：$NOTARY_SUBMIT_JSON"
+  fi
+  NOTARY_STATUS=$(/usr/bin/python3 - "$NOTARY_SUBMIT_JSON" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        print(json.load(fh).get("status", ""))
+except Exception:
+    print("")
+PY
+)
+  NOTARY_ID=$(/usr/bin/python3 - "$NOTARY_SUBMIT_JSON" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        print(json.load(fh).get("id", ""))
+except Exception:
+    print("")
+PY
+)
+  if [ "$NOTARY_STATUS" != "Accepted" ]; then
+    warn "pkg 公证未通过（${NOTARY_STATUS:-未知状态}）"
+    if [ -n "$NOTARY_ID" ]; then
+      xcrun notarytool log "$NOTARY_ID" \
+        --keychain-profile "$NOTARY_PROFILE" > "$NOTARY_LOG_JSON" 2>/dev/null || true
+      print_notary_log_summary "$NOTARY_LOG_JSON"
+      fail "pkg 公证失败，完整日志：$NOTARY_LOG_JSON"
+    fi
+    fail "pkg 公证失败，提交结果：$NOTARY_SUBMIT_JSON"
+  fi
   log "写入 notarization ticket..."
   xcrun stapler staple "$PKG_OUTPUT"
   xcrun stapler validate "$PKG_OUTPUT"
