@@ -72,7 +72,7 @@ targets:
         CFBundleName: $(PRODUCT_NAME)
         CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundleIconFile: AppIcon.icns
-        AuthAPIBaseURL: "http://localhost:2222"
+        AuthAPIBaseURL: "https://ygos.ezrpro.com/api/"
         NSHumanReadableDescription: EZRWorker OpenClaw 管理器
         LSApplicationCategoryType: public.app-category.utilities
 

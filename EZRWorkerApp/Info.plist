@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>AuthAPIBaseURL</key>
-	<string>http://localhost:2222</string>
+	<string>https://ygos.ezrpro.com/api/</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
