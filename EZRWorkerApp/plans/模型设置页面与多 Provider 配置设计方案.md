@@ -1,5 +1,28 @@
 # 模型设置页面与多 Provider 配置设计方案
 
+## 实施状态更新（2026-04-24）
+
+当前方案已经完成主线落地，但还没有做到文档里定义的全部能力。
+
+已完成：
+
+- 新主线侧边栏已新增 `模型` 入口，实际落点在 `消息渠道` 后面。
+- 已有独立模型页，支持 Provider 账户管理、默认模型、备用模型、智能体模型覆盖。
+- 已支持 `MiniMax`、`MiniMax（国内）`、`OpenAI / GPT`、`OpenAI-compatible`、`OpenRouter`、`Moonshot`、`Kimi Coding`、`Z.AI`、`Ollama` 等 Provider 的基础配置入口。
+- Provider 凭据已改为保存在本机 `Keychain`，模型与 Provider 元数据保存在 app 本地 store，并可同步到当前 Profile。
+- `OpenAI-compatible` 已支持 `Provider ID`、`Base URL`、兼容协议、远程拉取模型列表、手动添加模型 ID。
+- 默认模型与备用模型已经能写入 `agents.defaults.model.primary` / `agents.defaults.model.fallbacks`。
+- 智能体覆盖已经能写入和清除 `agents.list[].model.primary`。
+- 启动阶段的 MiniMax 目录补丁与 Provider 同步逻辑已修正，避免把 `minimax-cn` 误写成 `minimax`，也避免把脱敏配置整块回写。
+
+尚未完成：
+
+- 文档中的“视觉模型”独立配置还没有实现。
+- 文档中的 Provider 连通性验证 / 模型试跑 UI 还没有接入当前模型页。
+- 文档中的 OAuth 授权还没有接入；当前 `OpenAI` 仍然走 API Key。
+- 文档中的 Provider 启停、`只看异常`、`刷新全部模型列表` 等增强操作还没有完整实现。
+- 当前页面已经按产品要求移除了“当前 Gateway 可见模型”区块，因此这部分与原方案描述不再一致。
+
 ## 一、背景与现状
 
 当前新主线 app 没有一个面向用户的完整“模型设置”入口。仓库中已有一些可复用能力，但链路还没有收拢：
