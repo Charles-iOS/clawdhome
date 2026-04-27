@@ -59,6 +59,7 @@ PKG_SIGN_IDENTITY="${PKG_SIGN_IDENTITY:-Developer ID Installer: Shanghai Yike In
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 NOTARY_TIMEOUT="${NOTARY_TIMEOUT:-1h}"
 NOTARY_S3_ACCELERATION="${NOTARY_S3_ACCELERATION:-false}"
+NOTARY_LOCALE="${NOTARY_LOCALE:-en_US.UTF-8}"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 QUIET_XCODE="${QUIET_XCODE:-true}"
 PKG_ARCHS_RAW="${PKG_ARCHS:-arm64}"
@@ -187,7 +188,8 @@ run_notarytool_json() {
 
   rm -f "$output_file" "$err_file"
   set +e
-  xcrun notarytool "$@" --output-format json --no-progress > "$output_file" 2> "$err_file"
+  env LC_ALL="$NOTARY_LOCALE" LANG="$NOTARY_LOCALE" \
+    xcrun notarytool "$@" --output-format json --no-progress > "$output_file" 2> "$err_file"
   local exit_code=$?
   set -e
 
@@ -618,7 +620,8 @@ if [ "$NOTARIZE" = true ]; then
   if [ "$NOTARY_STATUS" != "Accepted" ]; then
     warn "pkg 公证未通过（${NOTARY_STATUS:-未知状态}）"
     if [ -n "$NOTARY_ID" ]; then
-      xcrun notarytool log "$NOTARY_ID" \
+      env LC_ALL="$NOTARY_LOCALE" LANG="$NOTARY_LOCALE" \
+        xcrun notarytool log "$NOTARY_ID" \
         --keychain-profile "$NOTARY_PROFILE" > "$NOTARY_LOG_JSON" 2>/dev/null || true
       print_notary_log_summary "$NOTARY_LOG_JSON"
       fail "pkg 公证失败，完整日志：$NOTARY_LOG_JSON"
