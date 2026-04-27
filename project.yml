@@ -61,7 +61,7 @@ targets:
         PRODUCT_NAME: EZRWorker
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
-        APP_UPDATE_MANIFEST_URL: ""
+        APP_UPDATE_MANIFEST_URL: https://assets.ezrpro.com/ezrworker/updates/latest.json
         CODE_SIGN_ENTITLEMENTS: EZRWorkerApp/EZRWorker.entitlements
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 9P6LY282WU

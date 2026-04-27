@@ -1459,6 +1459,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_UPDATE_MANIFEST_URL = "https://assets.ezrpro.com/ezrworker/updates/latest.json";
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -1591,6 +1592,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_UPDATE_MANIFEST_URL = "https://assets.ezrpro.com/ezrworker/updates/latest.json";
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
