@@ -136,16 +136,6 @@
 		7F01095C41E7284CAF0119E5 /* ProviderKeyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B57166787F28D6CA0DC966 /* ProviderKeyConfig.swift */; };
 		8093AFA6118892180BBEB830 /* UserDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EDBB82362FBD65CA0EB745 /* UserDirectoryService.swift */; };
 		816163E208A30C242C77413F /* SupervisorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */; };
-		A1C000000000000000000001 /* SupervisorRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000001 /* SupervisorRecord.swift */; };
-		A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000002 /* SupervisorController+Profiles.swift */; };
-		A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000003 /* SupervisorController+AutoStart.swift */; };
-		A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */; };
-		A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000005 /* SupervisorController+Readiness.swift */; };
-		A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000006 /* SupervisorController+Config.swift */; };
-		A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */; };
-		A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */; };
-		A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000009 /* ProcessOutputCollector.swift */; };
-		A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */; };
 		81DD6EB14A52BA5DC1D1A6B7 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0B7A4C6E52DA59C04D7A051 /* SystemConfiguration.framework */; };
 		8239CDB3AC1AFE7C7F476A23 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A58E344AB8D39F8E09BCE42 /* ProcessManager.swift */; };
 		82EB45092DE1110669843D4F /* PortAllocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53929C9886023FF85F7BA88E /* PortAllocator.swift */; };
@@ -171,6 +161,16 @@
 		A04C6C26B74915B70FB7D1A3 /* AppUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BED324F1ED7BF01A2E94129 /* AppUpdateBanner.swift */; };
 		A06C573A01685AA58F33F665 /* UpgradeConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F3149513BC01F516421443 /* UpgradeConfirmSheet.swift */; };
 		A0AA6566850DB453946BCC66 /* Agent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E1E96E5AA29609CE56A717 /* Agent.swift */; };
+		A1C000000000000000000001 /* SupervisorRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000001 /* SupervisorRecord.swift */; };
+		A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000002 /* SupervisorController+Profiles.swift */; };
+		A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000003 /* SupervisorController+AutoStart.swift */; };
+		A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */; };
+		A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000005 /* SupervisorController+Readiness.swift */; };
+		A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000006 /* SupervisorController+Config.swift */; };
+		A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */; };
+		A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */; };
+		A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000009 /* ProcessOutputCollector.swift */; };
+		A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */; };
 		A546B9CB6D7439ECB0AC6197 /* InstallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A166CCCC9E924E212D44E7 /* InstallManager.swift */; };
 		AB3B802AE7680B5CB4EFB2B0 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */; };
 		AB4DEC6B28295032A4EAE80C /* Agent Creation CLI Fallback.md in Resources */ = {isa = PBXBuildFile; fileRef = 7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */; };
@@ -366,7 +366,7 @@
 		6F3E305DD9F6C20E0AE4720C /* EZRWorker 架构重设计：单实例智能体配置管理面板.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 架构重设计：单实例智能体配置管理面板.md"; sourceTree = "<group>"; };
 		6FA3C9DABF937ABD459C670E /* Gateway 自重启交接修复技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Gateway 自重启交接修复技术方案.md"; sourceTree = "<group>"; };
 		737B53A6520DDF241C124184 /* EnvironmentChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentChecker.swift; sourceTree = "<group>"; };
-		74A2E865F4893F817C7BF536 /* EZRWorkerSupervisor */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
+		74A2E865F4893F817C7BF536 /* EZRWorkerSupervisor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
 		758D305253780E4DDF037E33 /* ConfigEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigEditorSheet.swift; sourceTree = "<group>"; };
 		76879C02F2548FC5B6641740 /* WizardStep4UserInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep4UserInfoView.swift; sourceTree = "<group>"; };
 		77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayHealthProbe.swift; sourceTree = "<group>"; };
@@ -401,6 +401,16 @@
 		9DDCCE3581AF68B6A18F0829 /* GatewayProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProfileStore.swift; sourceTree = "<group>"; };
 		9DE2B727C22955A7E3AA3BD9 /* MemoryTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTabView.swift; sourceTree = "<group>"; };
 		9F6E8B8C0512F7843AB6D169 /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
+		A1F000000000000000000001 /* SupervisorRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorRecord.swift; sourceTree = "<group>"; };
+		A1F000000000000000000002 /* SupervisorController+Profiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Profiles.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000003 /* SupervisorController+AutoStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+AutoStart.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Lifecycle.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000005 /* SupervisorController+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Readiness.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000006 /* SupervisorController+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Config.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+GatewayProcess.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
+		A1F000000000000000000009 /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
+		A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
 		A245488B0EA1984454B05131 /* UserPasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPasswordStore.swift; sourceTree = "<group>"; };
 		A4250EB561AA0155DE283768 /* EZRWorker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorker.entitlements; sourceTree = "<group>"; };
 		A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailWindowLayout.swift; sourceTree = "<group>"; };
@@ -457,19 +467,9 @@
 		E2CE856C50D2EFD17B00A5C6 /* UpdateCheckPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckPolicy.swift; sourceTree = "<group>"; };
 		E3A166CCCC9E924E212D44E7 /* InstallManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallManager.swift; sourceTree = "<group>"; };
 		E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorController.swift; sourceTree = "<group>"; };
-		A1F000000000000000000001 /* SupervisorRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorRecord.swift; sourceTree = "<group>"; };
-		A1F000000000000000000002 /* SupervisorController+Profiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Profiles.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000003 /* SupervisorController+AutoStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+AutoStart.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Lifecycle.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000005 /* SupervisorController+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Readiness.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000006 /* SupervisorController+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Config.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+GatewayProcess.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000009 /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
-		A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
 		E7FD8336226F6CD693C12B80 /* GatewayCronModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronModels.swift; sourceTree = "<group>"; };
 		EA4DB2255DD0BABA2748481C /* HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthCheck.swift; sourceTree = "<group>"; };
-		EA587CAEEC9E0880E72A31EA /* EZRWorkerHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA587CAEEC9E0880E72A31EA /* EZRWorkerHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EZRWorkerHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAE712347C5C362A5E831665 /* LocalAIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAIModels.swift; sourceTree = "<group>"; };
 		EB3825E5480565691A7697A9 /* ChannelType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelType.swift; sourceTree = "<group>"; };
 		EC3D0DE440728AE3F88B8070 /* GatewayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayManager.swift; sourceTree = "<group>"; };
@@ -1072,15 +1072,12 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7228B160710A74C119780ADB = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					E359B56798BC64BC260339AD = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 					EFB0E2F70653FCB2A446D643 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -1465,7 +1462,7 @@
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1490,7 +1487,7 @@
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerHelper/EZRWorkerHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1571,7 +1568,7 @@
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerHelper/EZRWorkerHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1597,7 +1594,7 @@
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1621,7 +1618,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1645,7 +1642,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 9P6LY282WU;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
