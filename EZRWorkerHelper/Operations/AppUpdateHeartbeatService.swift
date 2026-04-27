@@ -4,7 +4,7 @@ import Foundation
 final class AppUpdateHeartbeatService {
     static let shared = AppUpdateHeartbeatService()
 
-    private static let appApiURL = "https://clawdhome.app/api/version.json"
+    private static let appManifestURLEnvironmentKey = "APP_UPDATE_MANIFEST_URL"
     private static let cacheDirectory = "/var/lib/ezrworker"
     private static let cachePath = "\(cacheDirectory)/app-update-state.json"
     private static let clientIDPath = "\(cacheDirectory)/client-id"
@@ -41,7 +41,7 @@ final class AppUpdateHeartbeatService {
     }
 
     private func checkNow() async {
-        guard let url = URL(string: Self.appApiURL) else { return }
+        guard let url = configuredManifestURL() else { return }
 
         let previous = loadCachedState()
         let appVersion = installedAppVersion()
@@ -53,13 +53,8 @@ final class AppUpdateHeartbeatService {
 
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
             let now = Date().timeIntervalSinceReferenceDate
-            var state = previous ?? AppUpdateState(source: "helper")
-            state.latestVersion = json["version"] as? String
-            state.downloadURL = json["download_url"] as? String
-            state.releaseNotes = json["release_notes"] as? String ?? json["release_notes_en"] as? String
-            state.minimumVersion = json["min_version"] as? String
+            var state = try JSONDecoder().decode(AppUpdateState.self, from: data)
             state.lastSuccessfulCheckAt = now
             state.lastHeartbeatAt = now
             state.lastError = nil
@@ -72,6 +67,14 @@ final class AppUpdateHeartbeatService {
             saveCachedState(state)
             helperLog("[app-update] check failed: \(error.localizedDescription)", level: .warn)
         }
+    }
+
+    private func configuredManifestURL() -> URL? {
+        let rawValue = ProcessInfo.processInfo.environment[Self.appManifestURLEnvironmentKey] ?? ""
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, let url = URL(string: value) else { return nil }
+        guard url.scheme?.lowercased() == "https" else { return nil }
+        return url
     }
 
     private func saveCachedState(_ state: AppUpdateState) {

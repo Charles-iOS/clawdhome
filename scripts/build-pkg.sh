@@ -7,7 +7,7 @@
 #   bash scripts/build-pkg.sh --skip-build # 跳过 xcodebuild，直接打包（用于重复打包）
 #   PKG_ARCHS=x86_64 bash scripts/build-pkg.sh # 构建 Intel 包
 #   PKG_ARCHS="arm64 x86_64" bash scripts/build-pkg.sh # 构建 Universal 包
-#   bash scripts/build-pkg.sh --sync-api-version    # 同步 clawdhome_website/api/version.json（默认不同步）
+#   bash scripts/build-pkg.sh --sync-api-version    # 同步 UPDATE_SITE_DIR 中的兼容更新清单（默认不同步）
 #   SIGN_APP=true SIGN_PKG=true bash scripts/build-pkg.sh # 生成 Developer ID 签名 pkg
 #   SIGN_APP=true SIGN_PKG=true NOTARIZE=true NOTARY_PROFILE=clawdhome-release bash scripts/build-pkg.sh
 #
@@ -34,8 +34,15 @@ CONFIGURATION="Release"
 ARCHIVE_PATH="$REPO_ROOT/build/${APP_NAME}.xcarchive"
 EXPORT_DIR="$REPO_ROOT/build/export"
 DIST_DIR="$REPO_ROOT/dist"
-WEBSITE_DIR="${WEBSITE_DIR:-$REPO_ROOT/../clawdhome_website}"
-API_VERSION_JSON="$WEBSITE_DIR/api/version.json"
+UPDATE_SITE_DIR="${UPDATE_SITE_DIR:-${WEBSITE_DIR:-}}"
+UPDATE_BASE_URL="${UPDATE_BASE_URL:-}"
+UPDATE_MANIFEST_PATH="${UPDATE_MANIFEST_PATH:-/updates/latest.json}"
+UPDATE_COMPAT_MANIFEST_PATH="${UPDATE_COMPAT_MANIFEST_PATH:-/api/version.json}"
+UPDATE_DOWNLOAD_PATH="${UPDATE_DOWNLOAD_PATH:-/download}"
+API_VERSION_JSON=""
+if [ -n "$UPDATE_SITE_DIR" ]; then
+  API_VERSION_JSON="$UPDATE_SITE_DIR$UPDATE_COMPAT_MANIFEST_PATH"
+fi
 SOURCE_INFO_PLIST="$REPO_ROOT/EZRWorkerApp/Info.plist"
 BUILD_COUNTER_FILE="$REPO_ROOT/.build-version"
 INITIAL_BUILD_NUMBER=500
@@ -100,6 +107,19 @@ assert_bool "SIGN_APP" "$SIGN_APP"
 assert_bool "SIGN_PKG" "$SIGN_PKG"
 assert_bool "NOTARIZE" "$NOTARIZE"
 assert_bool "QUIET_XCODE" "$QUIET_XCODE"
+
+validate_update_base_url() {
+  local url="$1"
+  [ -n "$url" ] || fail "UPDATE_BASE_URL 必填（例如：https://updates.example.com）"
+  [[ "$url" == https://* ]] || fail "UPDATE_BASE_URL 必须使用 HTTPS：$url"
+  [[ "$url" != *"clawdhome.app"* ]] || fail "UPDATE_BASE_URL 不能使用旧域名：$url"
+}
+
+join_url_path() {
+  local base="${1%/}"
+  local path="/${2#/}"
+  echo "${base}${path}"
+}
 
 if [ "$NOTARIZE" = true ] && [ "$SIGN_PKG" != true ]; then
   fail "NOTARIZE=true 时必须同时设置 SIGN_PKG=true"
@@ -218,6 +238,7 @@ if [ "$SKIP_BUILD" = false ]; then
       CLAWDHOME_BUILD_NUMBER_OVERRIDE="$BUILD_NUMBER"
       MARKETING_VERSION="$BUILD_MARKETING_VERSION"
       CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+      APP_UPDATE_MANIFEST_URL="${APP_UPDATE_MANIFEST_URL:-}"
       INFOPLIST_KEY_CFBundleShortVersionString="$BUILD_MARKETING_VERSION"
       INFOPLIST_KEY_CFBundleVersion="$BUILD_NUMBER"
       OTHER_CODE_SIGN_FLAGS="--timestamp"
@@ -233,6 +254,7 @@ if [ "$SKIP_BUILD" = false ]; then
       CLAWDHOME_BUILD_NUMBER_OVERRIDE="$BUILD_NUMBER"
       MARKETING_VERSION="$BUILD_MARKETING_VERSION"
       CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+      APP_UPDATE_MANIFEST_URL="${APP_UPDATE_MANIFEST_URL:-}"
       INFOPLIST_KEY_CFBundleShortVersionString="$BUILD_MARKETING_VERSION"
       INFOPLIST_KEY_CFBundleVersion="$BUILD_NUMBER"
     )
@@ -449,28 +471,58 @@ if [ "$NOTARIZE" = true ]; then
   ok "pkg 公证完成"
 fi
 
+PKG_SHA256=$(shasum -a 256 "$PKG_OUTPUT" | awk '{print $1}')
+printf "%s  %s\n" "$PKG_SHA256" "$(basename "$PKG_OUTPUT")" > "$PKG_OUTPUT.sha256"
+chmod 644 "$PKG_OUTPUT.sha256"
 ok "安装包已生成：$PKG_OUTPUT"
+ok "SHA256：$PKG_OUTPUT.sha256"
 
-if [ "$SYNC_API_VERSION" = true ] && [ -f "$API_VERSION_JSON" ]; then
+if [ "$SYNC_API_VERSION" = true ]; then
+  validate_update_base_url "$UPDATE_BASE_URL"
+  if [ -z "$UPDATE_SITE_DIR" ]; then
+    fail "使用 --sync-api-version 时必须设置 UPDATE_SITE_DIR"
+  fi
+
+  DOWNLOAD_URL="$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/${PKG_NAME}")"
+  MANIFEST_ARCH_KEY="$PKG_ARCHS"
+  if [ "$MANIFEST_ARCH_KEY" = "arm64 x86_64" ]; then
+    MANIFEST_ARCH_KEY="universal"
+  fi
   log "同步 $API_VERSION_JSON 版本号 -> $FULL_VERSION"
-  DOWNLOAD_URL="https://clawdhome.app/download/${PKG_NAME}"
+  mkdir -p "$(dirname "$API_VERSION_JSON")"
   TMP_API_JSON="$(mktemp)"
-  awk -v v="$FULL_VERSION" -v dl="$DOWNLOAD_URL" '
-    {
-      if ($0 ~ /"version"[[:space:]]*:/) {
-        sub(/"version"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"version\": \"" v "\"")
-      }
-      if ($0 ~ /"download_url"[[:space:]]*:/) {
-        sub(/"download_url"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"download_url\": \"" dl "\"")
-      }
-      print
-    }
-  ' "$API_VERSION_JSON" > "$TMP_API_JSON"
+  /usr/bin/python3 - "$API_VERSION_JSON" "$TMP_API_JSON" "$FULL_VERSION" "$APP_BUILD_NUMBER" "$MANIFEST_ARCH_KEY" "$DOWNLOAD_URL" "$PKG_SHA256" <<'PY'
+import json
+import os
+import sys
+
+src, dst, version, build, arch, download_url, sha256 = sys.argv[1:]
+if os.path.exists(src):
+    with open(src, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+else:
+    data = {}
+
+data["version"] = version
+data["build"] = build
+if arch == "x86_64":
+    data["download_url_x64"] = download_url
+else:
+    data["download_url"] = download_url
+
+packages = data.setdefault("packages", {})
+packages[arch] = {
+    "url": download_url,
+    "sha256": sha256,
+}
+
+with open(dst, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, ensure_ascii=False, indent=2)
+    fh.write("\n")
+PY
   mv "$TMP_API_JSON" "$API_VERSION_JSON"
   chmod 644 "$API_VERSION_JSON"
   ok "已同步：$API_VERSION_JSON"
-elif [ "$SYNC_API_VERSION" = true ]; then
-  log "未找到 $API_VERSION_JSON，跳过 API 版本同步"
 fi
 
 # ── Step 6：清理临时目录 ──────────────────────────────────────────────────────
@@ -487,6 +539,7 @@ echo "  Build：${APP_BUILD_NUMBER}"
 echo "  架构：${PKG_ARCHS}"
 echo "  包版本：${PKG_VERSION_LABEL}"
 echo "  大小：$(du -sh "$PKG_OUTPUT" | cut -f1)"
+echo "  SHA256：$PKG_SHA256"
 echo "  路径：$PKG_OUTPUT"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

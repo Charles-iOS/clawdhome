@@ -106,6 +106,7 @@ struct EZRWorkerApp: App {
                     appDelegate.onWillTerminate = {
                         bootstrapCoordinator.prepareForAppTermination()
                     }
+                    await updater.bootstrapAppUpdates()
                 }
         }
         .windowStyle(.hiddenTitleBar)

@@ -10,9 +10,11 @@ struct AppSettingsView: View {
     @Environment(AuthSessionStore.self) private var authStore
     @Environment(GatewayProfileStore.self) private var profileStore
     @Environment(SupervisorClient.self) private var supervisorClient
+    @Environment(UpdateChecker.self) private var updater
     @Environment(\.openWindow) private var openWindow
 
     @State private var showCreateProfileSheet = false
+    @State private var showAppUpdateSheet = false
     @State private var pendingDeletionProfile: GatewayProfile?
     @State private var isDeletingProfile = false
     @State private var isRefreshingProfiles = false
@@ -38,6 +40,10 @@ struct AppSettingsView: View {
         .sheet(isPresented: $showCreateProfileSheet) {
             CreateProfileSheet()
                 .environment(profileStore)
+        }
+        .sheet(isPresented: $showAppUpdateSheet) {
+            AppUpdateSheet()
+                .environment(updater)
         }
         .task {
             await refreshProfilesRuntime(reloadProfiles: true)
@@ -587,13 +593,113 @@ struct AppSettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsInfoRow(
                     L10n.k("settings.version", fallback: "版本"),
-                    value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                    value: updater.currentAppVersion
                 )
                 SettingsInfoRow(
                     L10n.k("settings.build", fallback: "构建号"),
-                    value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                    value: updater.currentAppBuild
                 )
+
+                Divider()
+                    .padding(.vertical, 2)
+
+                SettingsInfoRow(
+                    "更新源",
+                    value: updater.appUpdateManifestIsConfigured ? "已配置" : "未配置"
+                )
+                SettingsInfoRow(
+                    "最新版本",
+                    value: latestAppVersionLabel
+                )
+                SettingsInfoRow(
+                    "最近检查",
+                    value: lastAppUpdateCheckLabel
+                )
+
+                if let error = updater.appCheckError ?? updater.appUpdateError, !error.isEmpty {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: SettingsFont.detail, weight: .medium))
+                        .foregroundStyle(.red)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Label(appUpdateStatusLabel, systemImage: appUpdateStatusIcon)
+                        .font(.system(size: SettingsFont.detail, weight: .medium))
+                        .foregroundStyle(appUpdateStatusColor)
+                }
+
+                appUpdateControls
             }
+        }
+    }
+
+    @ViewBuilder
+    private var appUpdateControls: some View {
+        if updater.isAwaitingAppRelaunch {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("安装器已打开，完成安装后会自动重启。")
+                    .font(.system(size: SettingsFont.detail))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else if let progress = updater.appUpdateProgress {
+            VStack(alignment: .leading, spacing: 8) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(updater.appMustUpdate ? .red : .orange)
+                HStack(spacing: 10) {
+                    Text(downloadProgressLabel(progress))
+                        .font(.system(size: SettingsFont.detail))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer()
+                    Button("取消") {
+                        updater.cancelDownload()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                }
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    appUpdateButtonGroup
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    appUpdateButtonGroup
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appUpdateButtonGroup: some View {
+        Button {
+            Task { await updater.checkApp() }
+        } label: {
+            if updater.isCheckingAppUpdate {
+                Text("检查中...")
+            } else {
+                Text("检查更新")
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(updater.isCheckingAppUpdate || !updater.appUpdateManifestIsConfigured)
+
+        if updater.appNeedsUpdate || updater.appMustUpdate {
+            Button {
+                showAppUpdateSheet = true
+            } label: {
+                Label("立即更新", systemImage: "arrow.down.circle.fill")
+                    .font(.system(size: SettingsFont.action, weight: .semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(updater.appMustUpdate ? .red : .orange)
+            .disabled(updater.appSelectedPackageURL == nil && updater.appDownloadURL == nil)
         }
     }
 
@@ -647,10 +753,83 @@ struct AppSettingsView: View {
         }
     }
 
+    private var latestAppVersionLabel: String {
+        guard let version = updater.appLatestVersion else { return "—" }
+        if let build = updater.appLatestBuild, !build.isEmpty {
+            return "v\(version) (\(build))"
+        }
+        return "v\(version)"
+    }
+
     private var bundledOpenClawPathTitle: String {
         guard let version = OpenClawRuntime.bundledOpenClawVersion else { return "OpenClaw" }
         return "OpenClaw · v\(version)"
     }
+
+    private var lastAppUpdateCheckLabel: String {
+        guard let timestamp = updater.appLastSuccessfulCheckAt else { return "—" }
+        let date = Date(timeIntervalSinceReferenceDate: timestamp)
+        return Self.appUpdateDateFormatter.string(from: date)
+    }
+
+    private var appUpdateStatusLabel: String {
+        if updater.isCheckingAppUpdate {
+            return "正在检查更新"
+        }
+        if updater.appMustUpdate {
+            return "需要更新后继续使用"
+        }
+        if updater.appNeedsUpdate {
+            return "有可用更新"
+        }
+        if updater.appLatestVersion != nil {
+            return "当前已是最新版本"
+        }
+        if updater.appUpdateManifestIsConfigured {
+            return "尚未检查"
+        }
+        return "App 更新源未配置"
+    }
+
+    private var appUpdateStatusIcon: String {
+        if updater.isCheckingAppUpdate {
+            return "arrow.triangle.2.circlepath"
+        }
+        if updater.appMustUpdate {
+            return "exclamationmark.triangle.fill"
+        }
+        if updater.appNeedsUpdate {
+            return "arrow.down.circle.fill"
+        }
+        if updater.appLatestVersion != nil {
+            return "checkmark.circle.fill"
+        }
+        return "info.circle"
+    }
+
+    private var appUpdateStatusColor: Color {
+        if updater.appMustUpdate { return .red }
+        if updater.appNeedsUpdate || updater.isCheckingAppUpdate { return .orange }
+        if updater.appLatestVersion != nil { return .green }
+        return .secondary
+    }
+
+    private func downloadProgressLabel(_ progress: Double) -> String {
+        let percentage = "\(Int(progress * 100))%"
+        guard updater.appTotalBytes > 0 else { return "正在下载 \(percentage)" }
+        let size = "\(UpdateChecker.formatBytes(updater.appDownloadedBytes)) / \(UpdateChecker.formatBytes(updater.appTotalBytes))"
+        if updater.appDownloadSpeed > 0 {
+            return "正在下载 \(percentage) · \(size) · \(UpdateChecker.formatSpeed(updater.appDownloadSpeed))"
+        }
+        return "正在下载 \(percentage) · \(size)"
+    }
+
+    private static let appUpdateDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     private var isAnyProfileOperationInFlight: Bool {
         isDeletingProfile || isRefreshingProfiles || profileActionProfileID != nil

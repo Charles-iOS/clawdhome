@@ -11,7 +11,7 @@ struct AppUpdateBanner: View {
     @State private var showSheet = false
 
     var body: some View {
-        if updater.appNeedsUpdate || updater.isAwaitingAppRelaunch {
+        if updater.appNeedsUpdate || updater.appMustUpdate || updater.isAwaitingAppRelaunch {
             Group {
                 if updater.isAwaitingAppRelaunch {
                     HStack(spacing: 8) {
@@ -34,14 +34,14 @@ struct AppUpdateBanner: View {
                 } else {
                     Button { showSheet = true } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: "arrow.up.circle.fill")
-                                .foregroundStyle(.orange)
+                            Image(systemName: updater.appMustUpdate ? "exclamationmark.triangle.fill" : "arrow.up.circle.fill")
+                                .foregroundStyle(bannerTint)
                                 .font(.system(size: 15))
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(L10n.k("auto.app_update_banner.new_version_available", fallback: "有新版本"))
+                                Text(bannerTitle)
                                     .font(.caption)
                                     .fontWeight(.medium)
-                                Text("v\(updater.appLatestVersion ?? "")")
+                                Text(bannerSubtitle)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
@@ -52,7 +52,7 @@ struct AppUpdateBanner: View {
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                        .background(bannerTint.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
                 }
@@ -69,6 +69,24 @@ struct AppUpdateBanner: View {
                 }
             }
         }
+    }
+
+    private var bannerTint: Color {
+        updater.appMustUpdate ? .red : .orange
+    }
+
+    private var bannerTitle: String {
+        if updater.appMustUpdate {
+            return L10n.k("auto.app_update_banner.must_update", fallback: "需要更新后继续使用")
+        }
+        return L10n.k("auto.app_update_banner.new_version_available", fallback: "有新版本")
+    }
+
+    private var bannerSubtitle: String {
+        if let latest = updater.appLatestVersion {
+            return "EZRWorker v\(latest) 可用"
+        }
+        return L10n.k("auto.app_update_banner.update_available", fallback: "更新可用")
     }
 }
 
@@ -98,7 +116,12 @@ struct AppUpdateSheet: View {
                         Text("v\(updater.appLatestVersion ?? "")")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(updateTint)
+                    }
+                    if updater.appMustUpdate, let minimumVersion = updater.appMinVersion {
+                        Text("最低要求 v\(minimumVersion)")
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
                 }
                 Spacer()
@@ -109,6 +132,13 @@ struct AppUpdateSheet: View {
                 .padding(.bottom, 12)
 
             // 更新说明
+            if let releaseDate = updater.appReleaseDate {
+                Text("发布日期：\(releaseDate)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 8)
+            }
+
             if let notes = updater.appReleaseNotes {
                 Text(L10n.k("auto.app_update_banner.release_notes", fallback: "更新内容"))
                     .font(.caption)
@@ -140,7 +170,7 @@ struct AppUpdateSheet: View {
                 VStack(spacing: 6) {
                     ProgressView(value: progress)
                         .progressViewStyle(.linear)
-                        .tint(.orange)
+                        .tint(updateTint)
                     if progress < 1.0 {
                         HStack(spacing: 0) {
                             // 左侧：百分比 + 大小
@@ -199,7 +229,8 @@ struct AppUpdateSheet: View {
                     }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .tint(updateTint)
+                    .disabled(updater.appSelectedPackageURL == nil && updater.appDownloadURL == nil)
                 }
             }
         }
@@ -213,5 +244,9 @@ struct AppUpdateSheet: View {
         .onChange(of: updater.isAwaitingAppRelaunch) { _, waiting in
             if waiting { dismiss() }
         }
+    }
+
+    private var updateTint: Color {
+        updater.appMustUpdate ? .red : .orange
     }
 }

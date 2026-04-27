@@ -22,7 +22,12 @@ BUILD_ARCHS ?= arm64
 
 .PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
-WEBSITE_DIR ?= ../clawdhome_website
+UPDATE_BASE_URL ?=
+UPDATE_SITE_DIR ?=
+UPDATE_MANIFEST_PATH ?= /updates/latest.json
+UPDATE_COMPAT_MANIFEST_PATH ?= /api/version.json
+UPDATE_DOWNLOAD_PATH ?= /download
+MIN_APP_VERSION ?=
 
 help:
 	@echo "可用目标："
@@ -47,6 +52,7 @@ help:
 	@echo "  QUIET_XCODE=false 可显示完整 xcodebuild 输出（默认静默并写入 build/logs/）"
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
+	@echo "  发布更新源：UPDATE_BASE_URL=https://... UPDATE_SITE_DIR=/path/to/static-site"
 	@echo "  test-release-scripts  校验 release/changelog 脚本"
 	@echo "  install-hooks    安装 git commit-msg / pre-commit hooks"
 	@echo "  run-release      直接运行 build/export 里的 Release 包（无需安装）"
@@ -211,6 +217,12 @@ release:
 	APP_SIGN_IDENTITY="$(APP_SIGN_IDENTITY)" \
 	PKG_SIGN_IDENTITY="$(PKG_SIGN_IDENTITY)" \
 	NOTARY_PROFILE="$(NOTARY_PROFILE)" \
+	UPDATE_BASE_URL="$(UPDATE_BASE_URL)" \
+	UPDATE_SITE_DIR="$(UPDATE_SITE_DIR)" \
+	UPDATE_MANIFEST_PATH="$(UPDATE_MANIFEST_PATH)" \
+	UPDATE_COMPAT_MANIFEST_PATH="$(UPDATE_COMPAT_MANIFEST_PATH)" \
+	UPDATE_DOWNLOAD_PATH="$(UPDATE_DOWNLOAD_PATH)" \
+	MIN_APP_VERSION="$(MIN_APP_VERSION)" \
 	bash scripts/release.sh
 
 release-dry-run:
@@ -221,6 +233,12 @@ release-dry-run:
 	APP_SIGN_IDENTITY="$(APP_SIGN_IDENTITY)" \
 	PKG_SIGN_IDENTITY="$(PKG_SIGN_IDENTITY)" \
 	NOTARY_PROFILE="$(NOTARY_PROFILE)" \
+	UPDATE_BASE_URL="$(UPDATE_BASE_URL)" \
+	UPDATE_SITE_DIR="$(UPDATE_SITE_DIR)" \
+	UPDATE_MANIFEST_PATH="$(UPDATE_MANIFEST_PATH)" \
+	UPDATE_COMPAT_MANIFEST_PATH="$(UPDATE_COMPAT_MANIFEST_PATH)" \
+	UPDATE_DOWNLOAD_PATH="$(UPDATE_DOWNLOAD_PATH)" \
+	MIN_APP_VERSION="$(MIN_APP_VERSION)" \
 	bash scripts/release.sh --dry-run
 
 release-notes-draft:

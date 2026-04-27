@@ -26,8 +26,18 @@ cd "$REPO_ROOT"
 
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 
-WEBSITE_DIR="${WEBSITE_DIR:-$REPO_ROOT/../clawdhome_website}"
-API_VERSION_JSON="$WEBSITE_DIR/api/version.json"
+UPDATE_BASE_URL="${UPDATE_BASE_URL:-}"
+UPDATE_SITE_DIR="${UPDATE_SITE_DIR:-${WEBSITE_DIR:-}}"
+UPDATE_MANIFEST_PATH="${UPDATE_MANIFEST_PATH:-/updates/latest.json}"
+UPDATE_COMPAT_MANIFEST_PATH="${UPDATE_COMPAT_MANIFEST_PATH:-/api/version.json}"
+UPDATE_DOWNLOAD_PATH="${UPDATE_DOWNLOAD_PATH:-/download}"
+MIN_APP_VERSION="${MIN_APP_VERSION:-}"
+MANIFEST_JSON=""
+COMPAT_MANIFEST_JSON=""
+if [ -n "$UPDATE_SITE_DIR" ]; then
+  MANIFEST_JSON="$UPDATE_SITE_DIR$UPDATE_MANIFEST_PATH"
+  COMPAT_MANIFEST_JSON="$UPDATE_SITE_DIR$UPDATE_COMPAT_MANIFEST_PATH"
+fi
 NOTES_DIR="${NOTES_DIR:-$REPO_ROOT/release-notes}"
 INFO_PLIST="$REPO_ROOT/EZRWorkerApp/Info.plist"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
@@ -80,6 +90,35 @@ render_changelog_preview() {
   fi
 }
 
+validate_update_base_url() {
+  local url="$1"
+  [ -n "$url" ] || fail "UPDATE_BASE_URL 必填（例如：https://updates.example.com）"
+  [[ "$url" == https://* ]] || fail "UPDATE_BASE_URL 必须使用 HTTPS：$url"
+  [[ "$url" != *"clawdhome.app"* ]] || fail "UPDATE_BASE_URL 不能使用旧域名：$url"
+}
+
+join_url_path() {
+  local base="${1%/}"
+  local path="/${2#/}"
+  echo "${base}${path}"
+}
+
+read_existing_min_version() {
+  local manifest="$1"
+  [ -f "$manifest" ] || return 0
+  /usr/bin/python3 - "$manifest" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        value = json.load(fh).get("min_version", "")
+except Exception:
+    value = ""
+print(value or "")
+PY
+}
+
 # ── 前置检查 ──────────────────────────────────────────────────────────────────
 
 if [ "$DRY_RUN" = false ]; then
@@ -101,6 +140,13 @@ if [ "$DRY_RUN" = false ] && [ "$SKIP_PUSH" = false ] && ! gh auth status &>/dev
   fail "gh 未登录。请运行：gh auth login"
 fi
 
+if [ "$DRY_RUN" = false ]; then
+  validate_update_base_url "$UPDATE_BASE_URL"
+  if [ -z "$UPDATE_SITE_DIR" ]; then
+    warn "未设置 UPDATE_SITE_DIR，将不会写入静态更新清单"
+  fi
+fi
+
 # ── Step 1：计算版本号 ────────────────────────────────────────────────────────
 
 CURRENT_VERSION=$(bash "$SCRIPT_DIR/semver.sh" --current 2>/dev/null || echo "")
@@ -109,8 +155,13 @@ BUMP_TYPE=$(bash "$SCRIPT_DIR/semver.sh" --bump-type 2>/dev/null || echo "none")
 
 [ -n "$NEXT_VERSION" ] || fail "无法计算下一版本号"
 
+BUMP_LABEL="$BUMP_TYPE bump"
+if [ "$BUMP_TYPE" = "initial" ]; then
+  BUMP_LABEL="初始发布"
+fi
+
 log "当前版本：${CURRENT_VERSION:-无 tag}"
-log "下一版本：v${NEXT_VERSION}（${BUMP_TYPE} bump）"
+log "下一版本：v${NEXT_VERSION}（${BUMP_LABEL}）"
 
 ZH_NOTES_FILE="$NOTES_DIR/v${NEXT_VERSION}.zh.md"
 EN_NOTES_FILE="$NOTES_DIR/v${NEXT_VERSION}.en.md"
@@ -135,6 +186,50 @@ if [ "$DRY_RUN" = true ]; then
   log "将写入的英文 CHANGELOG："
   render_changelog_preview en "$EN_NOTES_FILE"
   echo ""
+  PREVIEW_UPDATE_BASE_URL="$UPDATE_BASE_URL"
+  if [ -z "$PREVIEW_UPDATE_BASE_URL" ]; then
+    PREVIEW_UPDATE_BASE_URL="https://updates.example.invalid"
+    warn "未设置 UPDATE_BASE_URL，以下更新清单 URL 使用占位域名；正式发布必须设置 HTTPS 更新源"
+  elif [[ "$PREVIEW_UPDATE_BASE_URL" != https://* ]]; then
+    warn "UPDATE_BASE_URL 不是 HTTPS，正式发布会失败：$PREVIEW_UPDATE_BASE_URL"
+  elif [[ "$PREVIEW_UPDATE_BASE_URL" == *"clawdhome.app"* ]]; then
+    warn "UPDATE_BASE_URL 使用旧域名，正式发布会失败：$PREVIEW_UPDATE_BASE_URL"
+  fi
+
+  PREVIEW_DOWNLOAD_URL_ARM64="$(join_url_path "$PREVIEW_UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-arm64.pkg")"
+  PREVIEW_DOWNLOAD_URL_X64="$(join_url_path "$PREVIEW_UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-x64.pkg")"
+  PREVIEW_MANIFEST_URL="$(join_url_path "$PREVIEW_UPDATE_BASE_URL" "$UPDATE_MANIFEST_PATH")"
+  PREVIEW_MIN_VERSION="$MIN_APP_VERSION"
+  if [ -z "$PREVIEW_MIN_VERSION" ] && [ -n "$MANIFEST_JSON" ]; then
+    PREVIEW_MIN_VERSION="$(read_existing_min_version "$MANIFEST_JSON")"
+  fi
+  echo ""
+  log "将生成的静态更新清单预览："
+  echo "  Manifest URL：$PREVIEW_MANIFEST_URL"
+  echo "  输出文件：${MANIFEST_JSON:-未设置 UPDATE_SITE_DIR，正式发布时不写本地清单}"
+  echo "  兼容文件：${COMPAT_MANIFEST_JSON:-未设置 UPDATE_SITE_DIR，正式发布时不写兼容清单}"
+  cat <<EOF
+{
+  "version": "${NEXT_VERSION}",
+  "build": "<build number>",
+  "min_version": "${PREVIEW_MIN_VERSION}",
+  "channel": "stable",
+  "release_date": "<UTC ISO8601>",
+  "download_url": "${PREVIEW_DOWNLOAD_URL_ARM64}",
+  "download_url_x64": "${PREVIEW_DOWNLOAD_URL_X64}",
+  "packages": {
+    "arm64": {
+      "url": "${PREVIEW_DOWNLOAD_URL_ARM64}",
+      "sha256": "<arm64 sha256>"
+    },
+    "x86_64": {
+      "url": "${PREVIEW_DOWNLOAD_URL_X64}",
+      "sha256": "<x64 sha256>"
+    }
+  }
+}
+EOF
+  echo ""
   log "将执行的操作："
   echo "  1. 更新 EZRWorkerApp/Info.plist -> ${NEXT_VERSION}"
   echo "  2. 更新 CHANGELOG.zh.md / CHANGELOG.en.md"
@@ -149,7 +244,7 @@ if [ "$DRY_RUN" = true ]; then
     echo "     dist/EZRWorker-${NEXT_VERSION}-arm64.pkg"
     echo "     dist/EZRWorker-${NEXT_VERSION}-x64.pkg"
   fi
-  echo "  6. 同步 version.json（含中英文 release notes）"
+  echo "  6. 生成 updates/latest.json（可选同步 api/version.json 兼容路径）"
   echo "  7. git push && git push --tags"
   echo "  8. gh release create v${NEXT_VERSION}"
   exit 0
@@ -168,6 +263,11 @@ bash "$SCRIPT_DIR/changelog.sh" --write --lang en --version "$NEXT_VERSION" --no
 GITHUB_RELEASE_NOTES=$(bash "$SCRIPT_DIR/release_notes.sh" --github --version "$NEXT_VERSION" --notes-dir "$NOTES_DIR")
 API_RELEASE_NOTES_ZH=$(bash "$SCRIPT_DIR/release_notes.sh" --api zh --version "$NEXT_VERSION" --notes-dir "$NOTES_DIR")
 API_RELEASE_NOTES_EN=$(bash "$SCRIPT_DIR/release_notes.sh" --api en --version "$NEXT_VERSION" --notes-dir "$NOTES_DIR")
+MANIFEST_MIN_VERSION="$MIN_APP_VERSION"
+if [ -z "$MANIFEST_MIN_VERSION" ] && [ -n "$MANIFEST_JSON" ]; then
+  MANIFEST_MIN_VERSION="$(read_existing_min_version "$MANIFEST_JSON")"
+fi
+APP_UPDATE_MANIFEST_URL="$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_MANIFEST_PATH")"
 
 # 统一 release 版本：正式发布时将 Info.plist 对齐到即将发布的 semver
 log "更新 Info.plist 版本：${NEXT_VERSION}"
@@ -203,7 +303,7 @@ trap rollback EXIT
 build_release_pkg() {
   local archs="$1"
   log "构建打包（${archs}）..."
-  RELEASE_VERSION="$NEXT_VERSION" PKG_ARCHS="$archs" bash "$SCRIPT_DIR/build-pkg.sh" --no-sync-api-version
+  APP_UPDATE_MANIFEST_URL="$APP_UPDATE_MANIFEST_URL" RELEASE_VERSION="$NEXT_VERSION" PKG_ARCHS="$archs" bash "$SCRIPT_DIR/build-pkg.sh" --no-sync-api-version
 }
 
 build_release_pkg "arm64"
@@ -217,57 +317,90 @@ PKG_X64="$REPO_ROOT/dist/EZRWorker-${NEXT_VERSION}-x64.pkg"
 ok "打包完成：$PKG_ARM64"
 ok "打包完成：$PKG_X64"
 
-# ── Step 5：同步 version.json ────────────────────────────────────────────────
+# ── Step 5：生成静态更新清单 ────────────────────────────────────────────────
 
-if [ -f "$API_VERSION_JSON" ]; then
-  log "同步 version.json..."
+PKG_ARM64_SHA256_FILE="$PKG_ARM64.sha256"
+PKG_X64_SHA256_FILE="$PKG_X64.sha256"
+[ -f "$PKG_ARM64_SHA256_FILE" ] || fail "未找到 $PKG_ARM64_SHA256_FILE"
+[ -f "$PKG_X64_SHA256_FILE" ] || fail "未找到 $PKG_X64_SHA256_FILE"
+PKG_ARM64_SHA256=$(awk '{print $1}' "$PKG_ARM64_SHA256_FILE")
+PKG_X64_SHA256=$(awk '{print $1}' "$PKG_X64_SHA256_FILE")
+APP_BUILD_NUMBER=$("$PLIST_BUDDY" -c "Print :CFBundleVersion" "$REPO_ROOT/build/export/EZRWorker.app/Contents/Info.plist" 2>/dev/null || echo "")
+[ -n "$APP_BUILD_NUMBER" ] || fail "无法从构建产物读取 CFBundleVersion"
+RELEASE_DATE_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-  DOWNLOAD_URL="https://clawdhome.app/download/EZRWorker-${NEXT_VERSION}-arm64.pkg"
-  DOWNLOAD_URL_X64="https://clawdhome.app/download/EZRWorker-${NEXT_VERSION}-x64.pkg"
+DOWNLOAD_URL_ARM64="$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-arm64.pkg")"
+DOWNLOAD_URL_X64="$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-x64.pkg")"
+
+if [ -n "$UPDATE_SITE_DIR" ] && [ -d "$UPDATE_SITE_DIR" ]; then
+  log "生成静态更新清单..."
+  mkdir -p "$(dirname "$MANIFEST_JSON")" "$(dirname "$COMPAT_MANIFEST_JSON")"
 
   TMP_JSON=$(mktemp)
-  /usr/bin/python3 - "$API_VERSION_JSON" "$TMP_JSON" "$NEXT_VERSION" "$DOWNLOAD_URL" "$DOWNLOAD_URL_X64" "$API_RELEASE_NOTES_ZH" "$API_RELEASE_NOTES_EN" <<'PY'
+  /usr/bin/python3 - "$TMP_JSON" "$NEXT_VERSION" "$APP_BUILD_NUMBER" "$MANIFEST_MIN_VERSION" "$RELEASE_DATE_UTC" "$DOWNLOAD_URL_ARM64" "$DOWNLOAD_URL_X64" "$PKG_ARM64_SHA256" "$PKG_X64_SHA256" "$API_RELEASE_NOTES_ZH" "$API_RELEASE_NOTES_EN" <<'PY'
 import json
 import sys
 
-src, dst, version, download_url, download_url_x64, notes_zh, notes_en = sys.argv[1:]
-with open(src, "r", encoding="utf-8") as fh:
-    data = json.load(fh)
+(
+    dst,
+    version,
+    build,
+    min_version,
+    release_date,
+    download_url_arm64,
+    download_url_x64,
+    sha256_arm64,
+    sha256_x64,
+    notes_zh,
+    notes_en,
+) = sys.argv[1:]
 
-data["version"] = version
-data["download_url"] = download_url
-data["download_url_x64"] = download_url_x64
-data["release_notes"] = notes_zh
-data["release_notes_en"] = notes_en
+data = {
+    "version": version,
+    "build": build,
+    "min_version": min_version,
+    "channel": "stable",
+    "release_date": release_date,
+    "release_notes": notes_zh,
+    "release_notes_en": notes_en,
+    "download_url": download_url_arm64,
+    "download_url_x64": download_url_x64,
+    "packages": {
+        "arm64": {
+            "url": download_url_arm64,
+            "sha256": sha256_arm64,
+        },
+        "x86_64": {
+            "url": download_url_x64,
+            "sha256": sha256_x64,
+        },
+    },
+}
 
 with open(dst, "w", encoding="utf-8") as fh:
     json.dump(data, fh, ensure_ascii=False, indent=2)
     fh.write("\n")
 PY
-  mv "$TMP_JSON" "$API_VERSION_JSON"
-  chmod 644 "$API_VERSION_JSON"
+  mv "$TMP_JSON" "$MANIFEST_JSON"
+  cp "$MANIFEST_JSON" "$COMPAT_MANIFEST_JSON"
+  chmod 644 "$MANIFEST_JSON" "$COMPAT_MANIFEST_JSON"
 
-  # 复制 pkg 到网站 download 目录
-  WEBSITE_DOWNLOAD_DIR="$WEBSITE_DIR/download"
-  if [ -d "$WEBSITE_DIR" ]; then
-    mkdir -p "$WEBSITE_DOWNLOAD_DIR"
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg"
-    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg"
-    # 向后兼容：保留无架构后缀的历史命名，默认指向 arm64 包。
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}.pkg"
-    cp -f "$PKG_ARM64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest.pkg"
-    cp -f "$PKG_X64" "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest-x64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest.pkg"
-    chmod 644 "$WEBSITE_DOWNLOAD_DIR/EZRWorker-latest-x64.pkg"
-    ok "已复制 pkg 到网站 download 目录"
-  fi
+  UPDATE_DOWNLOAD_DIR="$UPDATE_SITE_DIR${UPDATE_DOWNLOAD_PATH%/}"
+  mkdir -p "$UPDATE_DOWNLOAD_DIR"
+  cp -f "$PKG_ARM64" "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+  cp -f "$PKG_X64" "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg"
+  cp -f "$PKG_ARM64_SHA256_FILE" "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg.sha256"
+  cp -f "$PKG_X64_SHA256_FILE" "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg.sha256"
+  chmod 644 "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg" \
+    "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg" \
+    "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-arm64.pkg.sha256" \
+    "$UPDATE_DOWNLOAD_DIR/EZRWorker-${NEXT_VERSION}-x64.pkg.sha256"
 
-  ok "version.json 已同步 → v${NEXT_VERSION}"
+  ok "静态更新清单已生成：$MANIFEST_JSON"
+  ok "兼容更新清单已同步：$COMPAT_MANIFEST_JSON"
+  ok "pkg 已复制到：$UPDATE_DOWNLOAD_DIR"
 else
-  warn "未找到 $API_VERSION_JSON，跳过 API 版本同步"
+  warn "UPDATE_SITE_DIR 未设置或目录不存在，跳过静态更新清单写入"
 fi
 
 # ── Step 6：push + GitHub Release ────────────────────────────────────────────
@@ -281,7 +414,7 @@ if [ "$SKIP_PUSH" = false ]; then
   RELEASE_NOTES_FILE=$(mktemp)
   echo "$GITHUB_RELEASE_NOTES" > "$RELEASE_NOTES_FILE"
 
-  gh release create "v${NEXT_VERSION}" "$PKG_ARM64" "$PKG_X64" \
+  gh release create "v${NEXT_VERSION}" "$PKG_ARM64" "$PKG_X64" "$PKG_ARM64_SHA256_FILE" "$PKG_X64_SHA256_FILE" \
     --title "EZRWorker ${NEXT_VERSION}" \
     --notes-file "$RELEASE_NOTES_FILE"
 
@@ -305,17 +438,21 @@ echo "  版本：${CURRENT_VERSION:-无} → ${NEXT_VERSION}"
 echo "  Bump：${BUMP_TYPE}"
 echo "  PKG (arm64)：$PKG_ARM64"
 echo "  PKG (x64)：$PKG_X64"
+echo "  Manifest URL：$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_MANIFEST_PATH")"
 echo "  Tag：v${NEXT_VERSION}"
 if [ "$SKIP_PUSH" = false ]; then
   echo "  GitHub Release：已创建"
 fi
-if [ -f "$API_VERSION_JSON" ]; then
-  echo "  version.json：已同步"
+if [ -f "$MANIFEST_JSON" ]; then
+  echo "  latest.json：$MANIFEST_JSON"
+fi
+if [ -f "$COMPAT_MANIFEST_JSON" ]; then
+  echo "  兼容 version.json：$COMPAT_MANIFEST_JSON"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-if [ -d "$WEBSITE_DIR" ]; then
+if [ -d "$UPDATE_SITE_DIR" ]; then
   echo "下一步（更新线上网站）："
-  echo "  cd $WEBSITE_DIR && make deploy"
+  echo "  cd $UPDATE_SITE_DIR && make deploy"
 fi
 echo ""

@@ -66,6 +66,8 @@ bash scripts/semver.sh --current
 bash scripts/semver.sh --bump-type
 ```
 
+没有任何 `v*` tag 时，首个发布版本默认为 `1.0.0`。如需临时调整首发版本，可设置 `INITIAL_VERSION=1.0.0` 这类 `MAJOR.MINOR.PATCH` 格式的值。
+
 bump 规则：
 
 | Commit 类型 | 版本变化 |

@@ -4,6 +4,7 @@
 //   - EZRWorker App 自身版本（官网 API）→ 提示管理员升级 App
 
 import AppKit
+import CryptoKit
 import Darwin
 import Foundation
 import Observation
@@ -29,12 +30,22 @@ final class UpdateChecker {
 
     // MARK: - EZRWorker App 自身版本检测
 
+    var appUpdateState = AppUpdateState()
+    var appUpdatePhase: AppUpdateDownloadPhase = .idle
     var appLatestVersion: String? = nil
+    var appLatestBuild: String? = nil
     var appDownloadURL: URL? = nil
+    var appDownloadURLX64: URL? = nil
+    var appSelectedPackageURL: URL? = nil
+    var appSelectedPackageSHA256: String? = nil
     /// 更新说明（从 API 获取，中文优先）
     var appReleaseNotes: String? = nil
     /// 最低要求版本（低于此版本强制升级）
     var appMinVersion: String? = nil
+    var appChannel: String = "stable"
+    var appReleaseDate: String? = nil
+    var appLastSuccessfulCheckAt: TimeInterval? = nil
+    var appUpdateManifestSource: String? = nil
     /// 下载进度：nil=空闲，0.0–1.0=下载中，1.0=完成
     var appUpdateProgress: Double? = nil
     var appUpdateError: String? = nil
@@ -51,13 +62,14 @@ final class UpdateChecker {
     /// 当前下载任务（用于取消）
     private var currentDownloadSession: URLSession?
     private var relaunchMonitorTask: Task<Void, Never>?
+    private var isCancellingAppDownload = false
 
     private static let udKeyAppLastChecked  = "appUpdate.lastChecked"
     private static let udKeyAppVersion      = "appUpdate.version"
     private static let udKeyAppDownloadURL  = "appUpdate.downloadURL"
     private static let udKeyAppReleaseNotes = "appUpdate.releaseNotes"
     private static let udKeyAppMinVersion   = "appUpdate.minVersion"
-    private static let appApiURL            = "https://clawdhome.app/api/version.json"
+    private static let appManifestURLKey    = "AppUpdateManifestURL"
     private let appCacheInterval: TimeInterval = 24 * 3600
 
     // MARK: - 初始化（从缓存恢复，避免启动时显示L10n.k("services.update_checker.text_f013ea9d", fallback: "加载中")）
@@ -69,12 +81,11 @@ final class UpdateChecker {
             latestReleaseURL = URL(string: urlStr)
         }
         // App 自身缓存
-        appLatestVersion = UserDefaults.standard.string(forKey: Self.udKeyAppVersion)
-        if let dl = UserDefaults.standard.string(forKey: Self.udKeyAppDownloadURL) {
-            appDownloadURL = URL(string: dl)
+        if let cachedState = Self.loadCachedAppUpdateState() {
+            applyAppUpdateState(cachedState, persist: false)
+        } else {
+            applyLegacyAppUpdateDefaults()
         }
-        appReleaseNotes = UserDefaults.standard.string(forKey: Self.udKeyAppReleaseNotes)
-        appMinVersion   = UserDefaults.standard.string(forKey: Self.udKeyAppMinVersion)
     }
 
     // MARK: - openclaw 检测
@@ -127,20 +138,37 @@ final class UpdateChecker {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
     }
 
+    var currentAppBuild: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+    }
+
+    var configuredAppUpdateManifestURL: URL? {
+        Self.configuredAppUpdateManifestURL()
+    }
+
+    var appUpdateManifestIsConfigured: Bool {
+        configuredAppUpdateManifestURL != nil
+    }
+
     /// 当前 App 是否低于最新版本
     var appNeedsUpdate: Bool {
         guard let latest = appLatestVersion else { return false }
-        return compareVersions(currentAppVersion, latest) == .orderedAscending
+        return AppVersionComparator.compare(currentAppVersion, latest) == .orderedAscending
     }
 
     /// 当前 App 是否低于最低要求版本（强制升级）
     var appMustUpdate: Bool {
         guard let min = appMinVersion else { return false }
-        return compareVersions(currentAppVersion, min) == .orderedAscending
+        return AppVersionComparator.compare(currentAppVersion, min) == .orderedAscending
+    }
+
+    func bootstrapAppUpdates() async {
+        await checkAppIfNeeded()
     }
 
     func checkAppIfNeeded() async {
-        let lastChecked = UserDefaults.standard.object(forKey: Self.udKeyAppLastChecked) as? TimeInterval
+        let lastChecked = appLastSuccessfulCheckAt
+            ?? UserDefaults.standard.object(forKey: Self.udKeyAppLastChecked) as? TimeInterval
         let now = Date().timeIntervalSinceReferenceDate
         guard UpdateCheckPolicy.shouldCheck(
             now: now,
@@ -148,94 +176,210 @@ final class UpdateChecker {
             cachedVersion: appLatestVersion,
             minimumInterval: appCacheInterval
         ) else { return }
-        await checkApp()
+        await checkApp(forceNetwork: false)
     }
 
     func checkApp() async {
+        await checkApp(forceNetwork: true)
+    }
+
+    private func checkApp(forceNetwork: Bool) async {
         guard !isCheckingAppUpdate else { return }
         isCheckingAppUpdate = true
+        appUpdatePhase = .checking
         appCheckError = nil
-        defer { isCheckingAppUpdate = false }
+        defer {
+            isCheckingAppUpdate = false
+            if case .checking = appUpdatePhase {
+                appUpdatePhase = appNeedsUpdate ? .available : .upToDate
+            }
+        }
 
-        guard let url = URL(string: Self.appApiURL) else { return }
-        var req = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        guard let manifestURL = configuredAppUpdateManifestURL else {
+            appCheckError = L10n.k(
+                "services.update_checker.manifest_not_configured",
+                fallback: "App 更新源未配置"
+            )
+            appUpdatePhase = appNeedsUpdate ? .available : .idle
+            return
+        }
+
+        let requestURL = forceNetwork ? Self.cacheBustedURL(manifestURL) : manifestURL
+        var req = URLRequest(url: requestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
         req.setValue(buildUpdateUserAgent(), forHTTPHeaderField: "User-Agent")
         let systemLanguage = Self.preferredSystemLanguage()
         req.setValue(systemLanguage, forHTTPHeaderField: "X-EZRWorker-System-Language")
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            let (data, response) = try await URLSession.shared.data(for: req)
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
+                throw UpdateError.httpError(httpResponse.statusCode)
+            }
 
-            applyAppUpdateState(
-                AppUpdateState(
-                    latestVersion: json["version"] as? String,
-                    downloadURL: json["download_url"] as? String,
-                    releaseNotes: json["release_notes"] as? String ?? json["release_notes_en"] as? String,
-                    minimumVersion: json["min_version"] as? String,
-                    lastSuccessfulCheckAt: Date().timeIntervalSinceReferenceDate,
-                    lastHeartbeatAt: nil,
-                    lastError: nil,
-                    source: "app-fallback"
-                )
+            var state = try JSONDecoder().decode(AppUpdateState.self, from: data)
+            state.lastSuccessfulCheckAt = Date().timeIntervalSinceReferenceDate
+            state.lastError = nil
+            state.source = manifestURL.absoluteString
+            state.releaseNotes = Self.localizedReleaseNotes(
+                zh: state.releaseNotes,
+                en: state.releaseNotesEn
             )
+
+            let selectedPackage = Self.selectedPackage(from: state, architecture: Self.cpuArchitecture())
+            state.selectedPackageURL = selectedPackage.url
+            state.selectedPackageSHA256 = selectedPackage.sha256
+
+            applyAppUpdateState(state)
         } catch {
             appCheckError = error.localizedDescription
+            appUpdatePhase = .failed(error.localizedDescription)
         }
     }
 
-    private func applyAppUpdateState(_ state: AppUpdateState) {
+    private func applyAppUpdateState(_ state: AppUpdateState, persist: Bool = true) {
+        appUpdateState = state
         appLatestVersion = state.latestVersion
-        UserDefaults.standard.set(state.latestVersion, forKey: Self.udKeyAppVersion)
+        appLatestBuild = state.latestBuild
 
-        if let downloadURL = state.downloadURL {
+        if let downloadURL = state.downloadURL?.nonEmptyTrimmed {
             appDownloadURL = URL(string: downloadURL)
-            UserDefaults.standard.set(downloadURL, forKey: Self.udKeyAppDownloadURL)
         } else {
             appDownloadURL = nil
+        }
+
+        if let downloadURLX64 = state.downloadURLX64?.nonEmptyTrimmed {
+            appDownloadURLX64 = URL(string: downloadURLX64)
+        } else {
+            appDownloadURLX64 = nil
+        }
+
+        if let selectedPackageURL = state.selectedPackageURL?.nonEmptyTrimmed
+            ?? Self.selectedPackage(from: state, architecture: Self.cpuArchitecture()).url {
+            appSelectedPackageURL = URL(string: selectedPackageURL)
+        } else {
+            appSelectedPackageURL = nil
+        }
+        appSelectedPackageSHA256 = state.selectedPackageSHA256?.nonEmptyTrimmed
+
+        if let releaseNotes = state.releaseNotes?.nonEmptyTrimmed {
+            appReleaseNotes = releaseNotes
+        } else {
+            appReleaseNotes = nil
+        }
+
+        if let minimumVersion = state.minimumVersion?.nonEmptyTrimmed {
+            appMinVersion = minimumVersion
+        } else {
+            appMinVersion = nil
+        }
+
+        appChannel = state.channel
+        appReleaseDate = state.releaseDate?.nonEmptyTrimmed
+        appLastSuccessfulCheckAt = state.lastSuccessfulCheckAt
+        appUpdateManifestSource = state.source.nonEmptyTrimmed
+
+        appUpdatePhase = appLatestVersion == nil ? .idle : (appNeedsUpdate ? .available : .upToDate)
+
+        guard persist else { return }
+        persistAppUpdateState(state)
+    }
+
+    private func applyLegacyAppUpdateDefaults() {
+        let downloadURL = UserDefaults.standard.string(forKey: Self.udKeyAppDownloadURL)
+        let state = AppUpdateState(
+            latestVersion: UserDefaults.standard.string(forKey: Self.udKeyAppVersion),
+            downloadURL: downloadURL,
+            selectedPackageURL: downloadURL,
+            releaseNotes: UserDefaults.standard.string(forKey: Self.udKeyAppReleaseNotes),
+            minimumVersion: UserDefaults.standard.string(forKey: Self.udKeyAppMinVersion),
+            lastSuccessfulCheckAt: UserDefaults.standard.object(forKey: Self.udKeyAppLastChecked) as? TimeInterval,
+            source: "user-defaults"
+        )
+        applyAppUpdateState(state, persist: false)
+    }
+
+    private func persistAppUpdateState(_ state: AppUpdateState) {
+        if let latestVersion = state.latestVersion {
+            UserDefaults.standard.set(latestVersion, forKey: Self.udKeyAppVersion)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.udKeyAppVersion)
+        }
+
+        if let selectedPackageURL = state.selectedPackageURL ?? state.downloadURL {
+            UserDefaults.standard.set(selectedPackageURL, forKey: Self.udKeyAppDownloadURL)
+        } else {
             UserDefaults.standard.removeObject(forKey: Self.udKeyAppDownloadURL)
         }
 
         if let releaseNotes = state.releaseNotes {
-            appReleaseNotes = releaseNotes
             UserDefaults.standard.set(releaseNotes, forKey: Self.udKeyAppReleaseNotes)
         } else {
-            appReleaseNotes = nil
             UserDefaults.standard.removeObject(forKey: Self.udKeyAppReleaseNotes)
         }
 
         if let minimumVersion = state.minimumVersion {
-            appMinVersion = minimumVersion
             UserDefaults.standard.set(minimumVersion, forKey: Self.udKeyAppMinVersion)
         } else {
-            appMinVersion = nil
             UserDefaults.standard.removeObject(forKey: Self.udKeyAppMinVersion)
         }
 
         if let lastSuccessfulCheckAt = state.lastSuccessfulCheckAt {
             UserDefaults.standard.set(lastSuccessfulCheckAt, forKey: Self.udKeyAppLastChecked)
         }
+
+        do {
+            let cacheURL = try Self.appUpdateCacheURL()
+            try FileManager.default.createDirectory(
+                at: cacheURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONEncoder().encode(state)
+            try data.write(to: cacheURL, options: .atomic)
+        } catch {
+            appCheckError = error.localizedDescription
+        }
     }
 
     // MARK: - 下载并安装
 
     func downloadAndInstall() async {
-        guard let downloadURL = appDownloadURL else { return }
+        guard let downloadURL = appSelectedPackageURL ?? appDownloadURL else {
+            appUpdateError = L10n.k(
+                "services.update_checker.missing_download_url",
+                fallback: "更新清单中没有可用的下载地址"
+            )
+            appUpdatePhase = .failed(appUpdateError ?? "")
+            return
+        }
+        guard downloadURL.scheme?.lowercased() == "https" else {
+            appUpdateError = L10n.k(
+                "services.update_checker.insecure_download_url",
+                fallback: "更新包下载地址必须使用 HTTPS"
+            )
+            appUpdatePhase = .failed(appUpdateError ?? "")
+            return
+        }
+
         relaunchMonitorTask?.cancel()
         isAwaitingAppRelaunch = false
+        isCancellingAppDownload = false
         appUpdateError = nil
+        appUpdatePhase = .downloading(progress: 0.0)
         appUpdateProgress = 0.0
         appDownloadedBytes = 0
         appTotalBytes = 0
         appDownloadSpeed = 0
 
         let version = appLatestVersion ?? "latest"
-        let dest = FileManager.default.temporaryDirectory
-            .appendingPathComponent("EZRWorker-\(version).pkg")
+        let arch = Self.packageArchSuffix(for: Self.cpuArchitecture())
+        let dest: URL
 
         do {
+            dest = try Self.updatePackageDestinationURL(version: version, arch: arch)
             let tmp = try await downloadFile(from: downloadURL) { [weak self] metrics in
                 Task { @MainActor in
                     self?.appUpdateProgress = metrics.progress
+                    self?.appUpdatePhase = .downloading(progress: metrics.progress)
                     self?.appDownloadedBytes = metrics.bytesWritten
                     self?.appTotalBytes = metrics.totalBytes
                     self?.appDownloadSpeed = metrics.speed
@@ -248,33 +392,58 @@ final class UpdateChecker {
                 try? FileManager.default.removeItem(at: tmp)
                 throw UpdateError.invalidFile
             }
+
+            if let expectedSHA256 = appSelectedPackageSHA256?.nonEmptyTrimmed {
+                let actualSHA256 = try Self.sha256Hex(of: tmp)
+                guard actualSHA256.caseInsensitiveCompare(expectedSHA256) == .orderedSame else {
+                    try? FileManager.default.removeItem(at: tmp)
+                    throw UpdateError.checksumMismatch
+                }
+            }
+
+            try FileManager.default.createDirectory(
+                at: dest.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try? FileManager.default.removeItem(at: dest)
             try FileManager.default.moveItem(at: tmp, to: dest)
             appUpdateProgress = 1.0
+            appUpdatePhase = .openingInstaller
             guard NSWorkspace.shared.open(dest) else {
                 throw UpdateError.launchInstallerFailed
             }
             appUpdateProgress = nil
             hideAppForUpgrade()
             isAwaitingAppRelaunch = true
+            appUpdatePhase = .awaitingRelaunch
             startInstalledAppMonitor(expectedVersion: version)
-        } catch is CancellationError {
-            appUpdateError = nil
-            appUpdateProgress = nil
-            isAwaitingAppRelaunch = false
         } catch {
+            if isCancellingAppDownload || Self.isCancellationError(error) {
+                appUpdateError = nil
+                appUpdateProgress = nil
+                appUpdatePhase = appNeedsUpdate ? .available : .idle
+                isAwaitingAppRelaunch = false
+                currentDownloadSession = nil
+                isCancellingAppDownload = false
+                return
+            }
+
             appUpdateError = error.localizedDescription
             appUpdateProgress = nil
+            appUpdatePhase = .failed(error.localizedDescription)
             isAwaitingAppRelaunch = false
         }
         currentDownloadSession = nil
+        isCancellingAppDownload = false
     }
 
     /// 取消正在进行的下载
     func cancelDownload() {
+        isCancellingAppDownload = true
         currentDownloadSession?.invalidateAndCancel()
         currentDownloadSession = nil
         appUpdateProgress = nil
+        appUpdatePhase = appNeedsUpdate ? .available : .idle
         appDownloadedBytes = 0
         appTotalBytes = 0
         appDownloadSpeed = 0
@@ -297,7 +466,7 @@ final class UpdateChecker {
                 try? await Task.sleep(for: .seconds(2))
 
                 guard let installedVersion = self.installedBundleVersion() else { continue }
-                guard self.compareVersions(installedVersion, expectedVersion) != .orderedAscending else { continue }
+                guard AppVersionComparator.compare(installedVersion, expectedVersion) != .orderedAscending else { continue }
 
                 // 让安装器完成最后的 bundle 写入和签名校验，再拉起新版。
                 try? await Task.sleep(for: .seconds(1))
@@ -311,6 +480,7 @@ final class UpdateChecker {
                     "services.update_checker.install_complete_reopen_manually",
                     fallback: "安装器已启动，但未检测到新版自动打开。请完成安装后手动重新打开 EZRWorker。"
                 )
+                self.appUpdatePhase = .failed(self.appUpdateError ?? "")
                 NSApp.unhide(nil)
                 NSApp.activate(ignoringOtherApps: true)
             }
@@ -318,21 +488,34 @@ final class UpdateChecker {
     }
 
     private func installedBundleVersion() -> String? {
-        guard let info = NSDictionary(contentsOf: Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")) else {
-            return nil
+        let candidates = [
+            URL(fileURLWithPath: "/Applications/EZRWorker.app/Contents/Info.plist"),
+            Bundle.main.bundleURL.appendingPathComponent("Contents/Info.plist")
+        ]
+        for candidate in candidates {
+            if let info = NSDictionary(contentsOf: candidate),
+               let version = info["CFBundleShortVersionString"] as? String,
+               !version.isEmpty {
+                return version
+            }
         }
-        return info["CFBundleShortVersionString"] as? String
+        return nil
     }
 
     private func relaunchInstalledApp() {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { [weak self] _, error in
+        let installedAppURL = URL(fileURLWithPath: "/Applications/EZRWorker.app")
+        let appURL = FileManager.default.fileExists(atPath: installedAppURL.path)
+            ? installedAppURL
+            : Bundle.main.bundleURL
+        NSWorkspace.shared.openApplication(at: appURL, configuration: config) { [weak self] _, error in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 if let error {
                     self.isAwaitingAppRelaunch = false
                     self.appUpdateError = error.localizedDescription
+                    self.appUpdatePhase = .failed(error.localizedDescription)
                     NSApp.unhide(nil)
                     NSApp.activate(ignoringOtherApps: true)
                     return
@@ -352,8 +535,135 @@ final class UpdateChecker {
         return "EZRWorker/\(currentAppVersion) (\(build); macOS \(osVersion); \(arch); \(cpuModel); RAM \(memory); lang \(language))"
     }
 
-    private var currentAppBuild: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+    private static func configuredAppUpdateManifestURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: appManifestURLKey) as? String else {
+            return nil
+        }
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.contains("$("), let url = URL(string: value) else {
+            return nil
+        }
+        guard url.scheme?.lowercased() == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func cacheBustedURL(_ url: URL) -> URL {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        var queryItems = components.queryItems ?? []
+        queryItems.append(URLQueryItem(name: "t", value: String(Int(Date().timeIntervalSince1970))))
+        components.queryItems = queryItems
+        return components.url ?? url
+    }
+
+    private static func selectedPackage(
+        from state: AppUpdateState,
+        architecture: String
+    ) -> (url: String?, sha256: String?) {
+        let packageKeys: [String]
+        switch architecture {
+        case "x86_64":
+            packageKeys = ["x86_64", "x64", "intel"]
+        case "arm64", "arm64e":
+            packageKeys = ["arm64", "aarch64"]
+        default:
+            packageKeys = [architecture, "arm64"]
+        }
+
+        if let packages = state.packages {
+            for key in packageKeys {
+                if let package = packages[key],
+                   let url = package.url?.nonEmptyTrimmed {
+                    return (url, package.sha256?.nonEmptyTrimmed)
+                }
+            }
+        }
+
+        if architecture == "x86_64",
+           let x64URL = state.downloadURLX64?.nonEmptyTrimmed {
+            return (x64URL, nil)
+        }
+        return (state.downloadURL?.nonEmptyTrimmed, nil)
+    }
+
+    private static func localizedReleaseNotes(zh: String?, en: String?) -> String? {
+        let language = preferredSystemLanguage().lowercased()
+        let zhNotes = zh?.nonEmptyTrimmed
+        let enNotes = en?.nonEmptyTrimmed
+        if language.hasPrefix("zh") {
+            return zhNotes ?? enNotes
+        }
+        return enNotes ?? zhNotes
+    }
+
+    private static func appUpdateCacheURL() throws -> URL {
+        let appSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        return appSupport
+            .appendingPathComponent("EZRWorker", isDirectory: true)
+            .appendingPathComponent("app-update-state.json")
+    }
+
+    private static func loadCachedAppUpdateState() -> AppUpdateState? {
+        guard let cacheURL = try? appUpdateCacheURL(),
+              let data = try? Data(contentsOf: cacheURL) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(AppUpdateState.self, from: data)
+    }
+
+    private static func updatePackageDestinationURL(version: String, arch: String) throws -> URL {
+        let caches = try FileManager.default.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let fileName = "EZRWorker-\(sanitizedPathComponent(version))-\(arch).pkg"
+        return caches
+            .appendingPathComponent("EZRWorker", isDirectory: true)
+            .appendingPathComponent("Updates", isDirectory: true)
+            .appendingPathComponent(fileName)
+    }
+
+    private static func packageArchSuffix(for architecture: String) -> String {
+        architecture == "x86_64" ? "x64" : "arm64"
+    }
+
+    private static func sanitizedPathComponent(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-_"))
+        let scalars = value.unicodeScalars.map { scalar in
+            allowed.contains(scalar) ? Character(String(scalar)) : "-"
+        }
+        let sanitized = String(scalars)
+        return sanitized.isEmpty ? "latest" : sanitized
+    }
+
+    private static func sha256Hex(of url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        var hasher = SHA256()
+        while true {
+            let data = try handle.read(upToCount: 1024 * 1024) ?? Data()
+            if data.isEmpty { break }
+            hasher.update(data: data)
+        }
+        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func isCancellationError(_ error: Error) -> Bool {
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return true
+        }
+        return (error as NSError).code == NSURLErrorCancelled
     }
 
     private static func systemVersionString() -> String {
@@ -409,12 +719,14 @@ final class UpdateChecker {
     enum UpdateError: LocalizedError {
         case invalidFile
         case httpError(Int)
+        case checksumMismatch
         case launchInstallerFailed
 
         var errorDescription: String? {
             switch self {
             case .invalidFile: return L10n.k("services.update_checker.file", fallback: "下载的文件无效，请稍后重试")
             case .httpError(let code): return "\(L10n.k("services.update_checker.server_error_prefix", fallback: "服务器返回错误")) (\(code))，\(L10n.k("services.update_checker.retry_later_suffix", fallback: "请稍后重试"))"
+            case .checksumMismatch: return L10n.k("services.update_checker.checksum_mismatch", fallback: "更新包校验失败，请稍后重试")
             case .launchInstallerFailed: return L10n.k("services.update_checker.open_open_pkg", fallback: "无法打开安装程序，请手动打开下载的 pkg")
             }
         }
@@ -424,20 +736,7 @@ final class UpdateChecker {
 
     func needsUpdate(_ installed: String?) -> Bool {
         guard let installed, let latest = latestVersion else { return false }
-        return compareVersions(installed, latest) == .orderedAscending
-    }
-
-    /// 逐段比较版本号（支持 "YYYY.M.DL10n.k("services.update_checker.text_ed4b80bf", fallback: " 和 ")1.0.180" 两种格式）
-    private func compareVersions(_ a: String, _ b: String) -> ComparisonResult {
-        let av = a.split(separator: ".").compactMap { Int($0) }
-        let bv = b.split(separator: ".").compactMap { Int($0) }
-        for i in 0..<max(av.count, bv.count) {
-            let ai = i < av.count ? av[i] : 0
-            let bi = i < bv.count ? bv[i] : 0
-            if ai < bi { return .orderedAscending }
-            if ai > bi { return .orderedDescending }
-        }
-        return .orderedSame
+        return AppVersionComparator.compare(installed, latest) == .orderedAscending
     }
 
     // MARK: - 下载进度指标
@@ -548,5 +847,12 @@ final class UpdateChecker {
         if kb < 1024 { return String(format: "%.0f KB/s", kb) }
         let mb = kb / 1024
         return String(format: "%.1f MB/s", mb)
+    }
+}
+
+private extension String {
+    var nonEmptyTrimmed: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }

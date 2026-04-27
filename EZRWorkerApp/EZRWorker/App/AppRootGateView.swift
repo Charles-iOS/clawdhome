@@ -33,6 +33,7 @@ struct AppRootGateView: View {
 struct AuthenticatedAppShell: View {
     @Environment(AppBootstrapCoordinator.self) private var bootstrapCoordinator
     @Environment(GatewayProfileStore.self) private var profileStore
+    @Environment(UpdateChecker.self) private var updater
 
     var body: some View {
         ZStack {
@@ -55,6 +56,11 @@ struct AuthenticatedAppShell: View {
                 case .started:
                     EmptyView()
                 }
+            }
+
+            if updater.appMustUpdate {
+                ForceAppUpdateOverlay()
+                    .environment(updater)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -119,6 +125,111 @@ struct AuthenticatedSceneGate<Content: View>: View {
         case .blocked:
             ProtectedWindowPlaceholder()
         }
+    }
+}
+
+private struct ForceAppUpdateOverlay: View {
+    @Environment(UpdateChecker.self) private var updater
+
+    var body: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.94)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 14) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .frame(width: 58, height: 58)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L10n.k("app_update.force.title", fallback: "需要更新后继续使用"))
+                            .font(.title2.weight(.semibold))
+                        Text(versionSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let notes = updater.appReleaseNotes {
+                    ScrollView {
+                        Text(notes)
+                            .font(.callout)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxHeight: 190)
+                }
+
+                if let progress = updater.appUpdateProgress {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.linear)
+                            .tint(.red)
+                        Text(downloadProgressLabel(progress))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let error = updater.appUpdateError, !error.isEmpty {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack {
+                    Button(role: .destructive) {
+                        NSApp.terminate(nil)
+                    } label: {
+                        Text(L10n.k("app_update.force.quit", fallback: "退出 EZRWorker"))
+                    }
+                    .keyboardShortcut(.cancelAction)
+
+                    Spacer()
+
+                    Button {
+                        Task { await updater.downloadAndInstall() }
+                    } label: {
+                        if updater.appUpdateProgress != nil || updater.isAwaitingAppRelaunch {
+                            Text(L10n.k("app_update.force.updating", fallback: "正在更新..."))
+                        } else {
+                            Text(L10n.k("app_update.force.update_now", fallback: "立即更新"))
+                        }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(
+                        updater.appUpdateProgress != nil
+                            || updater.isAwaitingAppRelaunch
+                            || (updater.appSelectedPackageURL == nil && updater.appDownloadURL == nil)
+                    )
+                }
+            }
+            .padding(28)
+            .frame(width: 480, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: Color.black.opacity(0.16), radius: 24, y: 10)
+        }
+    }
+
+    private var versionSummary: String {
+        let current = updater.currentAppVersion
+        let minimum = updater.appMinVersion ?? "—"
+        let latest = updater.appLatestVersion ?? "—"
+        return "当前 v\(current) · 最低要求 v\(minimum) · 最新 v\(latest)"
+    }
+
+    private func downloadProgressLabel(_ progress: Double) -> String {
+        let percentage = "\(Int(progress * 100))%"
+        guard updater.appTotalBytes > 0 else { return "正在下载 \(percentage)" }
+        let size = "\(UpdateChecker.formatBytes(updater.appDownloadedBytes)) / \(UpdateChecker.formatBytes(updater.appTotalBytes))"
+        if updater.appDownloadSpeed > 0 {
+            return "正在下载 \(percentage) · \(size) · \(UpdateChecker.formatSpeed(updater.appDownloadSpeed))"
+        }
+        return "正在下载 \(percentage) · \(size)"
     }
 }
 

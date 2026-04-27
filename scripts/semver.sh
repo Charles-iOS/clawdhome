@@ -6,6 +6,9 @@
 #   bash scripts/semver.sh --current    # 输出当前 tag 版本号（如 1.1.7）
 #   bash scripts/semver.sh --bump-type  # 仅输出 bump 类型（major/minor/patch/none）
 #
+# 环境变量：
+#   INITIAL_VERSION=1.0.0               # 没有 v* tag 时的首个发布版本
+#
 # 兼容 macOS bash 3.2，零外部依赖。
 
 set -euo pipefail
@@ -13,6 +16,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+INITIAL_VERSION="${INITIAL_VERSION:-1.0.0}"
+
+if ! [[ "$INITIAL_VERSION" =~ ^[0-9]+(\.[0-9]+){2}$ ]]; then
+  echo "INITIAL_VERSION 必须是 MAJOR.MINOR.PATCH 格式：$INITIAL_VERSION" >&2
+  exit 1
+fi
 
 # ── 解析参数 ──────────────────────────────────────────────────────────────────
 
@@ -51,8 +60,12 @@ fi
 # ── 解析版本号为 MAJOR.MINOR.PATCH ──────────────────────────────────────────
 
 if [ -z "$CURRENT" ]; then
-  echo "未找到 v* tag，无法计算下一版本。请先打初始 tag（如 git tag v1.1.7）" >&2
-  exit 1
+  if [ "$MODE" = "bump-type" ]; then
+    echo "initial"
+  else
+    echo "$INITIAL_VERSION"
+  fi
+  exit 0
 fi
 
 MAJOR=$(echo "$CURRENT" | cut -d. -f1)

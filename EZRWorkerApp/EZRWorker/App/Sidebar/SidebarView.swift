@@ -89,9 +89,12 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .safeAreaInset(edge: .bottom) {
-            gatewayStatus
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+            VStack(alignment: .leading, spacing: 8) {
+                AppUpdateBanner()
+                gatewayStatus
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
+            }
         }
     }
 
