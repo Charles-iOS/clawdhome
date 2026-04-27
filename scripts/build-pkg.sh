@@ -57,6 +57,8 @@ APPLE_TEAM_ID="${APPLE_TEAM_ID:-9P6LY282WU}"
 APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-Developer ID Application: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)}"
 PKG_SIGN_IDENTITY="${PKG_SIGN_IDENTITY:-Developer ID Installer: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
+NOTARY_TIMEOUT="${NOTARY_TIMEOUT:-1h}"
+NOTARY_S3_ACCELERATION="${NOTARY_S3_ACCELERATION:-false}"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 QUIET_XCODE="${QUIET_XCODE:-true}"
 PKG_ARCHS_RAW="${PKG_ARCHS:-arm64}"
@@ -107,6 +109,7 @@ assert_bool() {
 assert_bool "SIGN_APP" "$SIGN_APP"
 assert_bool "SIGN_PKG" "$SIGN_PKG"
 assert_bool "NOTARIZE" "$NOTARIZE"
+assert_bool "NOTARY_S3_ACCELERATION" "$NOTARY_S3_ACCELERATION"
 assert_bool "QUIET_XCODE" "$QUIET_XCODE"
 
 validate_update_base_url() {
@@ -160,6 +163,49 @@ for issue in issues[:20]:
 if len(issues) > 20:
     print(f"- 还有 {len(issues) - 20} 条，详见完整日志。")
 PY
+}
+
+json_get() {
+  local json_file="$1"
+  local key="$2"
+  /usr/bin/python3 - "$json_file" "$key" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        print(json.load(fh).get(sys.argv[2], ""))
+except Exception:
+    print("")
+PY
+}
+
+run_notarytool_json() {
+  local output_file="$1"
+  local err_file="$2"
+  shift 2
+
+  rm -f "$output_file" "$err_file"
+  set +e
+  xcrun notarytool "$@" --output-format json --no-progress > "$output_file" 2> "$err_file"
+  local exit_code=$?
+  set -e
+
+  if [ "$exit_code" -ne 0 ]; then
+    [ -s "$err_file" ] && cat "$err_file" >&2
+    [ -s "$output_file" ] && cat "$output_file" >&2
+    if [ "$exit_code" -eq 138 ]; then
+      fail "notarytool 崩溃（Bus error 10）。输出：$output_file，错误：$err_file"
+    fi
+    fail "notarytool 执行失败（exit $exit_code）。输出：$output_file，错误：$err_file"
+  fi
+}
+
+clean_filesystem_metadata() {
+  local root="$1"
+  [ -e "$root" ] || return 0
+  find "$root" \( -name ".DS_Store" -o -name "._*" \) -print0 | xargs -0 rm -f
+  xattr -cr "$root" 2>/dev/null || true
 }
 
 is_macho_file() {
@@ -341,7 +387,7 @@ if [ "$SKIP_BUILD" = false ]; then
 
   # 从 archive 中取出 app（使用 ditto 保留符号链接，避免 Node/npm 运行时损坏）
   mkdir -p "$EXPORT_DIR"
-  ditto "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$EXPORT_DIR/${APP_NAME}.app"
+  ditto --noextattr --noqtn "$ARCHIVE_PATH/Products/Applications/${APP_NAME}.app" "$EXPORT_DIR/${APP_NAME}.app"
   ok "构建完成：$EXPORT_DIR/${APP_NAME}.app"
 else
   log "跳过构建，使用已有：$EXPORT_DIR/${APP_NAME}.app"
@@ -384,6 +430,7 @@ else
   fi
 fi
 
+clean_filesystem_metadata "$APP_BUNDLE"
 sign_app_bundle_for_distribution
 
 # ── Step 2：准备 pkg 目录结构 ─────────────────────────────────────────────────
@@ -398,7 +445,7 @@ mkdir -p "$PKG_ROOT/Applications"
 mkdir -p "$PKG_SCRIPTS"
 
 # 拷贝 app（含嵌入的 Node.js + OpenClaw，保留符号链接）
-ditto "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
+ditto --noextattr --noqtn "$APP_BUNDLE" "$PKG_ROOT/Applications/${APP_NAME}.app"
 
 SUPERVISOR_PLIST_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist"
 SUPERVISOR_BINARY_IN_BUNDLE="$PKG_ROOT/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
@@ -496,6 +543,13 @@ POSTINSTALL
 chmod +x "$PKG_SCRIPTS/preinstall" "$PKG_SCRIPTS/postinstall"
 ok "安装脚本生成完成"
 
+clean_filesystem_metadata "$PKG_ROOT"
+if [ "$SIGN_APP" = true ]; then
+  log "校验打包目录中的 app 签名..."
+  codesign --verify --deep --strict --verbose=2 "$PKG_ROOT/Applications/${APP_NAME}.app"
+  ok "打包目录 app 签名校验通过"
+fi
+
 # ── Step 5：打包 pkg ──────────────────────────────────────────────────────────
 
 log "生成 $PKG_NAME..."
@@ -507,7 +561,7 @@ if [ "$SIGN_PKG" = true ]; then
   rm -f "$UNSIGNED_PKG_OUTPUT" "$PKG_OUTPUT"
 fi
 
-pkgbuild \
+COPYFILE_DISABLE=1 pkgbuild \
   --root "$PKG_ROOT" \
   --scripts "$PKG_SCRIPTS" \
   --identifier "$BUNDLE_ID" \
@@ -535,37 +589,32 @@ if [ "$NOTARIZE" = true ]; then
   require_cmd spctl
   log "提交 pkg 公证..."
   NOTARY_SUBMIT_JSON="$REPO_ROOT/build/logs/notary-submit-${PKG_VERSION_LABEL}.json"
+  NOTARY_SUBMIT_ERR="$REPO_ROOT/build/logs/notary-submit-${PKG_VERSION_LABEL}.err"
+  NOTARY_WAIT_JSON="$REPO_ROOT/build/logs/notary-wait-${PKG_VERSION_LABEL}.json"
+  NOTARY_WAIT_ERR="$REPO_ROOT/build/logs/notary-wait-${PKG_VERSION_LABEL}.err"
   NOTARY_LOG_JSON="$REPO_ROOT/build/logs/notary-log-${PKG_VERSION_LABEL}.json"
   mkdir -p "$REPO_ROOT/build/logs"
-  if ! xcrun notarytool submit "$PKG_OUTPUT" \
-      --keychain-profile "$NOTARY_PROFILE" \
-      --wait \
-      --output-format json > "$NOTARY_SUBMIT_JSON"; then
-    cat "$NOTARY_SUBMIT_JSON" >&2 || true
-    fail "pkg 公证提交失败：$NOTARY_SUBMIT_JSON"
+
+  NOTARY_S3_ARGS=(--no-s3-acceleration)
+  if [ "$NOTARY_S3_ACCELERATION" = true ]; then
+    NOTARY_S3_ARGS=(--s3-acceleration)
   fi
-  NOTARY_STATUS=$(/usr/bin/python3 - "$NOTARY_SUBMIT_JSON" <<'PY'
-import json
-import sys
 
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as fh:
-        print(json.load(fh).get("status", ""))
-except Exception:
-    print("")
-PY
-)
-  NOTARY_ID=$(/usr/bin/python3 - "$NOTARY_SUBMIT_JSON" <<'PY'
-import json
-import sys
+  run_notarytool_json "$NOTARY_SUBMIT_JSON" "$NOTARY_SUBMIT_ERR" \
+    submit "$PKG_OUTPUT" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    "${NOTARY_S3_ARGS[@]}"
 
-try:
-    with open(sys.argv[1], "r", encoding="utf-8") as fh:
-        print(json.load(fh).get("id", ""))
-except Exception:
-    print("")
-PY
-)
+  NOTARY_ID=$(json_get "$NOTARY_SUBMIT_JSON" "id")
+  [ -n "$NOTARY_ID" ] || fail "pkg 公证提交后未返回 submission id：$NOTARY_SUBMIT_JSON"
+
+  log "等待公证结果：$NOTARY_ID"
+  run_notarytool_json "$NOTARY_WAIT_JSON" "$NOTARY_WAIT_ERR" \
+    wait "$NOTARY_ID" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --timeout "$NOTARY_TIMEOUT"
+
+  NOTARY_STATUS=$(json_get "$NOTARY_WAIT_JSON" "status")
   if [ "$NOTARY_STATUS" != "Accepted" ]; then
     warn "pkg 公证未通过（${NOTARY_STATUS:-未知状态}）"
     if [ -n "$NOTARY_ID" ]; then
