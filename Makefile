@@ -12,8 +12,8 @@ INITIAL_BUILD_NUMBER := 500
 BUILD_COUNTER_SCRIPT := scripts/build_counter.sh
 
 APPLE_TEAM_ID ?= 9P6LY282WU
-APP_SIGN_IDENTITY ?= Developer ID Application
-PKG_SIGN_IDENTITY ?= Developer ID Installer
+APP_SIGN_IDENTITY ?= Developer ID Application: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)
+PKG_SIGN_IDENTITY ?= Developer ID Installer: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)
 NOTARY_PROFILE ?= ezrworker-release
 SIGN_APP ?= false
 SIGN_PKG ?= false

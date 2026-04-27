@@ -54,8 +54,8 @@ SIGN_APP="${SIGN_APP:-false}"
 SIGN_PKG="${SIGN_PKG:-false}"
 NOTARIZE="${NOTARIZE:-false}"
 APPLE_TEAM_ID="${APPLE_TEAM_ID:-9P6LY282WU}"
-APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-Developer ID Application}"
-PKG_SIGN_IDENTITY="${PKG_SIGN_IDENTITY:-Developer ID Installer}"
+APP_SIGN_IDENTITY="${APP_SIGN_IDENTITY:-Developer ID Application: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)}"
+PKG_SIGN_IDENTITY="${PKG_SIGN_IDENTITY:-Developer ID Installer: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 RELEASE_VERSION="${RELEASE_VERSION:-}"
 QUIET_XCODE="${QUIET_XCODE:-true}"
@@ -90,6 +90,7 @@ esac
 
 log()  { echo "▶ $*"; }
 ok()   { echo "✅ $*"; }
+warn() { echo "⚠️  $*"; }
 fail() { echo "❌ $*" >&2; exit 1; }
 
 require_cmd() {
@@ -130,16 +131,6 @@ fi
 if [ "$NOTARIZE" = true ] && [ -z "$NOTARY_PROFILE" ]; then
   fail "NOTARIZE=true 时必须提供 NOTARY_PROFILE（xcrun notarytool store-credentials 的 profile 名）"
 fi
-
-validate_app_sign_identity() {
-  [ "$SIGN_APP" = true ] || return 0
-  require_cmd security
-
-  if ! security find-identity -v -p codesigning 2>/dev/null | grep -F "$APP_SIGN_IDENTITY" >/dev/null; then
-    security find-identity -v -p codesigning 2>/dev/null || true
-    fail "未找到可用 App 签名证书：$APP_SIGN_IDENTITY。请安装 Developer ID Application 证书，或用 APP_SIGN_IDENTITY 覆盖为钥匙串中的完整证书名称。"
-  fi
-}
 
 print_notary_log_summary() {
   local log_file="$1"
@@ -265,7 +256,6 @@ compute_build_number() {
 
 BUILD_MARKETING_VERSION=$(compute_marketing_version)
 BUILD_NUMBER=$(compute_build_number)
-validate_app_sign_identity
 
 run_xcodebuild() {
   local log_file="$1"

@@ -45,8 +45,8 @@ xcrun notarytool store-credentials ezrworker-release \
 
 ```bash
 APPLE_TEAM_ID=9P6LY282WU
-APP_SIGN_IDENTITY="Developer ID Application"
-PKG_SIGN_IDENTITY="Developer ID Installer"
+APP_SIGN_IDENTITY="Developer ID Application: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)"
+PKG_SIGN_IDENTITY="Developer ID Installer: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)"
 NOTARY_PROFILE=ezrworker-release
 ```
 
@@ -145,8 +145,8 @@ make notarize-pkg NOTARY_PROFILE=ezrworker-release
 ```bash
 make notarize-pkg \
   APPLE_TEAM_ID=9P6LY282WU \
-  APP_SIGN_IDENTITY="Developer ID Application" \
-  PKG_SIGN_IDENTITY="Developer ID Installer" \
+  APP_SIGN_IDENTITY="Developer ID Application: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)" \
+  PKG_SIGN_IDENTITY="Developer ID Installer: Shanghai Yike Information Technology Co.,Ltd. (9P6LY282WU)" \
   NOTARY_PROFILE=ezrworker-release
 ```
 
