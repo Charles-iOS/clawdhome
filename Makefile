@@ -52,7 +52,7 @@ help:
 	@echo "  notarize-pkg     生成已签名且已公证安装包（读取 NOTARY_PROFILE）"
 	@echo "  QUIET_XCODE=false 可显示完整 xcodebuild 输出（默认静默并写入 build/logs/）"
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
-	@echo "  release-local    本地发布：更新 changelog + tag + 签名 pkg + 更新清单，跳过 push/GitHub Release"
+	@echo "  release-local    Git 发布：更新 changelog + tag + 签名 pkg + 更新清单 + git push，跳过 GitHub Release"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
 	@echo "  发布更新源：UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/ UPDATE_SITE_DIR=/path/to/static-site"
 	@echo "  test-release-scripts  校验 release/changelog 脚本"
@@ -243,7 +243,7 @@ release-local:
 	UPDATE_COMPAT_MANIFEST_PATH="$(UPDATE_COMPAT_MANIFEST_PATH)" \
 	UPDATE_DOWNLOAD_PATH="$(UPDATE_DOWNLOAD_PATH)" \
 	MIN_APP_VERSION="$(MIN_APP_VERSION)" \
-	bash scripts/release.sh --skip-push
+	bash scripts/release.sh --skip-github-release
 
 release-dry-run:
 	SIGN_APP=true \

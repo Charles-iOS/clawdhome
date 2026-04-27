@@ -5,6 +5,8 @@
 #   bash scripts/release.sh              # 完整发布流程
 #   bash scripts/release.sh --dry-run    # 仅预览，不执行任何写操作
 #   bash scripts/release.sh --skip-push  # 跳过 git push 和 GitHub Release
+#   bash scripts/release.sh --skip-github-release
+#                                           # 推送 git/tag，但跳过 GitHub Release
 #
 # 流程：
 #   1. semver.sh 计算下一版本号
@@ -13,9 +15,9 @@
 #   4. git commit + tag
 #   5. build-pkg.sh 构建打包
 #   6. 同步 version.json release_notes / release_notes_en
-#   7. git push + gh release create
+#   7. git push + gh release create（可选跳过 GitHub Release）
 #
-# 兼容 macOS bash 3.2，需要 gh CLI。
+# 兼容 macOS bash 3.2。完整发布需要 gh CLI。
 
 set -euo pipefail
 export LC_ALL=C
@@ -44,10 +46,12 @@ PLIST_BUDDY="/usr/libexec/PlistBuddy"
 
 DRY_RUN=false
 SKIP_PUSH=false
+SKIP_GITHUB_RELEASE=false
 for arg in "$@"; do
   case "$arg" in
-    --dry-run)    DRY_RUN=true ;;
-    --skip-push)  SKIP_PUSH=true ;;
+    --dry-run)              DRY_RUN=true ;;
+    --skip-push)            SKIP_PUSH=true ;;
+    --skip-github-release)  SKIP_GITHUB_RELEASE=true ;;
   esac
 done
 
@@ -131,12 +135,12 @@ if [ "$DRY_RUN" = false ]; then
 fi
 
 # 检查 gh CLI
-if [ "$DRY_RUN" = false ] && [ "$SKIP_PUSH" = false ] && ! command -v gh &>/dev/null; then
+if [ "$DRY_RUN" = false ] && [ "$SKIP_PUSH" = false ] && [ "$SKIP_GITHUB_RELEASE" = false ] && ! command -v gh &>/dev/null; then
   fail "需要 GitHub CLI（gh）。安装：brew install gh && gh auth login"
 fi
 
 # 检查 gh 登录状态
-if [ "$DRY_RUN" = false ] && [ "$SKIP_PUSH" = false ] && ! gh auth status &>/dev/null 2>&1; then
+if [ "$DRY_RUN" = false ] && [ "$SKIP_PUSH" = false ] && [ "$SKIP_GITHUB_RELEASE" = false ] && ! gh auth status &>/dev/null 2>&1; then
   fail "gh 未登录。请运行：gh auth login"
 fi
 
@@ -410,16 +414,20 @@ if [ "$SKIP_PUSH" = false ]; then
   git push
   git push --tags
 
-  log "创建 GitHub Release..."
-  RELEASE_NOTES_FILE=$(mktemp)
-  echo "$GITHUB_RELEASE_NOTES" > "$RELEASE_NOTES_FILE"
+  if [ "$SKIP_GITHUB_RELEASE" = false ]; then
+    log "创建 GitHub Release..."
+    RELEASE_NOTES_FILE=$(mktemp)
+    echo "$GITHUB_RELEASE_NOTES" > "$RELEASE_NOTES_FILE"
 
-  gh release create "v${NEXT_VERSION}" "$PKG_ARM64" "$PKG_X64" "$PKG_ARM64_SHA256_FILE" "$PKG_X64_SHA256_FILE" \
-    --title "EZRWorker ${NEXT_VERSION}" \
-    --notes-file "$RELEASE_NOTES_FILE"
+    gh release create "v${NEXT_VERSION}" "$PKG_ARM64" "$PKG_X64" "$PKG_ARM64_SHA256_FILE" "$PKG_X64_SHA256_FILE" \
+      --title "EZRWorker ${NEXT_VERSION}" \
+      --notes-file "$RELEASE_NOTES_FILE"
 
-  rm -f "$RELEASE_NOTES_FILE"
-  ok "GitHub Release v${NEXT_VERSION} 已创建"
+    rm -f "$RELEASE_NOTES_FILE"
+    ok "GitHub Release v${NEXT_VERSION} 已创建"
+  else
+    warn "跳过 GitHub Release（--skip-github-release）"
+  fi
 else
   warn "跳过 push 和 GitHub Release（--skip-push）"
 fi
@@ -440,8 +448,14 @@ echo "  PKG (arm64)：$PKG_ARM64"
 echo "  PKG (x64)：$PKG_X64"
 echo "  Manifest URL：$(join_url_path "$UPDATE_BASE_URL" "$UPDATE_MANIFEST_PATH")"
 echo "  Tag：v${NEXT_VERSION}"
-if [ "$SKIP_PUSH" = false ]; then
+if [ "$SKIP_PUSH" = false ] && [ "$SKIP_GITHUB_RELEASE" = false ]; then
   echo "  GitHub Release：已创建"
+elif [ "$SKIP_PUSH" = false ]; then
+  echo "  Git：已推送"
+  echo "  GitHub Release：已跳过"
+else
+  echo "  Git：已跳过推送"
+  echo "  GitHub Release：已跳过"
 fi
 if [ -f "$MANIFEST_JSON" ]; then
   echo "  latest.json：$MANIFEST_JSON"
