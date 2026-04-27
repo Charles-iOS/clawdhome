@@ -11,9 +11,9 @@ BUILD_COUNTER_FILE := .build-version
 INITIAL_BUILD_NUMBER := 500
 BUILD_COUNTER_SCRIPT := scripts/build_counter.sh
 
-APPLE_TEAM_ID ?= Y7P5QLKLYG
-APP_SIGN_IDENTITY ?= Developer ID Application: Mengjun Xie (Y7P5QLKLYG)
-PKG_SIGN_IDENTITY ?= Developer ID Installer: Mengjun Xie (Y7P5QLKLYG)
+APPLE_TEAM_ID ?= 9P6LY282WU
+APP_SIGN_IDENTITY ?= Developer ID Application
+PKG_SIGN_IDENTITY ?= Developer ID Installer
 NOTARY_PROFILE ?= clawdhome-release
 SIGN_APP ?= false
 SIGN_PKG ?= false
@@ -22,7 +22,7 @@ BUILD_ARCHS ?= arm64
 
 .PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
-UPDATE_BASE_URL ?=
+UPDATE_BASE_URL ?= https://assets.ezrpro.com/ezrworker/
 UPDATE_SITE_DIR ?=
 UPDATE_MANIFEST_PATH ?= /updates/latest.json
 UPDATE_COMPAT_MANIFEST_PATH ?= /api/version.json
@@ -52,7 +52,7 @@ help:
 	@echo "  QUIET_XCODE=false 可显示完整 xcodebuild 输出（默认静默并写入 build/logs/）"
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
-	@echo "  发布更新源：UPDATE_BASE_URL=https://... UPDATE_SITE_DIR=/path/to/static-site"
+	@echo "  发布更新源：UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/ UPDATE_SITE_DIR=/path/to/static-site"
 	@echo "  test-release-scripts  校验 release/changelog 脚本"
 	@echo "  install-hooks    安装 git commit-msg / pre-commit hooks"
 	@echo "  run-release      直接运行 build/export 里的 Release 包（无需安装）"

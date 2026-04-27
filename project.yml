@@ -64,7 +64,7 @@ targets:
         APP_UPDATE_MANIFEST_URL: ""
         CODE_SIGN_ENTITLEMENTS: EZRWorkerApp/EZRWorker.entitlements
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
@@ -126,7 +126,7 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_ENTITLEMENTS: EZRWorkerHelper/EZRWorkerHelper.entitlements
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         SKIP_INSTALL: YES
 
@@ -147,6 +147,6 @@ targets:
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         SKIP_INSTALL: YES

@@ -26,7 +26,7 @@ cd "$REPO_ROOT"
 
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 
-UPDATE_BASE_URL="${UPDATE_BASE_URL:-}"
+UPDATE_BASE_URL="${UPDATE_BASE_URL:-https://assets.ezrpro.com/ezrworker/}"
 UPDATE_SITE_DIR="${UPDATE_SITE_DIR:-${WEBSITE_DIR:-}}"
 UPDATE_MANIFEST_PATH="${UPDATE_MANIFEST_PATH:-/updates/latest.json}"
 UPDATE_COMPAT_MANIFEST_PATH="${UPDATE_COMPAT_MANIFEST_PATH:-/api/version.json}"

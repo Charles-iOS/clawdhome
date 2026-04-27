@@ -37,16 +37,16 @@ sudo xcodebuild -license accept
 ```bash
 xcrun notarytool store-credentials clawdhome-release \
   --apple-id "你的 Apple ID" \
-  --team-id "Y7P5QLKLYG" \
+  --team-id "9P6LY282WU" \
   --password "app-specific-password"
 ```
 
 项目默认读取这些环境变量：
 
 ```bash
-APPLE_TEAM_ID=Y7P5QLKLYG
-APP_SIGN_IDENTITY="Developer ID Application: Mengjun Xie (Y7P5QLKLYG)"
-PKG_SIGN_IDENTITY="Developer ID Installer: Mengjun Xie (Y7P5QLKLYG)"
+APPLE_TEAM_ID=9P6LY282WU
+APP_SIGN_IDENTITY="Developer ID Application"
+PKG_SIGN_IDENTITY="Developer ID Installer"
 NOTARY_PROFILE=clawdhome-release
 ```
 
@@ -144,9 +144,9 @@ make notarize-pkg NOTARY_PROFILE=clawdhome-release
 
 ```bash
 make notarize-pkg \
-  APPLE_TEAM_ID=Y7P5QLKLYG \
-  APP_SIGN_IDENTITY="Developer ID Application: Mengjun Xie (Y7P5QLKLYG)" \
-  PKG_SIGN_IDENTITY="Developer ID Installer: Mengjun Xie (Y7P5QLKLYG)" \
+  APPLE_TEAM_ID=9P6LY282WU \
+  APP_SIGN_IDENTITY="Developer ID Application" \
+  PKG_SIGN_IDENTITY="Developer ID Installer" \
   NOTARY_PROFILE=clawdhome-release
 ```
 
