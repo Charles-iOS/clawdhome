@@ -20,7 +20,7 @@ SIGN_PKG ?= false
 NOTARIZE ?= true
 BUILD_ARCHS ?= arm64
 
-.PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
+.PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-local release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
 UPDATE_BASE_URL ?= https://assets.ezrpro.com/ezrworker/
 UPDATE_SITE_DIR ?=
@@ -52,6 +52,7 @@ help:
 	@echo "  notarize-pkg     生成已签名且已公证安装包（读取 NOTARY_PROFILE）"
 	@echo "  QUIET_XCODE=false 可显示完整 xcodebuild 输出（默认静默并写入 build/logs/）"
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
+	@echo "  release-local    本地发布：更新 changelog + tag + 签名 pkg + 更新清单，跳过 push/GitHub Release"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
 	@echo "  发布更新源：UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/ UPDATE_SITE_DIR=/path/to/static-site"
 	@echo "  test-release-scripts  校验 release/changelog 脚本"
@@ -227,6 +228,22 @@ release:
 	UPDATE_DOWNLOAD_PATH="$(UPDATE_DOWNLOAD_PATH)" \
 	MIN_APP_VERSION="$(MIN_APP_VERSION)" \
 	bash scripts/release.sh
+
+release-local:
+	SIGN_APP=true \
+	SIGN_PKG=true \
+	NOTARIZE=$(NOTARIZE) \
+	APPLE_TEAM_ID="$(APPLE_TEAM_ID)" \
+	APP_SIGN_IDENTITY="$(APP_SIGN_IDENTITY)" \
+	PKG_SIGN_IDENTITY="$(PKG_SIGN_IDENTITY)" \
+	NOTARY_PROFILE="$(NOTARY_PROFILE)" \
+	UPDATE_BASE_URL="$(UPDATE_BASE_URL)" \
+	UPDATE_SITE_DIR="$(UPDATE_SITE_DIR)" \
+	UPDATE_MANIFEST_PATH="$(UPDATE_MANIFEST_PATH)" \
+	UPDATE_COMPAT_MANIFEST_PATH="$(UPDATE_COMPAT_MANIFEST_PATH)" \
+	UPDATE_DOWNLOAD_PATH="$(UPDATE_DOWNLOAD_PATH)" \
+	MIN_APP_VERSION="$(MIN_APP_VERSION)" \
+	bash scripts/release.sh --skip-push
 
 release-dry-run:
 	SIGN_APP=true \
