@@ -23,6 +23,20 @@ enum OpenClawRuntime {
         runtimeRootURL.appendingPathComponent("openclaw/lib/node_modules/openclaw/openclaw.mjs")
     }
 
+    static var bundledOpenClawPackageURL: URL {
+        bundledOpenClawEntry.deletingLastPathComponent().appendingPathComponent("package.json")
+    }
+
+    static var bundledOpenClawVersion: String? {
+        let packageURL = bundledOpenClawPackageURL
+        guard let data = try? Data(contentsOf: packageURL),
+              let package = try? JSONDecoder().decode(OpenClawPackageMetadata.self, from: data),
+              !package.version.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return package.version
+    }
+
     static var bundledNpxURL: URL {
         runtimeRootURL.appendingPathComponent("node/bin/npx")
     }
@@ -169,4 +183,8 @@ enum OpenClawRuntime {
         }
     }
     #endif
+}
+
+private struct OpenClawPackageMetadata: Decodable {
+    let version: String
 }

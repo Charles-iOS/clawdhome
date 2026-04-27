@@ -183,7 +183,7 @@ struct AppSettingsView: View {
         SettingsSectionCard(
             "OpenClaw 终端",
             subtitle: "进入当前 Profile 的命令行环境。",
-            minHeight: SettingsLayout.operationCardMinHeight
+            minHeight: SettingsLayout.systemCardMinHeight
         ) {
             VStack(alignment: .leading, spacing: 16) {
                 if let selectedProfile = profileStore.selectedProfile,
@@ -549,7 +549,7 @@ struct AppSettingsView: View {
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsPathBlock(title: "Node.js", path: GatewayProcessManager.bundledNodeURL.path)
-                SettingsPathBlock(title: "OpenClaw", path: GatewayProcessManager.bundledOpenClawEntry.path)
+                SettingsPathBlock(title: bundledOpenClawPathTitle, path: GatewayProcessManager.bundledOpenClawEntry.path)
 
                 switch envChecker.status {
                 case .ready:
@@ -645,6 +645,11 @@ struct AppSettingsView: View {
         case .unchecked:
             return .secondary
         }
+    }
+
+    private var bundledOpenClawPathTitle: String {
+        guard let version = OpenClawRuntime.bundledOpenClawVersion else { return "OpenClaw" }
+        return "OpenClaw · v\(version)"
     }
 
     private var isAnyProfileOperationInFlight: Bool {
@@ -1007,8 +1012,7 @@ private enum SettingsFont {
 }
 
 private enum SettingsLayout {
-    static let operationCardMinHeight: CGFloat = 320
-    static let systemCardMinHeight: CGFloat = 320
+    static let systemCardMinHeight: CGFloat = 360
     static let twoColumnCardMinimumWidth: CGFloat = 360
     static let profileCardWidth: CGFloat = 420
     static let profileCardHeight: CGFloat = 392
@@ -1052,7 +1056,7 @@ private struct SettingsSectionCard<Content: View>: View {
             content
         }
         .padding(22)
-        .frame(maxWidth: .infinity, minHeight: minHeight, maxHeight: minHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor))
