@@ -9,7 +9,7 @@
 #   PKG_ARCHS="arm64 x86_64" bash scripts/build-pkg.sh # 构建 Universal 包
 #   bash scripts/build-pkg.sh --sync-api-version    # 同步 UPDATE_SITE_DIR 中的兼容更新清单（默认不同步）
 #   SIGN_APP=true SIGN_PKG=true bash scripts/build-pkg.sh # 生成 Developer ID 签名 pkg
-#   SIGN_APP=true SIGN_PKG=true NOTARIZE=true NOTARY_PROFILE=clawdhome-release bash scripts/build-pkg.sh
+#   SIGN_APP=true SIGN_PKG=true NOTARIZE=true NOTARY_PROFILE=ezrworker-release bash scripts/build-pkg.sh
 #
 # 输出：dist/EZRWorker-<VERSION>-<ARCH>.pkg（如 -arm64 / -x64 / -universal）
 #

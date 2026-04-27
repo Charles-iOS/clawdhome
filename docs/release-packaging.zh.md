@@ -35,7 +35,7 @@ sudo xcodebuild -license accept
 配置公证 profile 示例：
 
 ```bash
-xcrun notarytool store-credentials clawdhome-release \
+xcrun notarytool store-credentials ezrworker-release \
   --apple-id "你的 Apple ID" \
   --team-id "9P6LY282WU" \
   --password "app-specific-password"
@@ -47,7 +47,7 @@ xcrun notarytool store-credentials clawdhome-release \
 APPLE_TEAM_ID=9P6LY282WU
 APP_SIGN_IDENTITY="Developer ID Application"
 PKG_SIGN_IDENTITY="Developer ID Installer"
-NOTARY_PROFILE=clawdhome-release
+NOTARY_PROFILE=ezrworker-release
 ```
 
 ## 版本规则
@@ -137,7 +137,7 @@ make pkg-signed
 生成已签名、已公证的包：
 
 ```bash
-make notarize-pkg NOTARY_PROFILE=clawdhome-release
+make notarize-pkg NOTARY_PROFILE=ezrworker-release
 ```
 
 如果证书名称不同，按需覆盖：
@@ -147,7 +147,7 @@ make notarize-pkg \
   APPLE_TEAM_ID=9P6LY282WU \
   APP_SIGN_IDENTITY="Developer ID Application" \
   PKG_SIGN_IDENTITY="Developer ID Installer" \
-  NOTARY_PROFILE=clawdhome-release
+  NOTARY_PROFILE=ezrworker-release
 ```
 
 ## 发布说明

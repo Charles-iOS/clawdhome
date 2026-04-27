@@ -416,7 +416,7 @@ docs/
 需要注意的是：
 
 - 脚本里的本地运行时身份已经切到 `EZRWorker`
-- 但外部发布基础设施仍然保留 `clawdhome.app`、`clawdhome_website`、`clawdhome-release` 这些名字，这是发布链路而不是本地运行时身份
+- 但外部发布基础设施可能仍保留历史命名，这是发布链路而不是本地运行时身份；新的公证 profile 使用 `ezrworker-release`
 
 ### `tests/`
 
