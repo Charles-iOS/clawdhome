@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1] - 2026-04-28
+
+### Improvements & Fixes
+- Switched the in-app update feed to `https://imp-assets.ezrpro.com/ezrworker/`.
+- Updated the post-release CDN instructions to clarify the manifest, dual-architecture packages, and checksum files that must be uploaded.
+
+
 ## [1.0.0] - 2026-04-28
 
 ### Features
