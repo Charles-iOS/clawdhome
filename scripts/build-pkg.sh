@@ -221,6 +221,7 @@ sign_app_bundle_for_distribution() {
   require_cmd codesign
 
   local entitlements="$REPO_ROOT/EZRWorkerApp/EZRWorker.entitlements"
+  local node_runtime_entitlements="$REPO_ROOT/Resources/node-runtime.entitlements"
   local signed_count_file="$REPO_ROOT/build/logs/codesign-native-count.txt"
   mkdir -p "$(dirname "$signed_count_file")"
   echo "0" > "$signed_count_file"
@@ -228,11 +229,17 @@ sign_app_bundle_for_distribution() {
   log "签名嵌入的原生运行时文件..."
   while IFS= read -r -d '' path; do
     if is_macho_file "$path"; then
-      if ! codesign --force \
-          --sign "$APP_SIGN_IDENTITY" \
-          --timestamp \
-          --options runtime \
-          "$path"; then
+      local codesign_args=(
+        --force
+        --sign "$APP_SIGN_IDENTITY"
+        --timestamp
+        --options runtime
+      )
+      if [ "$path" = "$APP_BUNDLE/Contents/Resources/node/bin/node" ]; then
+        [ -f "$node_runtime_entitlements" ] || fail "Node runtime entitlements 不存在：$node_runtime_entitlements"
+        codesign_args+=(--entitlements "$node_runtime_entitlements")
+      fi
+      if ! codesign "${codesign_args[@]}" "$path"; then
         fail "原生文件签名失败：$path"
       fi
       echo $(( $(cat "$signed_count_file") + 1 )) > "$signed_count_file"
