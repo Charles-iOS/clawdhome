@@ -10,30 +10,49 @@ final class SupervisorClient {
     private(set) var isConnected = false
     private(set) var runtimes: [SupervisorProfileRuntime] = []
 
+    @ObservationIgnored
+    private var connectionWaitTask: Task<Bool, Never>?
+
     private static let xpcTimeout: Duration = .seconds(20)
     private static let profilePrepareTimeout: Duration = .seconds(30)
     private static let profileStopTimeout: Duration = .seconds(30)
     private static let profileStartTimeout: Duration = .seconds(300)
     private static let pingTimeoutNanoseconds: UInt64 = 1_000_000_000
 
-    func connect() {
+    func connect(force: Bool = false) {
+        if connection != nil, !force {
+            return
+        }
+
         connection?.invalidate()
-        let connection = NSXPCConnection(machServiceName: EZRWorkerBranding.supervisorMachServiceName)
-        connection.remoteObjectInterface = NSXPCInterface(with: EZRWorkerSupervisorProtocol.self)
-        connection.invalidationHandler = { [weak self] in
+        let newConnection = NSXPCConnection(machServiceName: EZRWorkerBranding.supervisorMachServiceName)
+        let connectionID = ObjectIdentifier(newConnection)
+        newConnection.remoteObjectInterface = NSXPCInterface(with: EZRWorkerSupervisorProtocol.self)
+        newConnection.invalidationHandler = { [weak self] in
             os_log(.error, "[SupervisorClient] connection invalidated")
             DispatchQueue.main.async {
-                self?.isConnected = false
+                guard let self,
+                      let current = self.connection,
+                      ObjectIdentifier(current) == connectionID else {
+                    return
+                }
+                self.connection = nil
+                self.isConnected = false
             }
         }
-        connection.interruptionHandler = { [weak self] in
+        newConnection.interruptionHandler = { [weak self] in
             os_log(.info, "[SupervisorClient] connection interrupted")
             DispatchQueue.main.async {
-                self?.isConnected = false
+                guard let self,
+                      let current = self.connection,
+                      ObjectIdentifier(current) == connectionID else {
+                    return
+                }
+                self.isConnected = false
             }
         }
-        connection.resume()
-        self.connection = connection
+        newConnection.resume()
+        connection = newConnection
     }
 
     func disconnect() {
@@ -47,17 +66,65 @@ final class SupervisorClient {
         timeoutNanoseconds: UInt64 = 15_000_000_000,
         pollIntervalNanoseconds: UInt64 = 250_000_000
     ) async -> Bool {
+        if let connectionWaitTask {
+            return await connectionWaitTask.value
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return false }
+            return await self.performWaitUntilConnected(
+                timeoutNanoseconds: timeoutNanoseconds,
+                pollIntervalNanoseconds: pollIntervalNanoseconds
+            )
+        }
+        connectionWaitTask = task
+        let result = await task.value
+        connectionWaitTask = nil
+        return result
+    }
+
+    private func performWaitUntilConnected(
+        timeoutNanoseconds: UInt64,
+        pollIntervalNanoseconds: UInt64
+    ) async -> Bool {
+        if connection == nil {
+            connect()
+        }
+
         let start = DispatchTime.now().uptimeNanoseconds
+        var attemptedConnectionReset = false
         var attemptedBootstrap = false
 
         if Self.shouldRefreshEmbeddedSupervisor() {
+            if await ping(),
+               await shouldKeepExistingSupervisorForActiveGateway() {
+                return true
+            }
+
+            connect(force: true)
+            attemptedConnectionReset = true
+            if await ping(),
+               await shouldKeepExistingSupervisorForActiveGateway() {
+                return true
+            }
+
             attemptedBootstrap = true
             await bootstrapEmbeddedSupervisorIfNeeded()
         }
 
         while DispatchTime.now().uptimeNanoseconds - start < timeoutNanoseconds {
+            if connection == nil {
+                connect()
+            }
             if await ping() {
                 return true
+            }
+
+            if !attemptedConnectionReset {
+                attemptedConnectionReset = true
+                connect(force: true)
+                try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+                continue
             }
 
             if !attemptedBootstrap {
@@ -69,8 +136,28 @@ final class SupervisorClient {
         return false
     }
 
+    private func shouldKeepExistingSupervisorForActiveGateway() async -> Bool {
+        do {
+            let runtimes = try await listProfilesRuntime()
+            return runtimes.contains { runtime in
+                runtime.isRunning
+                    || runtime.readyState == .preparing
+                    || runtime.readyState == .starting
+                    || runtime.readyState == .ready
+            }
+        } catch {
+            os_log(
+                .info,
+                "[SupervisorClient] keep existing supervisor; runtime state unavailable during refresh: %{public}@",
+                error.localizedDescription
+            )
+            return true
+        }
+    }
+
     func ping() async -> Bool {
         guard let connection else { return false }
+        let connectionID = ObjectIdentifier(connection)
         return await withCheckedContinuation { continuation in
             let lock = NSLock()
             var resumed = false
@@ -81,6 +168,10 @@ final class SupervisorClient {
                 guard !resumed else { return }
                 resumed = true
                 DispatchQueue.main.async {
+                    guard let current = self.connection,
+                          ObjectIdentifier(current) == connectionID else {
+                        return
+                    }
                     self.isConnected = value
                 }
                 continuation.resume(returning: value)
@@ -219,6 +310,7 @@ final class SupervisorClient {
         guard let connection else {
             throw SupervisorClientError.notConnected
         }
+        let connectionID = ObjectIdentifier(connection)
 
         return try await withUnsafeThrowingContinuation { (continuation: UnsafeContinuation<T, Error>) in
             let lock = NSLock()
@@ -240,7 +332,12 @@ final class SupervisorClient {
                     error.localizedDescription
                 )
                 DispatchQueue.main.async {
-                    self?.isConnected = false
+                    guard let self,
+                          let current = self.connection,
+                          ObjectIdentifier(current) == connectionID else {
+                        return
+                    }
+                    self.isConnected = false
                 }
                 resumeOnce(
                     with: .failure(
@@ -269,6 +366,10 @@ final class SupervisorClient {
 
             operation(proxy) { value in
                 DispatchQueue.main.async {
+                    guard let current = self.connection,
+                          ObjectIdentifier(current) == connectionID else {
+                        return
+                    }
                     self.isConnected = true
                 }
                 resumeOnce(with: .success(value))
@@ -321,7 +422,7 @@ final class SupervisorClient {
         }
 
         os_log(.info, "[SupervisorClient] bootstrapped supervisor from %{public}@", context.plistURL.path)
-        connect()
+        connect(force: true)
     }
 
     private static func shouldRefreshEmbeddedSupervisor() -> Bool {

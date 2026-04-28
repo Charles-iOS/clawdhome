@@ -166,6 +166,31 @@ extension EZRWorkerSupervisorController {
                 return (false, message)
             }
 
+            if ownership == .supervised,
+               startupOutputIndicatesGatewayReady(startupOutput?.output) {
+                let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+                if requireSameListeningPID,
+                   let pid,
+                   let currentPID,
+                   currentPID != pid {
+                    let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                    record.readyState = .failed
+                    record.isRunning = false
+                    record.ownership = .none
+                    record.lastError = message
+                    record.lastLifecycleMessage = message
+                    return (false, message)
+                }
+
+                record.isPrepared = true
+                record.readyState = .ready
+                record.isRunning = true
+                record.pid = currentPID ?? pid
+                record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已就绪"
+                return (true, nil)
+            }
+
             let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
             record.lastProbeAt = Date()
             let currentPID: Int32?

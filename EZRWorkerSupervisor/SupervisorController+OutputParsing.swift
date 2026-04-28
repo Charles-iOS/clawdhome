@@ -42,6 +42,13 @@ extension EZRWorkerSupervisorController {
         return lines.reversed().first(where: { !Self.isBenignStartupProgressLine($0) })
     }
 
+    func startupOutputIndicatesGatewayReady(_ output: String?) -> Bool {
+        guard let output else { return false }
+        return Self.stripANSIEscapeCodes(from: output)
+            .components(separatedBy: .newlines)
+            .contains(where: Self.isGatewayReadyLine)
+    }
+
     static func isTerminalStartupFailureOutput(_ output: String?) -> Bool {
         guard let output else { return false }
         let normalized = stripANSIEscapeCodes(from: output).lowercased()
@@ -64,6 +71,7 @@ extension EZRWorkerSupervisorController {
         return normalized.contains("[gateway] loading configuration")
             || normalized.contains("[gateway] resolving authentication")
             || normalized.contains("[gateway] starting")
+            || isGatewayReadyLine(normalized)
             || normalized.contains("[gateway] log file:")
             || normalized.contains("[canvas] host mounted")
             || normalized.contains("[health-monitor] started")
@@ -73,6 +81,13 @@ extension EZRWorkerSupervisorController {
             || normalized.hasPrefix("sessions ok:")
             || normalized.hasPrefix("wrote ")
             || normalized.hasPrefix("config overwrite:")
+    }
+
+    static func isGatewayReadyLine(_ text: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.contains("[gateway] ready")
+            || normalized.contains("\"message\":\"gateway ready\"")
+            || normalized.hasSuffix("gateway ready")
     }
 
     static func stripANSIEscapeCodes(from text: String) -> String {
