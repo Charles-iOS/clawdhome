@@ -23,7 +23,7 @@ BUILD_ARCHS ?= arm64
 .PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-local release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
 UPDATE_BASE_URL ?= https://imp-assets.ezrpro.com/ezrworker/
-UPDATE_SITE_DIR ?=
+UPDATE_SITE_DIR ?= $(CURDIR)/ezrworker-updates-site
 UPDATE_MANIFEST_PATH ?= /updates/latest.json
 UPDATE_COMPAT_MANIFEST_PATH ?= /api/version.json
 UPDATE_DOWNLOAD_PATH ?= /download
