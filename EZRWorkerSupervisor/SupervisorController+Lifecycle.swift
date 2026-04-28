@@ -141,7 +141,10 @@ extension EZRWorkerSupervisorController {
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         let startupOutput = ProcessOutputCollector()
         let outputPipe = Pipe()
-        startupOutput.attach(to: outputPipe)
+        startupOutput.attach(
+            to: outputPipe,
+            teeTo: prepareGatewayOutputLog(for: record.resolution)
+        )
         process.standardOutput = outputPipe
         process.standardError = outputPipe
 
@@ -186,6 +189,24 @@ extension EZRWorkerSupervisorController {
             requireSameListeningPID: true,
             startupOutput: startupOutput
         )
+    }
+
+    private func prepareGatewayOutputLog(for resolution: GatewayProfileResolution) -> URL? {
+        let logsURL = resolution.stateDirURL.appendingPathComponent("logs", isDirectory: true)
+        let currentURL = logsURL.appendingPathComponent("gateway-current.log")
+        let previousURL = logsURL.appendingPathComponent("gateway-previous.log")
+        do {
+            try FileManager.default.createDirectory(at: logsURL, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: previousURL.path) {
+                try? FileManager.default.removeItem(at: previousURL)
+            }
+            if FileManager.default.fileExists(atPath: currentURL.path) {
+                try? FileManager.default.moveItem(at: currentURL, to: previousURL)
+            }
+            return currentURL
+        } catch {
+            return nil
+        }
     }
 
     func stopProfile(profileID: UUID) async -> (Bool, String?) {

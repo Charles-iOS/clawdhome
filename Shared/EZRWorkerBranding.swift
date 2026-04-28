@@ -37,6 +37,12 @@ enum EZRWorkerPaths {
         applicationSupportDirectory.appendingPathComponent("profiles", isDirectory: true)
     }
 
+    static var openClawPluginStageDirectory: URL {
+        applicationSupportDirectory
+            .appendingPathComponent("openclaw", isDirectory: true)
+            .appendingPathComponent("plugin-runtime-deps", isDirectory: true)
+    }
+
     static var profilesDocumentURL: URL {
         applicationSupportDirectory.appendingPathComponent("profiles.json")
     }
@@ -68,6 +74,11 @@ enum EZRWorkerPaths {
         )
         try? fm.createDirectory(
             at: profilesDirectory,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try? fm.createDirectory(
+            at: openClawPluginStageDirectory,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
