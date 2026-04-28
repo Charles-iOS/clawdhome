@@ -123,6 +123,21 @@ print(value or "")
 PY
 }
 
+assert_build_workspace_ready() {
+  local build_dir="$REPO_ROOT/build"
+  local tmp_dir="$build_dir/.release-preflight-$$"
+  mkdir -p "$build_dir" || fail "无法创建构建目录：$build_dir"
+  if ! mkdir "$tmp_dir" 2>/dev/null; then
+    fail "构建目录不可写：$build_dir。请先执行：sudo chown -R \"$(id -un)\":staff \"$build_dir\""
+  fi
+  if ! rmdir "$tmp_dir" 2>/dev/null; then
+    fail "构建目录无法清理：$build_dir。请先执行：sudo chown -R \"$(id -un)\":staff \"$build_dir\""
+  fi
+  if ! rm -rf "$build_dir/release-arm64" "$build_dir/release-x86_64" 2>/dev/null; then
+    fail "无法清理发布工作目录。请先执行：sudo chown -R \"$(id -un)\":staff \"$build_dir\""
+  fi
+}
+
 # ── 前置检查 ──────────────────────────────────────────────────────────────────
 
 if [ "$DRY_RUN" = false ]; then
@@ -132,6 +147,7 @@ if [ "$DRY_RUN" = false ]; then
     echo "$DIRTY"
     fail "工作区有未提交的更改，请先 commit 或 stash"
   fi
+  assert_build_workspace_ready
 fi
 
 # 检查 gh CLI
@@ -306,8 +322,14 @@ trap rollback EXIT
 
 build_release_pkg() {
   local archs="$1"
+  local work_suffix="$archs"
+  work_suffix="${work_suffix// /-}"
   log "构建打包（${archs}）..."
-  APP_UPDATE_MANIFEST_URL="$APP_UPDATE_MANIFEST_URL" RELEASE_VERSION="$NEXT_VERSION" PKG_ARCHS="$archs" bash "$SCRIPT_DIR/build-pkg.sh" --no-sync-api-version
+  APP_UPDATE_MANIFEST_URL="$APP_UPDATE_MANIFEST_URL" \
+    RELEASE_VERSION="$NEXT_VERSION" \
+    PKG_ARCHS="$archs" \
+    BUILD_WORK_DIR="$REPO_ROOT/build/release-${work_suffix}" \
+    bash "$SCRIPT_DIR/build-pkg.sh" --no-sync-api-version
 }
 
 build_release_pkg "arm64"
@@ -329,7 +351,7 @@ PKG_X64_SHA256_FILE="$PKG_X64.sha256"
 [ -f "$PKG_X64_SHA256_FILE" ] || fail "未找到 $PKG_X64_SHA256_FILE"
 PKG_ARM64_SHA256=$(awk '{print $1}' "$PKG_ARM64_SHA256_FILE")
 PKG_X64_SHA256=$(awk '{print $1}' "$PKG_X64_SHA256_FILE")
-APP_BUILD_NUMBER=$("$PLIST_BUDDY" -c "Print :CFBundleVersion" "$REPO_ROOT/build/export/EZRWorker.app/Contents/Info.plist" 2>/dev/null || echo "")
+APP_BUILD_NUMBER=$("$PLIST_BUDDY" -c "Print :CFBundleVersion" "$REPO_ROOT/build/release-arm64/export/EZRWorker.app/Contents/Info.plist" 2>/dev/null || echo "")
 [ -n "$APP_BUILD_NUMBER" ] || fail "无法从构建产物读取 CFBundleVersion"
 RELEASE_DATE_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 

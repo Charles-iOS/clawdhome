@@ -31,8 +31,9 @@ SUPERVISOR_LABEL="ai.ezrworker.mac.supervisor"
 SCHEME="EZRWorker"
 CONFIGURATION="Release"
 
-ARCHIVE_PATH="$REPO_ROOT/build/${APP_NAME}.xcarchive"
-EXPORT_DIR="$REPO_ROOT/build/export"
+BUILD_WORK_DIR="${BUILD_WORK_DIR:-$REPO_ROOT/build}"
+ARCHIVE_PATH="${ARCHIVE_PATH:-$BUILD_WORK_DIR/${APP_NAME}.xcarchive}"
+EXPORT_DIR="${EXPORT_DIR:-$BUILD_WORK_DIR/export}"
 DIST_DIR="$REPO_ROOT/dist"
 UPDATE_SITE_DIR="${UPDATE_SITE_DIR:-${WEBSITE_DIR:-}}"
 UPDATE_BASE_URL="${UPDATE_BASE_URL:-https://assets.ezrpro.com/ezrworker/}"
@@ -326,10 +327,11 @@ run_xcodebuild() {
 
 if [ "$SKIP_BUILD" = false ]; then
   log "构建 $APP_NAME..."
+  mkdir -p "$BUILD_WORK_DIR"
   # 优先使用当前用户权限清理，避免 make pkg 触发 sudo 密码输入。
   # 若历史残留 root:wheel 文件导致删除失败，则提示一次性修复命令。
   if ! rm -rf "$ARCHIVE_PATH" "$EXPORT_DIR" 2>/dev/null; then
-    fail "无法清理构建目录（可能存在 root 权限残留）。请先执行：sudo chown -R \"$(id -un)\":staff \"$REPO_ROOT/build\""
+    fail "无法清理构建目录（可能存在 root 权限残留）：$BUILD_WORK_DIR。请先执行：sudo chown -R \"$(id -un)\":staff \"$REPO_ROOT/build\""
   fi
 
   # 清除 DerivedData 增量缓存，确保 Release 从干净状态编译
@@ -439,8 +441,8 @@ sign_app_bundle_for_distribution
 
 log "准备安装包目录结构..."
 
-PKG_ROOT="$REPO_ROOT/build/pkg-root"
-PKG_SCRIPTS="$REPO_ROOT/build/pkg-scripts"
+PKG_ROOT="$BUILD_WORK_DIR/pkg-root"
+PKG_SCRIPTS="$BUILD_WORK_DIR/pkg-scripts"
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS"
 
 mkdir -p "$PKG_ROOT/Applications"
