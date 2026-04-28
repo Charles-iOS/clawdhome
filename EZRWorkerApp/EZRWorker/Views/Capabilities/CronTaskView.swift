@@ -31,7 +31,7 @@ struct CronTaskView: View {
                 .disabled(!gateway.isConnected)
             }
         }
-        .task { await gateway.cronStore.refresh() }
+        .task(id: gateway.isConnected) { await refreshWhenReady() }
         .sheet(isPresented: $showAddSheet) {
             CronAddSheet()
                 .presentationBackground(.clear)
@@ -40,6 +40,16 @@ struct CronTaskView: View {
             CronJobDetailView(job: job)
                 .frame(minWidth: 680, minHeight: 560)
         }
+    }
+
+    private func refreshWhenReady() async {
+        guard gateway.isConnected else { return }
+        let probe = await gateway.httpProbe()
+        guard probe.ready else {
+            appLog("CronTaskView: skip auto refresh because gateway is not ready")
+            return
+        }
+        await store.refresh()
     }
 
     @ViewBuilder

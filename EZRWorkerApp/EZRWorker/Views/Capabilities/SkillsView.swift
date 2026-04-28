@@ -47,6 +47,16 @@ struct SkillsView: View {
                 .disabled(!gateway.isConnected)
             }
         }
-        .task { await store.refresh() }
+        .task(id: gateway.isConnected) { await refreshWhenReady() }
+    }
+
+    private func refreshWhenReady() async {
+        guard gateway.isConnected else { return }
+        let probe = await gateway.httpProbe()
+        guard probe.ready else {
+            appLog("SkillsView: skip auto refresh because gateway is not ready")
+            return
+        }
+        await store.refresh()
     }
 }

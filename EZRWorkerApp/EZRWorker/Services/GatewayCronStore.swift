@@ -16,29 +16,22 @@ final class GatewayCronStore {
 
     private var client: GatewayClient?
     private var eventTask: Task<Void, Never>?
-    private var pollTask: Task<Void, Never>?
 
     // MARK: - 生命周期
 
     func start(client: GatewayClient) async {
         self.client = client
-        await refresh()
         startEventSubscription(client: client)
-        startPolling()
     }
 
-    /// 幂等启动：仅在 client 尚未设置时执行完整启动；已有 client 时仅 refresh
+    /// 幂等启动：仅绑定 client 和事件订阅，数据刷新由页面或显式操作触发。
     func startIfNeeded(client: GatewayClient) async {
-        if self.client != nil {
-            await refresh()
-            return
-        }
+        if self.client != nil { return }
         await start(client: client)
     }
 
     func stop() {
         eventTask?.cancel(); eventTask = nil
-        pollTask?.cancel(); pollTask = nil
         client = nil
         jobs = []
         runEntries = []
@@ -50,6 +43,7 @@ final class GatewayCronStore {
 
     func refresh() async {
         guard let client else { return }
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
         do {
@@ -125,17 +119,6 @@ final class GatewayCronStore {
             for await event in client.eventStream {
                 guard !Task.isCancelled else { break }
                 guard event.name.hasPrefix("cron.") else { continue }
-                await self?.refresh()
-            }
-        }
-    }
-
-    private func startPolling() {
-        pollTask?.cancel()
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-                guard !Task.isCancelled else { break }
                 await self?.refresh()
             }
         }

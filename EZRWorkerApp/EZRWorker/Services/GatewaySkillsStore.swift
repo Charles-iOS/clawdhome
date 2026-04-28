@@ -21,15 +21,11 @@ final class GatewaySkillsStore {
 
     func start(client: GatewayClient) async {
         self.client = client
-        await refresh()
     }
 
-    /// 幂等启动：仅在 client 尚未设置时执行完整启动；已有 client 时仅 refresh
+    /// 幂等启动：仅绑定 client，数据刷新由页面或显式操作触发。
     func startIfNeeded(client: GatewayClient) async {
-        if self.client != nil {
-            await refresh()
-            return
-        }
+        if self.client != nil { return }
         await start(client: client)
     }
 
@@ -44,6 +40,7 @@ final class GatewaySkillsStore {
 
     func refresh() async {
         guard let client else { return }
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
         do {
