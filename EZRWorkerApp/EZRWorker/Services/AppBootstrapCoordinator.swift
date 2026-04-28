@@ -18,7 +18,107 @@ final class AppBootstrapCoordinator {
         case screenUnlocked = "screen-unlocked"
     }
 
+    enum ProgressStepID: String, CaseIterable {
+        case profile
+        case environment
+        case supervisor
+        case runtime
+        case gateway
+        case token
+        case connection
+        case workspace
+    }
+
+    enum ProgressStepStatus: Equatable {
+        case pending
+        case active
+        case completed
+        case failed
+    }
+
+    struct ProgressStep: Identifiable, Equatable {
+        let id: ProgressStepID
+        let title: String
+        var status: ProgressStepStatus
+        var detail: String?
+    }
+
+    struct ProgressSnapshot: Equatable {
+        var steps: [ProgressStep]
+        var currentStepID: ProgressStepID?
+        var currentDetail: String
+
+        static func initial() -> ProgressSnapshot {
+            ProgressSnapshot(
+                steps: [
+                    ProgressStep(id: .profile, title: "读取员工配置", status: .pending),
+                    ProgressStep(id: .environment, title: "检查运行环境", status: .pending),
+                    ProgressStep(id: .supervisor, title: "连接本地守护进程", status: .pending),
+                    ProgressStep(id: .runtime, title: "同步运行状态", status: .pending),
+                    ProgressStep(id: .gateway, title: "启动 Gateway", status: .pending),
+                    ProgressStep(id: .token, title: "读取认证令牌", status: .pending),
+                    ProgressStep(id: .connection, title: "连接本地服务", status: .pending),
+                    ProgressStep(id: .workspace, title: "加载工作区数据", status: .pending),
+                ],
+                currentStepID: nil,
+                currentDetail: "准备开始初始化。"
+            )
+        }
+
+        func activating(_ id: ProgressStepID, detail: String) -> ProgressSnapshot {
+            var copy = self
+            let activeIndex = copy.steps.firstIndex(where: { $0.id == id })
+            for index in copy.steps.indices {
+                let status: ProgressStepStatus
+                if let activeIndex {
+                    if index < activeIndex {
+                        status = .completed
+                    } else if index == activeIndex {
+                        status = .active
+                    } else {
+                        status = .pending
+                    }
+                } else {
+                    status = copy.steps[index].status
+                }
+                copy.steps[index].status = status
+                copy.steps[index].detail = status == .active ? detail : nil
+            }
+            copy.currentStepID = id
+            copy.currentDetail = detail
+            return copy
+        }
+
+        func completingAll(detail: String) -> ProgressSnapshot {
+            var copy = self
+            for index in copy.steps.indices {
+                copy.steps[index].status = .completed
+                copy.steps[index].detail = nil
+            }
+            copy.currentStepID = nil
+            copy.currentDetail = detail
+            return copy
+        }
+
+        func failing(detail: String) -> ProgressSnapshot {
+            var copy = self
+            var failedIndex = copy.currentStepID.flatMap { id in
+                copy.steps.firstIndex(where: { $0.id == id })
+            }
+            if failedIndex == nil {
+                failedIndex = copy.steps.firstIndex(where: { $0.status == .active })
+            }
+            if let failedIndex {
+                copy.steps[failedIndex].status = .failed
+                copy.steps[failedIndex].detail = detail
+            }
+            copy.currentDetail = detail
+            return copy
+        }
+    }
+
     private(set) var state: State = .idle
+    private(set) var progress = ProgressSnapshot.initial()
 
     @ObservationIgnored private let processManager: GatewayProcessManager
     @ObservationIgnored private let envChecker: EnvironmentChecker
@@ -67,12 +167,15 @@ final class AppBootstrapCoordinator {
             break
         }
 
+        progress = ProgressSnapshot.initial()
         state = .starting
         do {
             try await performBootstrap()
+            progress = progress.completingAll(detail: "初始化完成。")
             state = .started
             startReconnectLoop()
         } catch {
+            progress = progress.failing(detail: error.localizedDescription)
             state = .failed(error.localizedDescription)
         }
     }
@@ -81,6 +184,7 @@ final class AppBootstrapCoordinator {
         stopReconnectLoop()
         await resetRuntimeState()
         state = .idle
+        progress = ProgressSnapshot.initial()
         await startIfNeeded()
     }
 
@@ -88,6 +192,7 @@ final class AppBootstrapCoordinator {
         stopReconnectLoop()
         await resetRuntimeState()
         state = .idle
+        progress = ProgressSnapshot.initial()
     }
 
     func prepareForAppTermination() {
@@ -99,9 +204,11 @@ final class AppBootstrapCoordinator {
         agentStore.markGatewayDisconnected()
         workspaceManager.resetConfiguration()
         state = .idle
+        progress = ProgressSnapshot.initial()
     }
 
     private func performBootstrap() async throws {
+        updateProgress(.profile, detail: "正在读取当前员工 Profile 和本地配置。")
         await profileStore.loadIfNeeded()
 
         switch profileStore.status {
@@ -128,6 +235,7 @@ final class AppBootstrapCoordinator {
             ])
         }
 
+        updateProgress(.environment, detail: "正在检查内置 Node/OpenClaw 运行环境。")
         await envChecker.check()
         if case .missing(let reason) = envChecker.status {
             throw NSError(domain: "AppBootstrapCoordinator", code: 5, userInfo: [
@@ -135,6 +243,7 @@ final class AppBootstrapCoordinator {
             ])
         }
 
+        updateProgress(.supervisor, detail: "正在连接 EZRWorkerSupervisor 本地守护进程。")
         supervisorClient.connect()
         guard await supervisorClient.waitUntilConnected() else {
             throw NSError(domain: "AppBootstrapCoordinator", code: 6, userInfo: [
@@ -144,15 +253,22 @@ final class AppBootstrapCoordinator {
 
         processManager.bind(profileStore: profileStore, supervisorClient: supervisorClient)
 
+        updateProgress(.runtime, detail: "正在同步员工 Profile 和 Gateway 运行状态。")
         _ = await supervisorClient.reloadProfiles()
 
         var runtimes = try await supervisorClient.listProfilesRuntime()
         var runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
 
         if runtime?.readyState != .ready {
-            try await supervisorClient.startProfile(profileID: selectedProfile.id)
+            updateProgress(
+                .gateway,
+                detail: runtimeProgressDetail(runtime) ?? "正在启动当前员工的 Gateway，本地依赖首次准备可能较久。"
+            )
+            try await startProfileWithProgressTracking(profileID: selectedProfile.id)
             runtimes = try await supervisorClient.listProfilesRuntime()
             runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
+        } else {
+            updateProgress(.gateway, detail: "Gateway 已在运行，准备连接本地服务。")
         }
 
         guard let runtime else {
@@ -164,6 +280,7 @@ final class AppBootstrapCoordinator {
         let currentUsername = NSUserName()
         workspaceManager.configure(profile: selectedResolution)
 
+        updateProgress(.token, detail: "正在读取当前 Gateway 的本地认证令牌。")
         let configURLs = selectedResolution.localPaths.configSnapshotURLs
         guard let token = await Self.waitForGatewayToken(configURLs: configURLs) else {
             throw NSError(domain: "AppBootstrapCoordinator", code: 8, userInfo: [
@@ -171,8 +288,10 @@ final class AppBootstrapCoordinator {
             ])
         }
 
+        updateProgress(.connection, detail: "正在连接 Gateway 控制接口 \(runtime.resolvedPort)。")
         await gatewayService.reconfigure(port: runtime.resolvedPort, token: token)
         if await Self.connectGatewayService(gatewayService: gatewayService) {
+            updateProgress(.workspace, detail: "正在加载员工、模型和工作区数据。")
             await completeGatewayDependentStartup(currentUsername: currentUsername)
         } else {
             appLog("bootstrap: gateway control connection deferred; reconnect loop will continue", level: .warn)
@@ -186,6 +305,69 @@ final class AppBootstrapCoordinator {
         agentStore.markGatewayDisconnected()
         workspaceManager.resetConfiguration()
         gatewayDependentStartupCompleted = false
+    }
+
+    private func updateProgress(_ stepID: ProgressStepID, detail: String) {
+        progress = progress.activating(stepID, detail: detail)
+    }
+
+    private func startProfileWithProgressTracking(profileID: UUID) async throws {
+        let operationTask = Task { [supervisorClient] in
+            try await supervisorClient.startProfile(profileID: profileID)
+        }
+        let progressTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                let runtime = await self.selectedRuntime(profileID: profileID)
+                await self.applySupervisorRuntimeProgress(runtime)
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+
+        do {
+            try await operationTask.value
+        } catch {
+            progressTask.cancel()
+            throw error
+        }
+
+        progressTask.cancel()
+        let runtime = await selectedRuntime(profileID: profileID)
+        applySupervisorRuntimeProgress(runtime)
+    }
+
+    private func applySupervisorRuntimeProgress(_ runtime: SupervisorProfileRuntime?) {
+        guard let runtime else {
+            updateProgress(.gateway, detail: "正在等待 Supervisor 返回当前 Gateway 状态。")
+            return
+        }
+        updateProgress(.gateway, detail: runtimeProgressDetail(runtime) ?? "正在启动当前员工的 Gateway。")
+    }
+
+    private func runtimeProgressDetail(_ runtime: SupervisorProfileRuntime?) -> String? {
+        guard let runtime else { return nil }
+        if let message = runtime.lastLifecycleMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !message.isEmpty {
+            return message
+        }
+
+        switch runtime.readyState {
+        case .unknown:
+            return "正在读取 Gateway 运行状态。"
+        case .stopped:
+            return "Gateway 尚未启动，准备拉起本地服务。"
+        case .preparing:
+            return "正在准备 Gateway 配置和工作区。"
+        case .starting:
+            if let pid = runtime.pid {
+                return "Gateway 进程 PID \(pid) 已启动，正在等待端口 \(runtime.resolvedPort) 就绪。"
+            }
+            return "正在等待 Gateway 打开本地端口 \(runtime.resolvedPort)。"
+        case .ready:
+            return "Gateway 已就绪。"
+        case .failed:
+            return runtime.lastError ?? "Gateway 启动失败。"
+        }
     }
 
     private func startReconnectLoop() {
@@ -261,6 +443,12 @@ final class AppBootstrapCoordinator {
         var runtime = await selectedRuntime(profileID: selectedProfile.id)
         var resolvedPort = runtime?.resolvedPort ?? selectedResolution.resolvedPort
 
+        if runtime?.readyState == .preparing || runtime?.readyState == .starting {
+            appLog("bootstrap: recovery waiting for current gateway startup on port \(resolvedPort)")
+            await processManager.refreshRuntimeState()
+            return
+        }
+
         let probe = await GatewayClient.httpProbe(port: resolvedPort)
         if !probe.alive {
             await gatewayService.disconnect()
@@ -268,7 +456,7 @@ final class AppBootstrapCoordinator {
             gatewayDependentStartupCompleted = false
 
             do {
-                if runtime?.isRunning == true || runtime?.readyState == .ready || runtime?.readyState == .starting {
+                if runtime?.isRunning == true || runtime?.readyState == .ready {
                     appLog("bootstrap: recovery restarting current gateway on port \(resolvedPort)")
                     try await supervisorClient.restartProfile(profileID: selectedProfile.id)
                 } else {

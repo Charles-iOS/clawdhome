@@ -46,7 +46,8 @@ struct AuthenticatedAppShell: View {
                 case .idle, .starting:
                     LoadingOverlayView(
                         title: L10n.k("auth.bootstrap.loading_title", fallback: "正在进入 EZRWorker"),
-                        subtitle: L10n.k("auth.bootstrap.loading_subtitle", fallback: "正在连接当前 Gateway/Profile 并准备工作区，请稍候。")
+                        subtitle: L10n.k("auth.bootstrap.loading_subtitle", fallback: "正在连接当前 Gateway/Profile 并准备工作区，请稍候。"),
+                        progress: bootstrapCoordinator.progress
                     )
                 case .failed(let message):
                     LoadingOverlayView(
@@ -256,6 +257,7 @@ private struct LaunchSplashView: View {
 private struct LoadingOverlayView: View {
     let title: String
     let subtitle: String
+    var progress: AppBootstrapCoordinator.ProgressSnapshot? = nil
 
     var body: some View {
         ZStack {
@@ -275,14 +277,80 @@ private struct LoadingOverlayView: View {
                     .controlSize(.large)
                 Text(title)
                     .font(.title3.weight(.semibold))
-                Text(subtitle)
+                Text(progress?.currentDetail ?? subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
+                    .frame(maxWidth: 380)
+
+                if let progress {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(progress.steps) { step in
+                            BootstrapProgressRow(step: step)
+                        }
+                    }
+                    .padding(.top, 4)
+                    .frame(maxWidth: 420, alignment: .leading)
+                }
             }
             .padding(28)
+            .frame(width: progress == nil ? 480 : 520)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+    }
+}
+
+private struct BootstrapProgressRow: View {
+    let step: AppBootstrapCoordinator.ProgressStep
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            statusIcon
+                .frame(width: 16, height: 16)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(step.title)
+                    .font(.caption.weight(step.status == .active ? .semibold : .regular))
+                    .foregroundStyle(titleColor)
+
+                if let detail = step.detail, !detail.isEmpty {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch step.status {
+        case .pending:
+            Image(systemName: "circle")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        case .active:
+            ProgressView()
+                .controlSize(.small)
+        case .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "xmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+        }
+    }
+
+    private var titleColor: Color {
+        switch step.status {
+        case .pending:
+            return .secondary
+        case .active, .completed, .failed:
+            return .primary
         }
     }
 }

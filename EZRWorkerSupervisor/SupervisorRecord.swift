@@ -11,6 +11,7 @@ final class SupervisorRecord {
     var ownership: SupervisorOwnership = .none
     var lastProbeAt: Date?
     var lastError: String?
+    var lastLifecycleMessage: String?
 
     init(profile: GatewayProfile) {
         self.profile = profile
@@ -49,7 +50,8 @@ final class SupervisorRecord {
             readyState: readyState,
             ownership: ownership,
             lastProbeAt: lastProbeAt,
-            lastError: lastError
+            lastError: lastError,
+            lastLifecycleMessage: lastLifecycleMessage
         )
     }
 }

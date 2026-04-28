@@ -230,6 +230,7 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
     var ownership: SupervisorOwnership
     var lastProbeAt: Date?
     var lastError: String?
+    var lastLifecycleMessage: String?
 
     var resolution: GatewayProfileResolution {
         GatewayProfileResolution(

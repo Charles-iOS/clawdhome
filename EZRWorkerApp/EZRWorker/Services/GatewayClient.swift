@@ -538,8 +538,10 @@ actor GatewayClient {
     ///   - (true, true):   readyz OK（完全就绪）
     static func httpProbe(port: Int) async -> (alive: Bool, ready: Bool) {
         let base = "http://127.0.0.1:\(port)"
-        if await checkHTTP("\(base)/readyz") { return (true, true) }
-        return (await checkHTTP("\(base)/healthz"), false)
+        async let ready = checkHTTP("\(base)/readyz")
+        async let healthy = checkHTTP("\(base)/healthz")
+        let (isReady, isHealthy) = await (ready, healthy)
+        return (isReady || isHealthy, isReady)
     }
 
     private static func checkHTTP(_ urlStr: String) async -> Bool {

@@ -24,6 +24,7 @@ extension EZRWorkerSupervisorController {
             record.isRunning = true
             record.pid = listeningPID
             record.readyState = probe.ready ? .ready : .starting
+            record.lastLifecycleMessage = probe.ready ? "Gateway 已就绪" : "Gateway 已启动，正在等待健康检查"
             if record.process?.isRunning == true,
                record.process?.processIdentifier == listeningPID {
                 record.ownership = .supervised
@@ -74,6 +75,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .adopted
                 record.pid = pid
                 record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已就绪"
                 return (true, nil)
             }
             return await waitForGatewayReady(
@@ -86,6 +88,7 @@ extension EZRWorkerSupervisorController {
             return nil
         case .fail(let message):
             record.lastError = message
+            record.lastLifecycleMessage = message
             record.readyState = .failed
             record.isRunning = false
             record.ownership = .none
@@ -105,8 +108,15 @@ extension EZRWorkerSupervisorController {
         record.readyState = .starting
         record.ownership = ownership
         record.lastError = nil
+        record.lastLifecycleMessage = "正在等待 Gateway 打开本地端口 \(record.resolution.resolvedPort)"
+        let startupStartedAt = Date()
+        let startupDeadline = startupStartedAt.addingTimeInterval(TimeInterval(Self.gatewayStartupProbeAttempts))
 
         for _ in 0..<Self.gatewayStartupProbeAttempts {
+            if Date() >= startupDeadline {
+                break
+            }
+
             if Task.isCancelled {
                 _ = await stopRecord(record)
                 return (false, "Gateway 启动已取消")
@@ -122,6 +132,7 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = false
                 record.ownership = .none
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 return (false, message)
             }
 
@@ -136,6 +147,7 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = false
                 record.ownership = .none
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 return (false, message)
             }
 
@@ -150,6 +162,7 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = false
                 record.ownership = .none
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 return (false, message)
             }
 
@@ -171,6 +184,7 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = false
                 record.ownership = .none
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 return (false, message)
             }
 
@@ -180,7 +194,21 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = true
                 record.pid = currentPID ?? pid
                 record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已就绪"
                 return (true, nil)
+            }
+            let elapsedSeconds = max(
+                1,
+                Int(Date().timeIntervalSince(startupStartedAt).rounded(.down))
+            )
+            if probe.alive {
+                record.lastLifecycleMessage = "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在等待健康检查"
+            } else if elapsedSeconds >= 30 {
+                record.lastLifecycleMessage = "仍在初始化插件运行依赖和本地缓存，已等待 \(elapsedSeconds) 秒"
+            } else if elapsedSeconds >= 8 {
+                record.lastLifecycleMessage = "Gateway 正在初始化本地运行依赖，首次启动可能较久"
+            } else {
+                record.lastLifecycleMessage = "正在等待 Gateway 打开本地端口 \(record.resolution.resolvedPort)"
             }
             try? await Task.sleep(nanoseconds: Self.gatewayStartupProbeIntervalNanoseconds)
         }
@@ -193,6 +221,7 @@ extension EZRWorkerSupervisorController {
             record.isRunning = true
             record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
             record.lastError = nil
+            record.lastLifecycleMessage = "Gateway 已就绪"
             return (true, nil)
         }
 
@@ -204,6 +233,7 @@ extension EZRWorkerSupervisorController {
                 ?? "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
             record.lastError = message
             record.readyState = .failed
+            record.lastLifecycleMessage = message
             return (false, message)
         }
 
@@ -212,6 +242,7 @@ extension EZRWorkerSupervisorController {
         record.readyState = .failed
         record.isRunning = false
         record.ownership = .none
+        record.lastLifecycleMessage = message
         return (false, message)
     }
 
@@ -248,6 +279,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .adopted
                 record.readyState = .ready
                 record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已就绪"
                 return
             case .relaunch:
                 record.pid = nil
@@ -255,6 +287,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
                 record.readyState = .starting
                 record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 请求重启，正在重新拉起"
                 Task { [profileID] in
                     _ = await self.startProfile(profileID: profileID)
                 }
@@ -265,6 +298,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
                 record.readyState = .failed
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 return
             }
         }
@@ -277,6 +311,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .adopted
                 record.readyState = .starting
                 record.lastError = nil
+                record.lastLifecycleMessage = "正在接管已有 Gateway 并等待就绪"
                 Task { [profileID] in
                     _ = await self.startProfile(profileID: profileID)
                 }
@@ -286,6 +321,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
                 record.readyState = .starting
                 record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已退出，正在重新启动"
                 Task { [profileID] in
                     _ = await self.startProfile(profileID: profileID)
                 }
@@ -295,6 +331,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
                 record.readyState = .failed
                 record.lastError = message
+                record.lastLifecycleMessage = message
             }
             return
         }
@@ -307,6 +344,7 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
                 record.readyState = .failed
                 record.lastError = Self.gatewayRestartHandoffLimitMessage
+                record.lastLifecycleMessage = Self.gatewayRestartHandoffLimitMessage
                 return
             }
 
@@ -315,6 +353,7 @@ extension EZRWorkerSupervisorController {
             record.ownership = .none
             record.readyState = .starting
             record.lastError = nil
+            record.lastLifecycleMessage = "Gateway 请求重启，正在重新拉起"
 
             Task { [profileID] in
                 _ = await self.startProfile(profileID: profileID)
@@ -330,6 +369,7 @@ extension EZRWorkerSupervisorController {
             record.lastError =
                 extractStartupFailureMessage(from: capturedOutput)
                 ?? "Gateway 异常退出 (exit \(exitCode))"
+            record.lastLifecycleMessage = record.lastError
         }
     }
 

@@ -10,10 +10,10 @@ enum GatewayHealthProbe {
 
     static func httpProbe(port: Int) async -> (alive: Bool, ready: Bool) {
         let baseURL = "http://127.0.0.1:\(port)"
-        if await check("\(baseURL)/readyz") {
-            return (true, true)
-        }
-        return (await check("\(baseURL)/healthz"), false)
+        async let ready = check("\(baseURL)/readyz")
+        async let healthy = check("\(baseURL)/healthz")
+        let (isReady, isHealthy) = await (ready, healthy)
+        return (isReady || isHealthy, isReady)
     }
 
     private static func check(_ urlString: String) async -> Bool {

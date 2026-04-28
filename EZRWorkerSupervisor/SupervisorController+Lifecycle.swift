@@ -10,21 +10,25 @@ extension EZRWorkerSupervisorController {
         let record = recordForProfile(profile)
         record.readyState = .preparing
         record.lastError = nil
+        record.lastLifecycleMessage = "正在检查 Profile 目录和 Gateway 配置"
 
         do {
             try ensureProfileDirectories(record.resolution)
+            record.lastLifecycleMessage = "正在准备 Profile 目录"
             try reconcileManagedConfigLayoutIfNeeded(record.resolution)
             let configExists = FileManager.default.fileExists(
                 atPath: record.resolution.resolvedConfigPath
             )
 
             if profile.sourceKind == .legacyReuse {
+                record.lastLifecycleMessage = "正在检查旧版 OpenClaw 配置"
                 guard configExists else {
                     throw NSError(domain: "EZRWorkerSupervisor", code: 404, userInfo: [
                         NSLocalizedDescriptionKey: "legacy profile 缺少 openclaw.json"
                     ])
                 }
             } else if !configExists {
+                record.lastLifecycleMessage = "首次创建 OpenClaw 配置和工作区"
                 let (ok, output) = await OpenClawRuntime.runOpenClaw(
                     arguments: ["setup", "--workspace", record.resolution.resolvedWorkspaceRoot],
                     profile: record.resolution
@@ -36,15 +40,18 @@ extension EZRWorkerSupervisorController {
                 }
             }
 
+            record.lastLifecycleMessage = "正在写入 Gateway 端口和认证配置"
             try normalizeConfig(for: record.resolution)
 
             record.isPrepared = true
             record.readyState = record.isRunning ? .ready : .stopped
+            record.lastLifecycleMessage = record.isRunning ? "Gateway 已就绪" : "Profile 已准备，等待启动 Gateway"
             return (true, nil)
         } catch {
             record.isPrepared = false
             record.readyState = .failed
             record.lastError = error.localizedDescription
+            record.lastLifecycleMessage = error.localizedDescription
             return (false, error.localizedDescription)
         }
     }
@@ -73,6 +80,7 @@ extension EZRWorkerSupervisorController {
             return (false, "未找到 profile: \(profileID.uuidString)")
         }
         let record = recordForProfile(profile)
+        record.lastLifecycleMessage = "正在检查是否已有可复用 Gateway"
         if let existingGatewayResult = await adoptExistingHealthyGatewayIfAvailable(for: record) {
             return existingGatewayResult
         }
@@ -90,6 +98,7 @@ extension EZRWorkerSupervisorController {
         }
 
         if let process = record.process, process.isRunning {
+            record.lastLifecycleMessage = "Gateway 进程已存在，正在等待就绪"
             return await waitForGatewayReady(
                 record: record,
                 pid: process.processIdentifier,
@@ -102,9 +111,11 @@ extension EZRWorkerSupervisorController {
             return existingGatewayResult
         }
 
+        record.lastLifecycleMessage = "正在检查 Gateway 端口 \(record.resolution.resolvedPort)"
         if let occupiedPID = gatewayPIDListening(onPort: record.resolution.resolvedPort) {
             switch await existingGatewayDisposition(for: record, listeningPID: occupiedPID) {
             case .adopt(let pid):
+                record.lastLifecycleMessage = "正在接管已有 Gateway 进程"
                 return await waitForGatewayReady(
                     record: record,
                     pid: pid,
@@ -115,6 +126,7 @@ extension EZRWorkerSupervisorController {
                 break
             case .fail(let message):
                 record.lastError = message
+                record.lastLifecycleMessage = message
                 record.readyState = .failed
                 record.isRunning = false
                 record.ownership = .none
@@ -149,6 +161,7 @@ extension EZRWorkerSupervisorController {
         }
 
         do {
+            record.lastLifecycleMessage = "正在启动 Gateway 进程"
             try process.run()
             record.process = process
             record.pid = process.processIdentifier
@@ -156,11 +169,13 @@ extension EZRWorkerSupervisorController {
             record.readyState = .starting
             record.ownership = .supervised
             record.lastError = nil
+            record.lastLifecycleMessage = "Gateway 进程已启动，正在等待本地服务响应"
         } catch {
             record.lastError = error.localizedDescription
             record.readyState = .failed
             record.isRunning = false
             record.ownership = .none
+            record.lastLifecycleMessage = error.localizedDescription
             return (false, error.localizedDescription)
         }
 
@@ -216,6 +231,7 @@ extension EZRWorkerSupervisorController {
         record.ownership = .none
         record.readyState = .stopped
         record.lastProbeAt = Date()
+        record.lastLifecycleMessage = "Gateway 已停止"
         return (true, nil)
     }
 
