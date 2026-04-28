@@ -18,7 +18,7 @@ App 版本更新功能不再依赖 Helper。
 已有能力：
 
 - `EZRWorkerApp/EZRWorker/Services/UpdateChecker.swift`
-  - 当前读取构建配置中的更新清单 URL，默认指向 `https://assets.ezrpro.com/ezrworker/updates/latest.json`
+  - 当前读取构建配置中的更新清单 URL，默认指向 `https://imp-assets.ezrpro.com/ezrworker/updates/latest.json`
   - 比较当前 App 版本和远端版本
   - 下载 `.pkg`
   - 打开安装器
@@ -32,7 +32,7 @@ App 版本更新功能不再依赖 Helper。
   - 已能生成 arm64 / x64 pkg
   - 已能同步 `updates/latest.json` 和兼容路径 `api/version.json`
   - 已能写出 `version`、`build`、`download_url`、`download_url_x64`、`packages`、`sha256`、`release_notes`、`release_notes_en`
-  - 当前默认更新源为 `https://assets.ezrpro.com/ezrworker/`，静态站目录由 `UPDATE_SITE_DIR` 指定
+  - 当前默认更新源为 `https://imp-assets.ezrpro.com/ezrworker/`，静态站目录由 `UPDATE_SITE_DIR` 指定
 
 主要缺口：
 
@@ -354,8 +354,8 @@ final class AppUpdateService {
 
 当前发布源配置：
 
-- 默认 `UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/`。
-- 客户端默认读取 `https://assets.ezrpro.com/ezrworker/updates/latest.json`。
+- 默认 `UPDATE_BASE_URL=https://imp-assets.ezrpro.com/ezrworker/`。
+- 客户端默认读取 `https://imp-assets.ezrpro.com/ezrworker/updates/latest.json`。
 - 本地静态站目录由 `UPDATE_SITE_DIR` 指定；示例：`/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site`。
 - `release-local` 生成本地更新站内容后，还需要把该目录内容上传或部署到 CDN 源站。
 
@@ -396,7 +396,7 @@ final class AppUpdateService {
 必要环境变量：
 
 ```bash
-UPDATE_BASE_URL="https://assets.ezrpro.com/ezrworker/"
+UPDATE_BASE_URL="https://imp-assets.ezrpro.com/ezrworker/"
 UPDATE_SITE_DIR="/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site"
 ```
 
@@ -418,7 +418,7 @@ ${UPDATE_BASE_URL}${UPDATE_DOWNLOAD_PATH}/EZRWorker-${NEXT_VERSION}-x64.pkg
 
 脚本约束：
 
-- 正式发布时 `UPDATE_BASE_URL` 必填，默认使用 `https://assets.ezrpro.com/ezrworker/`。
+- 正式发布时 `UPDATE_BASE_URL` 必填，默认使用 `https://imp-assets.ezrpro.com/ezrworker/`。
 - `UPDATE_BASE_URL` 必须是 HTTPS。
 - `UPDATE_BASE_URL` 不能是旧域名。
 - `UPDATE_SITE_DIR` 不存在时不写清单，但仍可创建 GitHub Release。

@@ -22,12 +22,12 @@ BUILD_ARCHS ?= arm64
 
 .PHONY: help bump-build build build-helper build-release dev-runtime install-helper uninstall-helper pkg pkg-intel pkg-universal pkg-all pkg-skip-build pkg-signed pkg-release sign-pkg notarize-pkg release release-local release-dry-run release-notes-draft changelog version-next install-hooks clean version i18n i18n-check check-mainline-no-helper test-release-scripts test-all test-fresh test-init test-checkpoint test-reset test-deploy test-clean
 
-UPDATE_BASE_URL ?= https://assets.ezrpro.com/ezrworker/
+UPDATE_BASE_URL ?= https://imp-assets.ezrpro.com/ezrworker/
 UPDATE_SITE_DIR ?=
 UPDATE_MANIFEST_PATH ?= /updates/latest.json
 UPDATE_COMPAT_MANIFEST_PATH ?= /api/version.json
 UPDATE_DOWNLOAD_PATH ?= /download
-APP_UPDATE_MANIFEST_URL ?= https://assets.ezrpro.com/ezrworker/updates/latest.json
+APP_UPDATE_MANIFEST_URL ?= https://imp-assets.ezrpro.com/ezrworker/updates/latest.json
 MIN_APP_VERSION ?=
 
 help:
@@ -54,7 +54,7 @@ help:
 	@echo "  release          正式发布：更新 changelog + tag + 签名 pkg + 默认公证 + GitHub Release（可用 NOTARIZE=false 关闭）"
 	@echo "  release-local    Git 发布：更新 changelog + tag + 签名 pkg + 更新清单 + git push，跳过 GitHub Release"
 	@echo "  release-dry-run  预览正式发布流程（不执行）"
-	@echo "  发布更新源：UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/ UPDATE_SITE_DIR=/path/to/static-site"
+	@echo "  发布更新源：UPDATE_BASE_URL=https://imp-assets.ezrpro.com/ezrworker/ UPDATE_SITE_DIR=/path/to/static-site"
 	@echo "  test-release-scripts  校验 release/changelog 脚本"
 	@echo "  install-hooks    安装 git commit-msg / pre-commit hooks"
 	@echo "  run-release      直接运行 build/export 里的 Release 包（无需安装）"

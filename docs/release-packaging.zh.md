@@ -175,7 +175,7 @@ make release-dry-run NOTARIZE=true
 发布前确保工作区干净，release notes 已确认。当前 EZRWorker 更新源默认是：
 
 ```text
-https://assets.ezrpro.com/ezrworker/updates/latest.json
+https://imp-assets.ezrpro.com/ezrworker/updates/latest.json
 ```
 
 本地发布推荐使用 `release-local`，它会推送 git/tag，生成更新清单和安装包，但跳过 GitHub Release：
@@ -222,10 +222,10 @@ download/EZRWorker-<version>-x64.pkg.sha256
 完成后需要把 `ezrworker-updates-site/` 目录内容上传或部署到 CDN 源站，使这些 URL 可访问：
 
 ```text
-https://assets.ezrpro.com/ezrworker/updates/latest.json
-https://assets.ezrpro.com/ezrworker/api/version.json
-https://assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-arm64.pkg
-https://assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-x64.pkg
+https://imp-assets.ezrpro.com/ezrworker/updates/latest.json
+https://imp-assets.ezrpro.com/ezrworker/api/version.json
+https://imp-assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-arm64.pkg
+https://imp-assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-x64.pkg
 ```
 
 ## Intel 与 M 芯片分发说明
