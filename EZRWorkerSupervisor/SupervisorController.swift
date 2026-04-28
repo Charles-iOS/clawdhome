@@ -38,7 +38,7 @@ actor EZRWorkerSupervisorController {
     }
 
     func listProfilesRuntimeJSON() async -> String {
-        await refreshLegacyRuntimeSnapshotsBeforeListing()
+        await refreshRuntimeSnapshotsBeforeListing()
         let snapshots = profileOrder.compactMap { profileID -> SupervisorProfileRuntime? in
             if let record = records[profileID] {
                 return record.snapshot()

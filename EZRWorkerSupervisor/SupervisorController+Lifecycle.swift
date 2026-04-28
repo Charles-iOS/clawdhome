@@ -120,7 +120,7 @@ extension EZRWorkerSupervisorController {
                     record: record,
                     pid: pid,
                     ownership: .adopted,
-                    requireSameListeningPID: true
+                    requireSameListeningPID: record.profile.sourceKind == .managed && pid != nil
                 )
             case .relaunch:
                 break

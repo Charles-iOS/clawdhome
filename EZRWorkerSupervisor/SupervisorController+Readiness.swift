@@ -1,15 +1,16 @@
 import Foundation
 
 extension EZRWorkerSupervisorController {
-    func refreshLegacyRuntimeSnapshotsBeforeListing() async {
+    func refreshRuntimeSnapshotsBeforeListing() async {
         for profileID in profileOrder {
-            guard let record = records[profileID],
-                  record.profile.sourceKind == .legacyReuse
-            else {
-                continue
-            }
+            guard let record = records[profileID] else { continue }
 
-            await refreshLegacyRuntimeSnapshot(record)
+            switch record.profile.sourceKind {
+            case .legacyReuse:
+                await refreshLegacyRuntimeSnapshot(record)
+            case .managed:
+                await refreshManagedRuntimeSnapshot(record)
+            }
         }
     }
 
@@ -58,6 +59,40 @@ extension EZRWorkerSupervisorController {
         }
     }
 
+    private func refreshManagedRuntimeSnapshot(_ record: SupervisorRecord) async {
+        let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
+        record.lastProbeAt = Date()
+
+        let ownsProcess = record.process?.isRunning == true
+            && record.process?.processIdentifier == listeningPID
+        let matchesProfile = listeningPID.map { gatewayProcessMatches(record: record, pid: $0) } ?? false
+
+        guard probe.alive, ownsProcess || matchesProfile else {
+            if record.process?.isRunning != true,
+               record.isRunning,
+               record.readyState != .failed {
+                record.process = nil
+                record.pid = nil
+                record.isRunning = false
+                record.ownership = .none
+                record.readyState = .stopped
+                record.lastLifecycleMessage = "Gateway 已停止"
+            }
+            return
+        }
+
+        record.isPrepared = true
+        record.isRunning = true
+        record.pid = listeningPID
+        record.ownership = ownsProcess ? .supervised : .adopted
+        record.readyState = probe.ready ? .ready : .starting
+        record.lastError = nil
+        record.lastLifecycleMessage = probe.ready
+            ? "Gateway 已就绪"
+            : "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在等待健康检查"
+    }
+
     func adoptExistingHealthyGatewayIfAvailable(
         for record: SupervisorRecord
     ) async -> (Bool, String?)? {
@@ -82,7 +117,7 @@ extension EZRWorkerSupervisorController {
                 record: record,
                 pid: pid,
                 ownership: .adopted,
-                requireSameListeningPID: pid != nil
+                requireSameListeningPID: record.profile.sourceKind == .managed && pid != nil
             )
         case .relaunch:
             return nil
