@@ -488,7 +488,16 @@ fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 if [ -d "$UPDATE_SITE_DIR" ]; then
-  echo "下一步（更新线上网站）："
-  echo "  cd $UPDATE_SITE_DIR && make deploy"
+  echo "下一步（发布到 CDN 源站）："
+  echo "  将 $UPDATE_SITE_DIR/ 目录内容上传到：$UPDATE_BASE_URL"
+  echo "  必须保持这些相对路径："
+  echo "    updates/latest.json"
+  echo "    api/version.json"
+  echo "    download/EZRWorker-${NEXT_VERSION}-arm64.pkg"
+  echo "    download/EZRWorker-${NEXT_VERSION}-x64.pkg"
+  echo "  上传后验证："
+  echo "    curl -I $(join_url_path "$UPDATE_BASE_URL" "$UPDATE_MANIFEST_PATH")"
+  echo "    curl -I $(join_url_path "$UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-arm64.pkg")"
+  echo "    curl -I $(join_url_path "$UPDATE_BASE_URL" "$UPDATE_DOWNLOAD_PATH/EZRWorker-${NEXT_VERSION}-x64.pkg")"
 fi
 echo ""
