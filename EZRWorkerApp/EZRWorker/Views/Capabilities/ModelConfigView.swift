@@ -610,9 +610,8 @@ struct ModelConfigView: View {
         saveError = nil
         modelStore.load()
 
-        gatewayModelGroups = await gateway.modelsList()
-
         guard gateway.isConnected else {
+            gatewayModelGroups = nil
             gatewayProviderIDs = []
             if pendingFallbackModel.isEmpty {
                 pendingFallbackModel = fallbackCandidates.first?.id ?? ""
@@ -641,6 +640,7 @@ struct ModelConfigView: View {
             savedFallbackModels = fallbackModels
 
             let providers = ((config["models"] as? [String: Any])?["providers"] as? [String: Any]) ?? [:]
+            gatewayModelGroups = Self.modelGroups(from: providers)
             gatewayProviderIDs = Set(providers.keys)
             pendingFallbackModel = fallbackCandidates.first?.id ?? ""
         } catch {
@@ -762,6 +762,28 @@ struct ModelConfigView: View {
 
     private func deletionMessage(for provider: ProviderTemplate) -> String {
         "会从本机移除 \(provider.displayName) 的模型配置和凭据；如果当前 Gateway 已连接，也会同步从当前 Profile 删除对应 provider。"
+    }
+
+    private static func modelGroups(from providers: [String: Any]) -> [ModelGroup] {
+        providers.keys.sorted().compactMap { providerID in
+            guard let provider = providers[providerID] as? [String: Any] else { return nil }
+            let rows = provider["models"] as? [[String: Any]] ?? []
+            let models = rows.compactMap { row -> ModelEntry? in
+                guard let rawID = row["id"] as? String else { return nil }
+                let id = normalizedModelID(rawID, providerId: providerID)
+                guard !id.isEmpty else { return nil }
+                let label = (row["name"] as? String)
+                    ?? (row["label"] as? String)
+                    ?? modelDisplayLabel(for: id)
+                return ModelEntry(id: id, label: label)
+            }
+            guard !models.isEmpty else { return nil }
+            return ModelGroup(
+                id: providerID,
+                provider: OpenClawProviderKeySync.staticConfig(for: providerID)?.displayName ?? providerID,
+                models: models
+            )
+        }
     }
 
     private var syncClosure: (ProviderTemplate) async throws -> Void {
