@@ -31,6 +31,7 @@ ClawdHomeHelper/GeneratedVersion.swift
 .claude/settings.local.json
 .claude/worktrees
 docs/plans
+ezrworker-updates-site/
 
 # 本地命名空间切换脚本（不托管）
 scripts/switch-namespace.local.sh

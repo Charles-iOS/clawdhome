@@ -18,7 +18,7 @@ App 版本更新功能不再依赖 Helper。
 已有能力：
 
 - `EZRWorkerApp/EZRWorker/Services/UpdateChecker.swift`
-  - 当前读取旧域名下的 `api/version.json`，需要改为可配置更新清单 URL
+  - 当前读取构建配置中的更新清单 URL，默认指向 `https://assets.ezrpro.com/ezrworker/updates/latest.json`
   - 比较当前 App 版本和远端版本
   - 下载 `.pkg`
   - 打开安装器
@@ -30,8 +30,9 @@ App 版本更新功能不再依赖 Helper。
   - 已定义更新状态模型，但它目前放在 Shared 层，容易暗示 App 更新需要跨进程协作
 - `scripts/release.sh` / `scripts/build-pkg.sh`
   - 已能生成 arm64 / x64 pkg
-  - 已能同步 `version.json` 的 `version`、`download_url`、`download_url_x64`、`release_notes`、`release_notes_en`
-  - 当前默认网站目录是 `../clawdhome_website`，下载 URL 硬编码旧域名，需要改为发布参数
+  - 已能同步 `updates/latest.json` 和兼容路径 `api/version.json`
+  - 已能写出 `version`、`build`、`download_url`、`download_url_x64`、`packages`、`sha256`、`release_notes`、`release_notes_en`
+  - 当前默认更新源为 `https://assets.ezrpro.com/ezrworker/`，静态站目录由 `UPDATE_SITE_DIR` 指定
 
 主要缺口：
 
@@ -39,7 +40,7 @@ App 版本更新功能不再依赖 Helper。
 - 新主线 `AppSettingsView` 的“关于”区域只展示当前版本/构建号，没有检查更新、更新详情和下载入口。
 - 现有 Helper 里有 `AppUpdateHeartbeatService` / `getCachedAppUpdateState` 历史链路，但新主线 App 更新不应再依赖 Helper/XPC。
 - 更新状态模型没有架构信息、文件大小、sha256、强制升级文案等字段。
-- 远端 `download_url_x64` 已由 release 脚本写出，但客户端当前只读 `download_url`。
+- 需要确认线上 CDN 已同步 `updates/latest.json`、`api/version.json` 和 `download/` 下的双架构 pkg。
 - `appMustUpdate` 已计算，但 UI 没有强制升级 gating。
 - 版本比较逻辑只支持纯数字段，应该集中测试 `1.6.0`、`1.6`、`v1.6.0`、build metadata 等场景。
 - 下载完整性只检查文件大小大于 100KB，缺少 sha256 校验。
@@ -344,21 +345,21 @@ final class AppUpdateService {
 3. 更新 `CHANGELOG.zh.md` / `CHANGELOG.en.md`。
 4. 更新 `EZRWorkerApp/Info.plist` 的 `CFBundleShortVersionString`。
 5. 创建 release commit 和 `vX.Y.Z` tag。
-6. 分别调用 `scripts/build-pkg.sh` 构建 arm64 / x86_64 pkg。
-7. 写入网站目录里的 `api/version.json`。
-8. 把 pkg 复制到网站目录的 `download/`。
-9. `git push`、推送 tag，并用 `gh release create` 创建 GitHub Release。
-10. 最后提示进入网站目录执行部署。
+6. 分别调用 `scripts/build-pkg.sh` 构建、签名并公证 arm64 / x86_64 pkg。
+7. 写入 `$UPDATE_SITE_DIR/updates/latest.json`，并同步兼容路径 `$UPDATE_SITE_DIR/api/version.json`。
+8. 把 pkg 与 `.sha256` 复制到 `$UPDATE_SITE_DIR/download/`。
+9. `make release` 会 `git push`、推送 tag，并用 `gh release create` 创建 GitHub Release。
+10. `make release-local` 会 `git push`、推送 tag，但跳过 GitHub Release。
+11. 最后提示把 `$UPDATE_SITE_DIR` 发布到 CDN 源站。
 
-当前问题：
+当前发布源配置：
 
-- `WEBSITE_DIR` 默认是 `../clawdhome_website`。
-- `API_VERSION_JSON` 固定是 `$WEBSITE_DIR/api/version.json`。
-- `DOWNLOAD_URL` / `DOWNLOAD_URL_X64` 硬编码旧域名。
-- dry-run 仍然描述“同步 version.json”，但没有展示完整静态清单。
-- `build-pkg.sh --sync-api-version` 也有同样的旧域名硬编码。
+- 默认 `UPDATE_BASE_URL=https://assets.ezrpro.com/ezrworker/`。
+- 客户端默认读取 `https://assets.ezrpro.com/ezrworker/updates/latest.json`。
+- 本地静态站目录由 `UPDATE_SITE_DIR` 指定；示例：`/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site`。
+- `release-local` 生成本地更新站内容后，还需要把该目录内容上传或部署到 CDN 源站。
 
-结论：发布脚本需要做成“更新站点可配置”，不能再内置旧域名或旧网站目录。
+实现状态：更新站点已配置化，不再内置旧域名或旧网站目录。
 
 ### 7.1 build-pkg.sh
 
@@ -395,8 +396,8 @@ final class AppUpdateService {
 必要环境变量：
 
 ```bash
-UPDATE_BASE_URL="https://your-owned-domain.example"
-UPDATE_SITE_DIR="/path/to/static-site"
+UPDATE_BASE_URL="https://assets.ezrpro.com/ezrworker/"
+UPDATE_SITE_DIR="/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site"
 ```
 
 可选环境变量：
@@ -417,11 +418,12 @@ ${UPDATE_BASE_URL}${UPDATE_DOWNLOAD_PATH}/EZRWorker-${NEXT_VERSION}-x64.pkg
 
 脚本约束：
 
-- 正式发布时 `UPDATE_BASE_URL` 必填。
+- 正式发布时 `UPDATE_BASE_URL` 必填，默认使用 `https://assets.ezrpro.com/ezrworker/`。
 - `UPDATE_BASE_URL` 必须是 HTTPS。
 - `UPDATE_BASE_URL` 不能是旧域名。
 - `UPDATE_SITE_DIR` 不存在时不写清单，但仍可创建 GitHub Release。
 - dry-run 必须打印最终 manifest URL、download URL、输出文件路径。
+- 发布构建前会检查并清理 `build/release-arm64` / `build/release-x86_64`，避免第二个架构清理失败导致前一个架构白跑。
 
 `min_version` 来源建议：
 

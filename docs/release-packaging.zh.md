@@ -22,8 +22,8 @@
 - Xcode 15+，并已接受 license
 - 可访问网络，因为打包会下载 Node.js，并通过 npm 安装 `openclaw@latest`
 - 正式发布需要 Developer ID Application / Developer ID Installer 证书
-- 正式发布需要 `gh` CLI 登录，用于创建 GitHub Release
-- 如果要同步官网更新信息，默认相邻目录存在 `../clawdhome_website`
+- `make release` 需要 `gh` CLI 登录，用于创建 GitHub Release；`make release-local` 不需要
+- 如果要同步应用内更新信息，需要设置 `UPDATE_SITE_DIR` 指向本地静态更新站目录
 
 检查 Xcode：
 
@@ -172,15 +172,21 @@ make release-dry-run NOTARIZE=true
 
 ## 正式发布
 
-发布前确保工作区干净，release notes 已确认：
+发布前确保工作区干净，release notes 已确认。当前 EZRWorker 更新源默认是：
+
+```text
+https://assets.ezrpro.com/ezrworker/updates/latest.json
+```
+
+本地发布推荐使用 `release-local`，它会推送 git/tag，生成更新清单和安装包，但跳过 GitHub Release：
 
 ```bash
 git status --short
-make release-dry-run NOTARIZE=true
-make release NOTARIZE=true
+UPDATE_SITE_DIR="/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site" make release-dry-run
+UPDATE_SITE_DIR="/Users/charles/Desktop/WORK/clawdhome/ezrworker-updates-site" make release-local
 ```
 
-`make release` 会执行：
+`make release-local` 会执行：
 
 1. 计算下一版本号。
 2. 读取中英文 release notes。
@@ -189,9 +195,11 @@ make release NOTARIZE=true
 5. 创建 release commit：`chore(release): vX.Y.Z`。
 6. 创建 tag：`vX.Y.Z`。
 7. 分别构建 `arm64` 和 `x86_64` pkg。
-8. 同步 `../clawdhome_website/api/version.json`。
-9. 复制安装包到 `../clawdhome_website/download/`。
-10. `git push`、`git push --tags`，并创建 GitHub Release。
+8. 同步 `$UPDATE_SITE_DIR/updates/latest.json` 和 `$UPDATE_SITE_DIR/api/version.json`。
+9. 复制安装包和 `.sha256` 到 `$UPDATE_SITE_DIR/download/`。
+10. `git push` 和 `git push --tags`。
+
+`make release` 比 `release-local` 多一步 GitHub Release，需要 `gh` CLI。
 
 正式产物：
 
@@ -200,17 +208,25 @@ dist/EZRWorker-<version>-arm64.pkg
 dist/EZRWorker-<version>-x64.pkg
 ```
 
-官网目录会得到：
+更新站目录会得到：
 
 ```text
+updates/latest.json
+api/version.json
 download/EZRWorker-<version>-arm64.pkg
 download/EZRWorker-<version>-x64.pkg
-download/EZRWorker-<version>.pkg
-download/EZRWorker-latest.pkg
-download/EZRWorker-latest-x64.pkg
+download/EZRWorker-<version>-arm64.pkg.sha256
+download/EZRWorker-<version>-x64.pkg.sha256
 ```
 
-其中无架构后缀的历史命名默认指向 `arm64` 包。
+完成后需要把 `ezrworker-updates-site/` 目录内容上传或部署到 CDN 源站，使这些 URL 可访问：
+
+```text
+https://assets.ezrpro.com/ezrworker/updates/latest.json
+https://assets.ezrpro.com/ezrworker/api/version.json
+https://assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-arm64.pkg
+https://assets.ezrpro.com/ezrworker/download/EZRWorker-<version>-x64.pkg
+```
 
 ## Intel 与 M 芯片分发说明
 
