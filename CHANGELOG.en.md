@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0] - 2026-04-28
+
+### Features
+- Released the first official EZRWorker macOS desktop version for managing digital workers, workspace sessions, and the OpenClaw Gateway.
+- Added setup and pairing flows for Feishu, WeCom, Telegram, and related channel integrations.
+- Added model provider configuration, onboarding, role marketplace, skills management, and cron task management.
+- Added in-app update checks, update prompts, and dual-architecture package distribution.
+
+### Improvements & Fixes
+- Improved Helper and Gateway startup, reconnection, health checks, and isolated runtime stability.
+- Completed package build, signing, notarization, and update manifest workflows for Apple Silicon and Intel Mac.
+
+
 ## [1.6.0] - 2026-04-03
 
 ### Features
