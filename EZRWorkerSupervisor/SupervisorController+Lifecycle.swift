@@ -13,6 +13,25 @@ extension EZRWorkerSupervisorController {
         record.lastLifecycleMessage = "正在检查 Profile 目录和 Gateway 配置"
 
         do {
+            if profile.sourceKind == .externalReuse,
+               profile.managementMode == .observeOnly {
+                let configExists = FileManager.default.fileExists(
+                    atPath: record.resolution.resolvedConfigPath
+                )
+                guard configExists else {
+                    throw NSError(domain: "EZRWorkerSupervisor", code: 404, userInfo: [
+                        NSLocalizedDescriptionKey: "external profile 缺少 openclaw.json"
+                    ])
+                }
+
+                record.isPrepared = true
+                record.readyState = record.isRunning ? .ready : .stopped
+                record.lastLifecycleMessage = record.isRunning
+                    ? "外部 Gateway 已接入（仅观察）"
+                    : "外部 Profile 已验证，等待外部 Gateway 启动"
+                return (true, nil)
+            }
+
             try ensureProfileDirectories(record.resolution)
             record.lastLifecycleMessage = "正在准备 Profile 目录"
             try reconcileManagedConfigLayoutIfNeeded(record.resolution)
@@ -85,6 +104,16 @@ extension EZRWorkerSupervisorController {
             return existingGatewayResult
         }
 
+        guard profile.managementMode == .managedByEZRWorker else {
+            let message = "该 Profile 当前为仅观察模式，不会由 EZRWorker 启动 Gateway"
+            record.lastError = message
+            record.lastLifecycleMessage = message
+            record.readyState = record.isPrepared ? .stopped : .failed
+            record.isRunning = false
+            record.ownership = .none
+            return (false, message)
+        }
+
         let prepareResult = await prepareProfile(profileID: profileID)
         guard prepareResult.0 else { return prepareResult }
         guard !Task.isCancelled else {
@@ -120,7 +149,7 @@ extension EZRWorkerSupervisorController {
                     record: record,
                     pid: pid,
                     ownership: .adopted,
-                    requireSameListeningPID: record.profile.sourceKind == .managed && pid != nil
+                    requireSameListeningPID: record.profile.sourceKind != .legacyReuse && pid != nil
                 )
             case .relaunch:
                 break
@@ -218,6 +247,12 @@ extension EZRWorkerSupervisorController {
     }
 
     func stopRecord(_ record: SupervisorRecord) async -> (Bool, String?) {
+        guard record.profile.managementMode == .managedByEZRWorker else {
+            let message = "该 Profile 当前为仅观察模式，不会由 EZRWorker 停止 Gateway"
+            record.lastLifecycleMessage = message
+            return (false, message)
+        }
+
         if let process = record.process, process.isRunning {
             process.terminationHandler = nil
             process.terminate()
@@ -233,7 +268,11 @@ extension EZRWorkerSupervisorController {
         } else if let pid = gatewayPIDListening(onPort: record.resolution.resolvedPort),
                   let commandLine = processCommandLine(pid: pid),
                   looksLikeGatewayProcess(commandLine),
-                  record.profile.sourceKind != .managed || record.pid == pid || gatewayProcessMatches(record: record, pid: pid) {
+                  record.profile.sourceKind == .legacyReuse
+                    || record.pid == pid
+                    || gatewayProcessMatches(record: record, pid: pid)
+                    || (record.profile.sourceKind == .externalReuse
+                        && externalGatewayProcessMatches(record: record, pid: pid, commandLine: commandLine)) {
             kill(pid, SIGTERM)
             for _ in 0..<12 {
                 if gatewayPIDListening(onPort: record.resolution.resolvedPort) == nil {

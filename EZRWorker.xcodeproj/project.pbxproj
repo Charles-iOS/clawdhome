@@ -171,6 +171,8 @@
 		A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */; };
 		A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000009 /* ProcessOutputCollector.swift */; };
 		A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */; };
+		A2C000000000000000000001 /* ExistingOpenClawImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F000000000000000000001 /* ExistingOpenClawImportView.swift */; };
+		A2C000000000000000000002 /* OpenClawInstanceDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */; };
 		A546B9CB6D7439ECB0AC6197 /* InstallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A166CCCC9E924E212D44E7 /* InstallManager.swift */; };
 		AB3B802AE7680B5CB4EFB2B0 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */; };
 		AB4DEC6B28295032A4EAE80C /* Agent Creation CLI Fallback.md in Resources */ = {isa = PBXBuildFile; fileRef = 7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */; };
@@ -411,6 +413,8 @@
 		A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
 		A1F000000000000000000009 /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
 		A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
+		A2F000000000000000000001 /* ExistingOpenClawImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExistingOpenClawImportView.swift; sourceTree = "<group>"; };
+		A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawInstanceDiscoveryService.swift; sourceTree = "<group>"; };
 		A245488B0EA1984454B05131 /* UserPasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPasswordStore.swift; sourceTree = "<group>"; };
 		A4250EB561AA0155DE283768 /* EZRWorker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorker.entitlements; sourceTree = "<group>"; };
 		A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailWindowLayout.swift; sourceTree = "<group>"; };
@@ -559,6 +563,7 @@
 				9DDCCE3581AF68B6A18F0829 /* GatewayProfileStore.swift */,
 				C3CD29580049C3C28EB5D4A7 /* GatewaySkillsStore.swift */,
 				1AB8CCD5F5E790E50CFD9928 /* ModelPingService.swift */,
+				A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */,
 				48F9BE1B58385F1831D981E3 /* OpenClawProviderKeySync.swift */,
 				6BB39D38BC5A4670D1250FA5 /* ProfileCLIService.swift */,
 				593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */,
@@ -969,6 +974,7 @@
 			isa = PBXGroup;
 			children = (
 				17EBE5B457012294EFE0E076 /* ModelPickerSheet.swift */,
+				A2F000000000000000000001 /* ExistingOpenClawImportView.swift */,
 				0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */,
 				79F52960A35FCDC71FC976B7 /* ProfileMigrationChoiceView.swift */,
 				D30E9A622A85E6C84D696F8A /* ProfileTerminalView.swift */,
@@ -1267,6 +1273,7 @@
 				13A532108EB6EDB8F29DF459 /* EZRWorkerApp.swift in Sources */,
 				73439DEDEBD676CA95BEC88A /* EZRWorkerBranding.swift in Sources */,
 				53609128E116AEC60E9DB5BD /* EnvironmentChecker.swift in Sources */,
+				A2C000000000000000000001 /* ExistingOpenClawImportView.swift in Sources */,
 				E6B71EC87DD08A1B125F3C68 /* FeishuChannelConfigSheet.swift in Sources */,
 				CC35A6BD4D1E1AF3E5F3B66B /* FeishuChannelOnboardingSheet.swift in Sources */,
 				57DE6A88D02779A43098531F /* FileInputAcceptFilter.swift in Sources */,
@@ -1310,6 +1317,7 @@
 				4DB3ABF4D896DA3DB2F04F98 /* ModelsStatus.swift in Sources */,
 				D768D451B0BD8DCC76D8EE3A /* NetworkModels.swift in Sources */,
 				6378AE98717EA50411B2DC1E /* NetworkPolicyView.swift in Sources */,
+				A2C000000000000000000002 /* OpenClawInstanceDiscoveryService.swift in Sources */,
 				E7976265D330A5AAF3652560 /* OpenClawProviderKeySync.swift in Sources */,
 				47FD3CDA0B277A2A5AB35C32 /* OpenClawRuntime.swift in Sources */,
 				F2C107DBF7853685484E5AED /* PageHeroHeader.swift in Sources */,

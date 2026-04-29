@@ -6,8 +6,26 @@ extension EZRWorkerSupervisorController {
         for record: SupervisorRecord,
         listeningPID: Int32?
     ) async -> ExistingGatewayDisposition {
-        guard record.profile.sourceKind == .managed else {
+        switch record.profile.sourceKind {
+        case .legacyReuse:
+            guard let listeningPID else { return .adopt(nil) }
+            guard let commandLine = processCommandLine(pid: listeningPID),
+                  looksLikeGatewayProcess(commandLine) else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用")
+            }
             return .adopt(listeningPID)
+        case .externalReuse:
+            guard let listeningPID else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被占用，但无法确认进程归属")
+            }
+            guard let commandLine = processCommandLine(pid: listeningPID),
+                  looksLikeGatewayProcess(commandLine),
+                  externalGatewayProcessMatches(record: record, pid: listeningPID, commandLine: commandLine) else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用，未接管")
+            }
+            return .adopt(listeningPID)
+        case .managed:
+            break
         }
 
         guard let listeningPID else {
@@ -51,8 +69,26 @@ extension EZRWorkerSupervisorController {
         for record: SupervisorRecord,
         listeningPID: Int32?
     ) async -> ExistingGatewayDisposition {
-        guard record.profile.sourceKind == .managed else {
+        switch record.profile.sourceKind {
+        case .legacyReuse:
+            guard let listeningPID else { return .adopt(nil) }
+            guard let commandLine = processCommandLine(pid: listeningPID),
+                  looksLikeGatewayProcess(commandLine) else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用")
+            }
             return .adopt(listeningPID)
+        case .externalReuse:
+            guard let listeningPID else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被占用，但无法确认进程归属")
+            }
+            guard let commandLine = processCommandLine(pid: listeningPID),
+                  looksLikeGatewayProcess(commandLine),
+                  externalGatewayProcessMatches(record: record, pid: listeningPID, commandLine: commandLine) else {
+                return .fail("端口 \(record.resolution.resolvedPort) 已被其他进程占用，未接管")
+            }
+            return .adopt(listeningPID)
+        case .managed:
+            break
         }
 
         guard let listeningPID else {
@@ -152,6 +188,32 @@ extension EZRWorkerSupervisorController {
             .contains(where: { gatewayOpenFile($0, matches: record.resolution) })
     }
 
+    func externalGatewayProcessMatches(
+        record: SupervisorRecord,
+        pid: Int32,
+        commandLine: String? = nil
+    ) -> Bool {
+        let commandLine = commandLine ?? processCommandLine(pid: pid)
+        if let commandLine,
+           commandLineReferences(commandLine, resolution: record.resolution) {
+            return true
+        }
+        return gatewayProcessMatches(record: record, pid: pid)
+    }
+
+    private func commandLineReferences(
+        _ commandLine: String,
+        resolution: GatewayProfileResolution
+    ) -> Bool {
+        let normalizedCommand = normalizedPathLikeText(commandLine)
+        let configPath = normalizedPath(resolution.resolvedConfigPath)
+        let runtimeConfigPath = normalizedPath(resolution.runtimeConfigURL.path)
+        let stateDir = normalizedPath(resolution.resolvedStateDir)
+        return normalizedCommand.contains(configPath)
+            || normalizedCommand.contains(runtimeConfigPath)
+            || normalizedCommand.contains(stateDir)
+    }
+
     private func managedProfileIDForGatewayProcess(pid: Int32) -> UUID? {
         let openFileNames = gatewayProcessOpenFileNames(pid: pid)
         for profileID in profileOrder {
@@ -196,6 +258,10 @@ extension EZRWorkerSupervisorController {
         URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
             .standardizedFileURL
             .path
+    }
+
+    private func normalizedPathLikeText(_ text: String) -> String {
+        NSString(string: text).expandingTildeInPath
     }
 
     private func runLocalCommand(

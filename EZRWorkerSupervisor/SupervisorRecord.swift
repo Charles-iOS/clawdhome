@@ -40,6 +40,8 @@ final class SupervisorRecord {
             profileID: profile.id,
             slug: profile.slug,
             displayName: profile.displayName,
+            sourceKind: profile.sourceKind,
+            managementMode: profile.managementMode,
             resolvedConfigPath: resolution.resolvedConfigPath,
             resolvedStateDir: resolution.resolvedStateDir,
             resolvedWorkspaceRoot: resolution.resolvedWorkspaceRoot,

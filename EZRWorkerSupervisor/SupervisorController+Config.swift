@@ -193,7 +193,7 @@ extension EZRWorkerSupervisorController {
         controlUI["allowInsecureAuth"] = true
         gateway["controlUi"] = controlUI
 
-        if resolution.sourceKind == .managed {
+        if resolution.sourceKind == .managed || resolution.sourceKind == .externalReuse {
             var auth = gateway["auth"] as? [String: Any] ?? [:]
             auth["mode"] = "token"
             let existingToken = (auth["token"] as? String)?
@@ -213,7 +213,51 @@ extension EZRWorkerSupervisorController {
         root["gateway"] = gateway
 
         let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: url, options: .atomic)
+        let backupURL = try backupExternalConfigIfNeeded(resolution)
+        do {
+            try data.write(to: url, options: .atomic)
+            if resolution.sourceKind == .externalReuse,
+               loadJSONObject(at: url) == nil,
+               let backupURL {
+                try? FileManager.default.removeItem(at: url)
+                try FileManager.default.copyItem(at: backupURL, to: url)
+                throw NSError(domain: "EZRWorkerSupervisor", code: 30, userInfo: [
+                    NSLocalizedDescriptionKey: "写入外部 openclaw.json 后校验失败，已恢复备份"
+                ])
+            }
+        } catch {
+            if resolution.sourceKind == .externalReuse,
+               let backupURL,
+               FileManager.default.fileExists(atPath: backupURL.path) {
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.copyItem(at: backupURL, to: url)
+            }
+            throw error
+        }
+    }
+
+    private func backupExternalConfigIfNeeded(_ resolution: GatewayProfileResolution) throws -> URL? {
+        guard resolution.sourceKind == .externalReuse,
+              FileManager.default.fileExists(atPath: resolution.configURL.path) else {
+            return nil
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        var backupURL = resolution.configURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(
+                "openclaw.json.ezrworker-backup-\(formatter.string(from: Date()))"
+            )
+        if FileManager.default.fileExists(atPath: backupURL.path) {
+            backupURL = resolution.configURL
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    "openclaw.json.ezrworker-backup-\(formatter.string(from: Date()))-\(UUID().uuidString.prefix(8))"
+                )
+        }
+        try FileManager.default.copyItem(at: resolution.configURL, to: backupURL)
+        return backupURL
     }
 
     private func generateGatewayToken() -> String {

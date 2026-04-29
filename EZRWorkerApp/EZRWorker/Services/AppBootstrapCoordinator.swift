@@ -218,6 +218,10 @@ final class AppBootstrapCoordinator {
             throw NSError(domain: "AppBootstrapCoordinator", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "请先完成旧单实例迁移选择"
             ])
+        case .needsExistingOpenClawImport:
+            throw NSError(domain: "AppBootstrapCoordinator", code: 9, userInfo: [
+                NSLocalizedDescriptionKey: "请先选择要导入的既有 OpenClaw 实例"
+            ])
         case .loading:
             throw NSError(domain: "AppBootstrapCoordinator", code: 2, userInfo: [
                 NSLocalizedDescriptionKey: "Profile 正在加载中"

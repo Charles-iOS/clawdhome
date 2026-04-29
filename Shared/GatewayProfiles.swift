@@ -4,6 +4,12 @@ import Foundation
 enum GatewayProfileSourceKind: String, Codable, CaseIterable {
     case managed
     case legacyReuse
+    case externalReuse
+}
+
+enum GatewayProfileManagementMode: String, Codable, CaseIterable {
+    case managedByEZRWorker
+    case observeOnly
 }
 
 struct GatewayProfile: Codable, Identifiable, Hashable {
@@ -12,11 +18,99 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
     var displayName: String
     var autoStart: Bool
     var sourceKind: GatewayProfileSourceKind
+    var managementMode: GatewayProfileManagementMode
     var configPathOverride: String?
     var stateDirOverride: String?
     var workspaceRootOverride: String?
     var portOverride: Int?
     var createdAt: Date
+
+    init(
+        id: UUID,
+        slug: String,
+        displayName: String,
+        autoStart: Bool,
+        sourceKind: GatewayProfileSourceKind,
+        managementMode: GatewayProfileManagementMode? = nil,
+        configPathOverride: String?,
+        stateDirOverride: String?,
+        workspaceRootOverride: String?,
+        portOverride: Int?,
+        createdAt: Date
+    ) {
+        let resolvedManagementMode = managementMode ?? Self.defaultManagementMode(for: sourceKind)
+        self.id = id
+        self.slug = slug
+        self.displayName = displayName
+        self.autoStart = resolvedManagementMode == .observeOnly ? false : autoStart
+        self.sourceKind = sourceKind
+        self.managementMode = resolvedManagementMode
+        self.configPathOverride = configPathOverride
+        self.stateDirOverride = stateDirOverride
+        self.workspaceRootOverride = workspaceRootOverride
+        self.portOverride = portOverride
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case slug
+        case displayName
+        case autoStart
+        case sourceKind
+        case managementMode
+        case configPathOverride
+        case stateDirOverride
+        case workspaceRootOverride
+        case portOverride
+        case createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let sourceKind = try container.decode(GatewayProfileSourceKind.self, forKey: .sourceKind)
+        let managementMode = try container.decodeIfPresent(
+            GatewayProfileManagementMode.self,
+            forKey: .managementMode
+        ) ?? Self.defaultManagementMode(for: sourceKind)
+
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.slug = try container.decode(String.self, forKey: .slug)
+        self.displayName = try container.decode(String.self, forKey: .displayName)
+        let decodedAutoStart = try container.decode(Bool.self, forKey: .autoStart)
+        self.autoStart = managementMode == .observeOnly ? false : decodedAutoStart
+        self.sourceKind = sourceKind
+        self.managementMode = managementMode
+        self.configPathOverride = try container.decodeIfPresent(String.self, forKey: .configPathOverride)
+        self.stateDirOverride = try container.decodeIfPresent(String.self, forKey: .stateDirOverride)
+        self.workspaceRootOverride = try container.decodeIfPresent(String.self, forKey: .workspaceRootOverride)
+        self.portOverride = try container.decodeIfPresent(Int.self, forKey: .portOverride)
+        self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(slug, forKey: .slug)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(autoStart, forKey: .autoStart)
+        try container.encode(sourceKind, forKey: .sourceKind)
+        try container.encode(managementMode, forKey: .managementMode)
+        try container.encodeIfPresent(configPathOverride, forKey: .configPathOverride)
+        try container.encodeIfPresent(stateDirOverride, forKey: .stateDirOverride)
+        try container.encodeIfPresent(workspaceRootOverride, forKey: .workspaceRootOverride)
+        try container.encodeIfPresent(portOverride, forKey: .portOverride)
+        try container.encode(createdAt, forKey: .createdAt)
+    }
+
+    static func defaultManagementMode(for sourceKind: GatewayProfileSourceKind) -> GatewayProfileManagementMode {
+        switch sourceKind {
+        case .managed, .legacyReuse:
+            return .managedByEZRWorker
+        case .externalReuse:
+            return .observeOnly
+        }
+    }
 }
 
 struct GatewayProfilesDocument: Codable {
@@ -219,6 +313,8 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
     var profileID: UUID
     var slug: String
     var displayName: String
+    var sourceKind: GatewayProfileSourceKind
+    var managementMode: GatewayProfileManagementMode
     var resolvedConfigPath: String
     var resolvedStateDir: String
     var resolvedWorkspaceRoot: String
@@ -237,13 +333,49 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
             profileID: profileID,
             slug: slug,
             displayName: displayName,
-            sourceKind: .managed,
+            sourceKind: sourceKind,
             resolvedConfigPath: resolvedConfigPath,
             resolvedStateDir: resolvedStateDir,
             resolvedWorkspaceRoot: resolvedWorkspaceRoot,
             resolvedPort: resolvedPort
         )
     }
+}
+
+enum OpenClawDiscoverySource: String, Codable, CaseIterable {
+    case runningProcess
+    case knownDirectory
+    case manualSelection
+}
+
+enum OpenClawDiscoveryConfidence: String, Codable, CaseIterable {
+    case high
+    case medium
+    case low
+}
+
+enum OpenClawDiscoveryRiskLevel: String, Codable, CaseIterable {
+    case safe
+    case needsReview
+    case blocked
+}
+
+struct OpenClawInstanceCandidate: Codable, Identifiable, Hashable {
+    var id: UUID
+    var displayNameSuggestion: String
+    var slugSuggestion: String
+    var source: OpenClawDiscoverySource
+    var confidence: OpenClawDiscoveryConfidence
+    var riskLevel: OpenClawDiscoveryRiskLevel
+    var configPath: String
+    var stateDir: String
+    var workspaceRoot: String?
+    var port: Int?
+    var pid: Int32?
+    var commandLine: String?
+    var launchdLabel: String?
+    var warnings: [String]
+    var detectedAt: Date
 }
 
 enum GatewayProfileResolver {
@@ -293,7 +425,7 @@ enum GatewayProfileResolver {
         switch profile.sourceKind {
         case .managed:
             defaultConfigURL = stateDir.appendingPathComponent("openclaw.json")
-        case .legacyReuse:
+        case .legacyReuse, .externalReuse:
             defaultConfigURL = managedRoot.appendingPathComponent("openclaw.json")
         }
         let configURL = profile.configPathOverride

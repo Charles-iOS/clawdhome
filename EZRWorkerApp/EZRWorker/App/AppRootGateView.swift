@@ -39,6 +39,8 @@ struct AuthenticatedAppShell: View {
         ZStack {
             if case .needsLegacyMigration(let legacyPort) = profileStore.status {
                 ProfileMigrationChoiceView(legacyPort: legacyPort)
+            } else if case .needsExistingOpenClawImport(let candidates) = profileStore.status {
+                ExistingOpenClawImportView(candidates: candidates)
             } else {
                 MainView()
 

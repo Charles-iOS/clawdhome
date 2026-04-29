@@ -18,6 +18,9 @@ struct AppSettingsView: View {
     @State private var pendingDeletionProfile: GatewayProfile?
     @State private var isDeletingProfile = false
     @State private var isRefreshingProfiles = false
+    @State private var isScanningExistingOpenClaw = false
+    @State private var showExistingOpenClawImportSheet = false
+    @State private var existingOpenClawImportCandidates: [OpenClawInstanceCandidate] = []
     @State private var profileActionProfileID: UUID?
     @State private var profileErrorMessage: String?
 
@@ -44,6 +47,13 @@ struct AppSettingsView: View {
         .sheet(isPresented: $showAppUpdateSheet) {
             AppUpdateSheet()
                 .environment(updater)
+        }
+        .sheet(isPresented: $showExistingOpenClawImportSheet) {
+            ExistingOpenClawImportView(candidates: existingOpenClawImportCandidates)
+                .environment(profileStore)
+                .environment(supervisorClient)
+                .environment(processManager)
+                .frame(minWidth: 860, minHeight: 640)
         }
         .task {
             await refreshProfilesRuntime(reloadProfiles: true)
@@ -309,6 +319,28 @@ struct AppSettingsView: View {
             .disabled(isAnyProfileOperationInFlight)
         }
 
+        Button {
+            Task {
+                await scanExistingOpenClaw()
+            }
+        } label: {
+            if isScanningExistingOpenClaw {
+                Text("扫描中...")
+            } else {
+                Text("扫描已有 OpenClaw")
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(isAnyProfileOperationInFlight)
+
+        Button("导入配置文件") {
+            importOpenClawConfigFile()
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(isAnyProfileOperationInFlight)
+
         Button("刷新运行态") {
             Task {
                 await refreshProfilesRuntime(reloadProfiles: true)
@@ -340,6 +372,9 @@ struct AppSettingsView: View {
                         }
 
                         profileBadge(profileSourceLabel(for: profile), tint: profileSourceColor(for: profile))
+                        if profile.managementMode == .observeOnly {
+                            profileBadge("仅观察", tint: .purple)
+                        }
                         profileBadge(
                             profileRuntimeLabel(for: profile, runtime: runtime, resolution: resolution),
                             tint: profileRuntimeColor(for: profile, runtime: runtime, resolution: resolution)
@@ -369,7 +404,7 @@ struct AppSettingsView: View {
             ))
             .font(.system(size: SettingsFont.body))
             .controlSize(.large)
-            .disabled(isBusy)
+            .disabled(isBusy || profile.managementMode == .observeOnly)
 
             LazyVGrid(columns: profileMetricColumns, alignment: .leading, spacing: 6) {
                 profileMetric("端口", "\(runtime?.resolvedPort ?? resolution.resolvedPort)")
@@ -487,6 +522,10 @@ struct AppSettingsView: View {
         isSelected: Bool,
         isBusy: Bool
     ) -> some View {
+        let lifecycleDisabled = isBusy
+            || profileRuntimeIsTransitional(runtime)
+            || profile.managementMode == .observeOnly
+
         if !isSelected {
             Button("切换到此 Profile") {
                 profileStore.selectProfile(id: profile.id)
@@ -504,7 +543,7 @@ struct AppSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+            .disabled(lifecycleDisabled)
         }
 
         if runtime?.isRunning == true {
@@ -515,7 +554,7 @@ struct AppSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+            .disabled(lifecycleDisabled)
 
             Button("重启") {
                 Task {
@@ -524,7 +563,7 @@ struct AppSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+            .disabled(lifecycleDisabled)
         } else {
             Button("启动") {
                 Task {
@@ -533,7 +572,7 @@ struct AppSettingsView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(isBusy || profileRuntimeIsTransitional(runtime))
+            .disabled(lifecycleDisabled)
         }
 
         Button(role: .destructive) {
@@ -832,7 +871,7 @@ struct AppSettingsView: View {
     }()
 
     private var isAnyProfileOperationInFlight: Bool {
-        isDeletingProfile || isRefreshingProfiles || profileActionProfileID != nil
+        isDeletingProfile || isRefreshingProfiles || isScanningExistingOpenClaw || profileActionProfileID != nil
     }
 
     private func runtime(for profile: GatewayProfile) -> SupervisorProfileRuntime? {
@@ -873,6 +912,8 @@ struct AppSettingsView: View {
             return "托管"
         case .legacyReuse:
             return "复用旧实例"
+        case .externalReuse:
+            return "外部复用"
         }
     }
 
@@ -882,6 +923,8 @@ struct AppSettingsView: View {
             return .blue
         case .legacyReuse:
             return .orange
+        case .externalReuse:
+            return .purple
         }
     }
 
@@ -890,7 +933,7 @@ struct AppSettingsView: View {
         runtime: SupervisorProfileRuntime?,
         resolution: GatewayProfileResolution
     ) -> String {
-        if profile.sourceKind == .legacyReuse {
+        if profile.sourceKind == .legacyReuse || profile.sourceKind == .externalReuse {
             return legacyConfigExists(for: resolution) ? "可复用" : "缺配置"
         }
 
@@ -902,14 +945,14 @@ struct AppSettingsView: View {
         runtime: SupervisorProfileRuntime?,
         resolution: GatewayProfileResolution
     ) -> String {
-        let legacyConfigIsReusable = profile.sourceKind == .legacyReuse && legacyConfigExists(for: resolution)
+        let externalConfigIsReusable = profile.sourceKind != .managed && legacyConfigExists(for: resolution)
         guard let runtime else { return "未同步" }
 
         switch runtime.readyState {
         case .unknown:
             return runtime.isRunning ? "运行中" : "未知"
         case .stopped:
-            if legacyConfigIsReusable { return "可复用" }
+            if externalConfigIsReusable { return profile.managementMode == .observeOnly ? "仅观察" : "可复用" }
             return runtime.isPrepared ? "已停止" : "未准备"
         case .preparing:
             return "准备中"
@@ -927,7 +970,7 @@ struct AppSettingsView: View {
         runtime: SupervisorProfileRuntime?,
         resolution: GatewayProfileResolution
     ) -> Color {
-        let legacyConfigIsReusable = profile.sourceKind == .legacyReuse && legacyConfigExists(for: resolution)
+        let externalConfigIsReusable = profile.sourceKind != .managed && legacyConfigExists(for: resolution)
         guard let runtime else { return .secondary }
 
         switch runtime.readyState {
@@ -938,7 +981,7 @@ struct AppSettingsView: View {
         case .failed:
             return .red
         case .stopped:
-            return legacyConfigIsReusable && !runtime.isPrepared ? .blue : .secondary
+            return externalConfigIsReusable && !runtime.isPrepared ? .blue : .secondary
         case .unknown:
             return .secondary
         }
@@ -988,7 +1031,7 @@ struct AppSettingsView: View {
             return "exclamationmark.triangle.fill"
         }
 
-        if profile.sourceKind == .legacyReuse,
+        if profile.sourceKind != .managed,
            legacyConfigExists(for: resolution),
            runtime.readyState == .stopped,
            !runtime.isPrepared {
@@ -1049,6 +1092,9 @@ struct AppSettingsView: View {
         if profile.sourceKind == .legacyReuse {
             return runtime?.isPrepared == true ? "重新检查配置" : "检查配置"
         }
+        if profile.sourceKind == .externalReuse {
+            return runtime?.isPrepared == true ? "重新检查配置" : "检查配置"
+        }
 
         return runtime?.isPrepared == true ? "重新准备配置" : "准备配置"
     }
@@ -1069,12 +1115,47 @@ struct AppSettingsView: View {
         }
     }
 
+    @MainActor
+    private func scanExistingOpenClaw() async {
+        guard !isScanningExistingOpenClaw else { return }
+        isScanningExistingOpenClaw = true
+        defer { isScanningExistingOpenClaw = false }
+
+        let candidates = OpenClawInstanceDiscoveryService.scanLightweightCandidates()
+        guard !candidates.isEmpty else {
+            profileErrorMessage = "未发现可导入的既有 OpenClaw 实例"
+            return
+        }
+
+        existingOpenClawImportCandidates = candidates
+        showExistingOpenClawImportSheet = true
+    }
+
+    private func importOpenClawConfigFile() {
+        let panel = NSOpenPanel()
+        panel.title = "选择 openclaw.json 或包含它的目录"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let candidate = try OpenClawInstanceDiscoveryService.candidateFromManualSelection(url)
+            existingOpenClawImportCandidates = [candidate]
+            showExistingOpenClawImportSheet = true
+        } catch {
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteMessage(for profile: GatewayProfile) -> String {
         let cleanupMessage: String
         if profile.sourceKind == .managed {
             cleanupMessage = "这会删除当前 profile 记录，并清理 App Support 下该 profile 的托管数据目录。"
         } else {
-            cleanupMessage = "这会删除当前 profile 记录，但不会删除 ~/.openclaw 原始数据。"
+            cleanupMessage = "这会删除当前 profile 记录，但不会删除原始 OpenClaw 数据。"
         }
 
         if profileStore.profiles.count == 1 {
@@ -1158,7 +1239,9 @@ struct AppSettingsView: View {
 
         do {
             try await ensureSupervisorReady()
-            try await supervisorClient.stopProfile(profileID: profile.id)
+            if profile.managementMode == .managedByEZRWorker {
+                try await supervisorClient.stopProfile(profileID: profile.id)
+            }
             _ = try profileStore.deleteProfile(profileID: profile.id)
             guard await supervisorClient.reloadProfiles() else {
                 throw NSError(domain: "AppSettingsView", code: 3, userInfo: [

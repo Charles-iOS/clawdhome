@@ -8,6 +8,8 @@ extension EZRWorkerSupervisorController {
             switch record.profile.sourceKind {
             case .legacyReuse:
                 await refreshLegacyRuntimeSnapshot(record)
+            case .externalReuse:
+                await refreshExternalRuntimeSnapshot(record)
             case .managed:
                 await refreshManagedRuntimeSnapshot(record)
             }
@@ -93,6 +95,52 @@ extension EZRWorkerSupervisorController {
             : "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在等待健康检查"
     }
 
+    private func refreshExternalRuntimeSnapshot(_ record: SupervisorRecord) async {
+        let configExists = FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath)
+        let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
+        record.lastProbeAt = Date()
+        record.isPrepared = configExists
+
+        guard probe.alive else {
+            if record.process?.isRunning != true {
+                record.process = nil
+            }
+            record.isRunning = false
+            record.pid = nil
+            record.ownership = .none
+            record.readyState = configExists ? .stopped : .failed
+            record.lastLifecycleMessage = configExists ? "外部 Gateway 未运行" : "外部 OpenClaw 配置缺失"
+            if !configExists {
+                record.lastError = "外部 OpenClaw 配置缺失"
+            }
+            return
+        }
+
+        guard let listeningPID,
+              let commandLine = processCommandLine(pid: listeningPID),
+              looksLikeGatewayProcess(commandLine),
+              externalGatewayProcessMatches(record: record, pid: listeningPID, commandLine: commandLine) else {
+            record.isRunning = false
+            record.pid = nil
+            record.ownership = .none
+            record.readyState = .failed
+            record.lastError = "端口 \(record.resolution.resolvedPort) 已被其他进程占用，未接管"
+            record.lastLifecycleMessage = record.lastError
+            return
+        }
+
+        record.process = nil
+        record.isRunning = true
+        record.pid = listeningPID
+        record.ownership = .adopted
+        record.readyState = probe.ready ? .ready : .starting
+        record.lastError = nil
+        record.lastLifecycleMessage = record.profile.managementMode == .observeOnly
+            ? "外部 Gateway 已接入（仅观察）"
+            : "外部 Gateway 已接入"
+    }
+
     func adoptExistingHealthyGatewayIfAvailable(
         for record: SupervisorRecord
     ) async -> (Bool, String?)? {
@@ -113,12 +161,12 @@ extension EZRWorkerSupervisorController {
                 record.lastLifecycleMessage = "Gateway 已就绪"
                 return (true, nil)
             }
-            return await waitForGatewayReady(
-                record: record,
-                pid: pid,
-                ownership: .adopted,
-                requireSameListeningPID: record.profile.sourceKind == .managed && pid != nil
-            )
+                return await waitForGatewayReady(
+                    record: record,
+                    pid: pid,
+                    ownership: .adopted,
+                    requireSameListeningPID: record.profile.sourceKind != .legacyReuse && pid != nil
+                )
         case .relaunch:
             return nil
         case .fail(let message):

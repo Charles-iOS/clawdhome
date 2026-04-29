@@ -14,6 +14,7 @@ final class GatewayProfileStore {
     enum Status: Equatable {
         case loading
         case needsLegacyMigration(legacyPort: Int?)
+        case needsExistingOpenClawImport([OpenClawInstanceCandidate])
         case ready
         case failed(String)
     }
@@ -78,9 +79,25 @@ final class GatewayProfileStore {
         }
 
         if FileManager.default.fileExists(atPath: EZRWorkerPaths.legacyOpenClawConfigURL.path) {
+            let candidates = OpenClawInstanceDiscoveryService.scanLightweightCandidates()
+            if candidates.contains(where: { !Self.isLegacyConfigPath($0.configPath) }) || candidates.count > 1 {
+                profiles = []
+                selectedProfileID = nil
+                status = .needsExistingOpenClawImport(candidates)
+                return
+            }
+
             profiles = []
             selectedProfileID = nil
             status = .needsLegacyMigration(legacyPort: GatewayProfileResolver.readLegacyGatewayPort())
+            return
+        }
+
+        let candidates = OpenClawInstanceDiscoveryService.scanLightweightCandidates()
+        if !candidates.isEmpty {
+            profiles = []
+            selectedProfileID = nil
+            status = .needsExistingOpenClawImport(candidates)
             return
         }
 
@@ -133,6 +150,22 @@ final class GatewayProfileStore {
     }
 
     func completeCreateNewMigration() throws {
+        let profile = try makeManagedProfile(
+            displayName: "Default",
+            requestedSlug: "default",
+            autoStart: true,
+            configPathOverride: nil,
+            stateDirOverride: nil,
+            workspaceRootOverride: nil,
+            portOverride: nil
+        )
+        profiles = [profile]
+        selectProfile(id: profile.id)
+        try persistProfiles()
+        status = .ready
+    }
+
+    func skipExistingOpenClawImportAndCreateManagedProfile() throws {
         let profile = try makeManagedProfile(
             displayName: "Default",
             requestedSlug: "default",
@@ -213,9 +246,73 @@ final class GatewayProfileStore {
         return profile
     }
 
+    @discardableResult
+    func importExternalProfile(
+        candidate: OpenClawInstanceCandidate,
+        displayName: String? = nil,
+        slug: String? = nil,
+        autoStart: Bool = false,
+        managementMode: GatewayProfileManagementMode = .observeOnly
+    ) throws -> GatewayProfile {
+        let normalizedConfigPath = try normalizedExistingConfigPath(candidate.configPath)
+        let normalizedStateDir = try normalizedExternalDirectoryPath(
+            candidate.stateDir,
+            label: "OPENCLAW_STATE_DIR"
+        )
+        let normalizedWorkspaceRoot = try normalizedOptionalExternalDirectoryPath(
+            candidate.workspaceRoot ?? Self.inferWorkspaceRoot(
+                configPath: normalizedConfigPath,
+                stateDir: normalizedStateDir
+            ),
+            label: "workspaceRoot"
+        )
+        let resolvedPort = candidate.port
+            ?? Self.readGatewayPort(configPath: normalizedConfigPath)
+            ?? GatewayProfileResolver.defaultGatewayPort
+
+        try validateExternalProfileImport(
+            configPath: normalizedConfigPath,
+            stateDir: normalizedStateDir,
+            workspaceRoot: normalizedWorkspaceRoot,
+            port: resolvedPort,
+            managementMode: managementMode
+        )
+
+        let requestedName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackName = candidate.displayNameSuggestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalDisplayName = requestedName?.isEmpty == false
+            ? requestedName!
+            : (fallbackName.isEmpty ? "Imported OpenClaw" : fallbackName)
+        let baseSlug = slug?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? slug!
+            : candidate.slugSuggestion
+        let resolvedSlug = GatewayProfileResolver.makeUniqueSlug(base: baseSlug, existing: profiles)
+
+        let profile = GatewayProfile(
+            id: UUID(),
+            slug: resolvedSlug,
+            displayName: finalDisplayName,
+            autoStart: managementMode == .observeOnly ? false : autoStart,
+            sourceKind: .externalReuse,
+            managementMode: managementMode,
+            configPathOverride: normalizedConfigPath,
+            stateDirOverride: normalizedStateDir,
+            workspaceRootOverride: normalizedWorkspaceRoot,
+            portOverride: resolvedPort,
+            createdAt: Date()
+        )
+
+        profiles.append(profile)
+        profiles.sort(by: { $0.createdAt < $1.createdAt })
+        selectProfile(id: profile.id)
+        try persistProfiles()
+        status = .ready
+        return profile
+    }
+
     func update(profileID: UUID, autoStart: Bool) throws {
         guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
-        profiles[index].autoStart = autoStart
+        profiles[index].autoStart = profiles[index].managementMode == .observeOnly ? false : autoStart
         try persistProfiles()
     }
 
@@ -351,6 +448,104 @@ final class GatewayProfileStore {
                 ])
             }
         }
+    }
+
+    private func validateExternalProfileImport(
+        configPath: String,
+        stateDir: String,
+        workspaceRoot: String?,
+        port: Int,
+        managementMode: GatewayProfileManagementMode
+    ) throws {
+        guard (1...65535).contains(port) else {
+            throw NSError(domain: "GatewayProfileStore", code: 20, userInfo: [
+                NSLocalizedDescriptionKey: "端口必须位于 1-65535"
+            ])
+        }
+
+        let normalizedConfigPath = Self.standardizedPath(configPath)
+        if profiles.contains(where: {
+            Self.standardizedPath(GatewayProfileResolver.resolve($0).resolvedConfigPath) == normalizedConfigPath
+        }) {
+            throw NSError(domain: "GatewayProfileStore", code: 21, userInfo: [
+                NSLocalizedDescriptionKey: "该 OpenClaw 配置已经导入过"
+            ])
+        }
+
+        let usedPorts = profiles.map { GatewayProfileResolver.resolve($0).resolvedPort }
+        let conflictingPorts = GatewayProfileResolver.conflictingBasePorts(
+            for: port,
+            existingPorts: usedPorts
+        )
+        if !conflictingPorts.isEmpty {
+            let conflicts = conflictingPorts.map(String.init).joined(separator: ", ")
+            throw NSError(domain: "GatewayProfileStore", code: 22, userInfo: [
+                NSLocalizedDescriptionKey:
+                    "端口 \(port) 与现有 profile 基础端口 \(conflicts) 间距不足 \(GatewayProfileResolver.managedPortSpacing)，请先调整后再导入"
+            ])
+        }
+
+        if managementMode == .managedByEZRWorker {
+            try validateOverridePath(
+                configPath,
+                label: "OPENCLAW_CONFIG_PATH",
+                expectsDirectory: false,
+                invalidPathCode: 23,
+                unusablePathCode: 24
+            )
+            try validateOverridePath(
+                stateDir,
+                label: "OPENCLAW_STATE_DIR",
+                expectsDirectory: true,
+                invalidPathCode: 25,
+                unusablePathCode: 26
+            )
+            try validateOverridePath(
+                workspaceRoot,
+                label: "workspaceRoot",
+                expectsDirectory: true,
+                invalidPathCode: 27,
+                unusablePathCode: 28
+            )
+        }
+    }
+
+    private func normalizedExistingConfigPath(_ path: String) throws -> String {
+        guard let url = GatewayProfileResolver.absoluteURLIfValid(path: path) else {
+            throw NSError(domain: "GatewayProfileStore", code: 29, userInfo: [
+                NSLocalizedDescriptionKey: "OPENCLAW_CONFIG_PATH 必须是绝对路径"
+            ])
+        }
+
+        var isDirectory = ObjCBool(false)
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+              !isDirectory.boolValue else {
+            throw NSError(domain: "GatewayProfileStore", code: 30, userInfo: [
+                NSLocalizedDescriptionKey: "未找到 openclaw.json：\(url.path)"
+            ])
+        }
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            throw NSError(domain: "GatewayProfileStore", code: 31, userInfo: [
+                NSLocalizedDescriptionKey: "openclaw.json 不可读：\(url.path)"
+            ])
+        }
+        return url.standardizedFileURL.path
+    }
+
+    private func normalizedExternalDirectoryPath(_ path: String, label: String) throws -> String {
+        guard let url = GatewayProfileResolver.absoluteURLIfValid(path: path) else {
+            throw NSError(domain: "GatewayProfileStore", code: 32, userInfo: [
+                NSLocalizedDescriptionKey: "\(label) 必须是绝对路径"
+            ])
+        }
+        return url.standardizedFileURL.path
+    }
+
+    private func normalizedOptionalExternalDirectoryPath(_ path: String?, label: String) throws -> String? {
+        guard let path, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return try normalizedExternalDirectoryPath(path, label: label)
     }
 
     private func validateOverridePath(
@@ -520,5 +715,54 @@ final class GatewayProfileStore {
         let managedRootURL = EZRWorkerPaths.managedProfileRoot(slug: profile.slug)
         guard FileManager.default.fileExists(atPath: managedRootURL.path) else { return }
         try? FileManager.default.removeItem(at: managedRootURL)
+    }
+
+    private static func isLegacyConfigPath(_ path: String) -> Bool {
+        standardizedPath(path) == standardizedPath(EZRWorkerPaths.legacyOpenClawConfigURL.path)
+    }
+
+    static func readGatewayPort(configPath: String) -> Int? {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let gateway = json["gateway"] as? [String: Any]
+        else {
+            return nil
+        }
+        if let number = gateway["port"] as? NSNumber {
+            return number.intValue
+        }
+        if let intValue = gateway["port"] as? Int {
+            return intValue
+        }
+        return nil
+    }
+
+    static func inferWorkspaceRoot(configPath: String, stateDir: String) -> String {
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: configPath)),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let agents = json["agents"] as? [String: Any],
+           let defaults = agents["defaults"] as? [String: Any],
+           let workspace = defaults["workspace"] as? String,
+           !workspace.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let expanded = NSString(string: workspace).expandingTildeInPath
+            if expanded.hasPrefix("/") {
+                return URL(fileURLWithPath: expanded).standardizedFileURL.path
+            }
+            return URL(fileURLWithPath: stateDir, isDirectory: true)
+                .appendingPathComponent(expanded)
+                .standardizedFileURL
+                .path
+        }
+
+        return URL(fileURLWithPath: stateDir, isDirectory: true)
+            .appendingPathComponent("workspace", isDirectory: true)
+            .standardizedFileURL
+            .path
+    }
+
+    static func standardizedPath(_ path: String) -> String {
+        URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
+            .standardizedFileURL
+            .path
     }
 }
