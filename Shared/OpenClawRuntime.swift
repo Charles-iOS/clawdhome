@@ -63,6 +63,9 @@ enum OpenClawRuntime {
         environment["OPENCLAW_NO_RESPAWN"] = "1"
         // Avoid blocking gateway readiness on Codex app-server live model discovery.
         environment["OPENCLAW_CODEX_DISCOVERY_LIVE"] = "0"
+        // EZRWorker manages local profiles directly by port/token. Bonjour LAN
+        // advertising can conflict when multiple local gateways run side by side.
+        environment["OPENCLAW_DISABLE_BONJOUR"] = "1"
         environment["OPENCLAW_GATEWAY_STARTUP_TRACE"] = "1"
         EZRWorkerPaths.ensureApplicationSupportDirectories()
         environment["OPENCLAW_PLUGIN_STAGE_DIR"] = EZRWorkerPaths.openClawPluginStageDirectory.path

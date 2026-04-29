@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-private let appBootstrapGatewayReadyWaitAttempts = 30
+private let appBootstrapGatewayReadyWaitAttempts = 180
 private let appBootstrapGatewayUnavailableConfirmAttempts = 3
 private let appBootstrapGatewayProbeIntervalNanoseconds: UInt64 = 1_000_000_000
 
@@ -737,13 +737,27 @@ final class AppBootstrapCoordinator {
         gatewayService: GatewayService,
         logFailure: Bool = true
     ) async -> Bool {
-        for attempt in 1...3 {
+        for attempt in 1...6 {
+            let probe = await gatewayService.httpProbe()
+            guard probe.ready else {
+                if logFailure {
+                    appLog(
+                        "bootstrap: gateway http not ready before websocket connect attempt \(attempt) alive=\(probe.alive) ready=\(probe.ready)",
+                        level: .debug
+                    )
+                }
+                if attempt < 6 {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+                continue
+            }
+
             await gatewayService.connect()
             if gatewayService.isConnected {
                 appLog("bootstrap: connected to current profile gateway on attempt \(attempt)")
                 return true
             }
-            if attempt < 3 {
+            if attempt < 6 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
