@@ -38,7 +38,7 @@ struct ProfileMigrationChoiceView: View {
 
                         migrationCard(
                             title: "创建新的",
-                            subtitle: "在 `~/Library/Application Support/EZRWorker/profiles/default/` 下创建全新的默认 profile，不改动旧 `~/.openclaw`。",
+                            subtitle: freshProfileSubtitle,
                             buttonTitle: "创建新的",
                             action: createFreshProfile
                         )
@@ -86,6 +86,13 @@ struct ProfileMigrationChoiceView: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var freshProfileSubtitle: String {
+        let defaultProfilePath = EZRWorkerPaths.profilesDirectory
+            .appendingPathComponent("default", isDirectory: true)
+            .path
+        return "在 `\(defaultProfilePath)/` 下创建全新的默认 profile，不改动旧 `~/.openclaw`。"
     }
 
     private func useLegacyProfile() {

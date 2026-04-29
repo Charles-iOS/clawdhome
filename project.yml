@@ -59,6 +59,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac
         PRODUCT_NAME: EZRWorker
+        APP_DISPLAY_NAME: EZRWorker
         SWIFT_VERSION: "5.9"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         APP_UPDATE_MANIFEST_URL: https://imp-assets.ezrpro.com/ezrworker/updates/latest.json
@@ -67,11 +68,20 @@ targets:
         DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.dev
+          APP_DISPLAY_NAME: EZRWorker Dev
+          CODE_SIGN_ENTITLEMENTS: EZRWorkerApp/EZRWorkerDebug.entitlements
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac
+          APP_DISPLAY_NAME: EZRWorker
+          CODE_SIGN_ENTITLEMENTS: EZRWorkerApp/EZRWorker.entitlements
     info:
       path: EZRWorkerApp/Info.plist
       properties:
         CFBundleName: $(PRODUCT_NAME)
-        CFBundleDisplayName: $(PRODUCT_NAME)
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
         CFBundleIconFile: AppIcon.icns
         AppUpdateManifestURL: $(APP_UPDATE_MANIFEST_URL)
         AuthAPIBaseURL: "https://ygos.ezrpro.com/api/"
@@ -129,6 +139,11 @@ targets:
         DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         SKIP_INSTALL: YES
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.dev.helper
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.helper
 
   EZRWorkerSupervisor:
     type: tool
@@ -150,3 +165,8 @@ targets:
         DEVELOPMENT_TEAM: 9P6LY282WU
         ENABLE_HARDENED_RUNTIME: YES
         SKIP_INSTALL: YES
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.dev.supervisor
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.ezrworker.mac.supervisor

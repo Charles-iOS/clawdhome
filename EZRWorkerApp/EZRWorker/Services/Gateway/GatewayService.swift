@@ -17,7 +17,7 @@ final class GatewayService {
     private(set) var port: Int
     private var token: String
 
-    init(port: Int = 18789, token: String = "") {
+    init(port: Int = GatewayProfileResolver.defaultGatewayPort, token: String = "") {
         self.port = port
         self.token = token
     }

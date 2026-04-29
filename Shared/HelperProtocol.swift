@@ -634,7 +634,7 @@ struct XcodeEnvStatus: Codable, Sendable {
 }
 
 /// XPC Mach Service 名称（App 与 Helper 均引用此常量）
-let kHelperMachServiceName = "ai.ezrworker.mac.helper"
+let kHelperMachServiceName = EZRWorkerBranding.helperMachServiceName
 
 enum PairingOutputParser {
     private static let ansiPattern = "\u{001B}\\[[0-9;?]*[ -/]*[@-~]"

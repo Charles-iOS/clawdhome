@@ -15,7 +15,7 @@ import os.log
 
 @Observable
 final class DaemonInstaller {
-    private static let plistName = "ai.ezrworker.mac.helper.plist"
+    private static let plistName = "\(EZRWorkerBranding.helperMachServiceName).plist"
     private let service = SMAppService.daemon(plistName: DaemonInstaller.plistName)
 
     /// DEBUG 模式下不使用 SMAppService，避免每次 build 后自动替换 helper 二进制
@@ -77,7 +77,7 @@ final class DaemonInstaller {
     @discardableResult
     func forceRestart() -> Bool {
         let script = """
-        do shell script "launchctl kickstart -k system/ai.ezrworker.mac.helper" with administrator privileges
+        do shell script "launchctl kickstart -k system/\(EZRWorkerBranding.helperMachServiceName)" with administrator privileges
         """
         var error: NSDictionary?
         NSAppleScript(source: script)?.executeAndReturnError(&error)
@@ -86,7 +86,11 @@ final class DaemonInstaller {
             os_log(.error, "[DaemonInstaller] forceRestart failed: %{public}@", msg)
             return false
         }
-        os_log(.info, "[DaemonInstaller] forceRestart succeeded via launchctl kickstart -k")
+        os_log(
+            .info,
+            "[DaemonInstaller] forceRestart succeeded via launchctl kickstart -k %{public}@",
+            EZRWorkerBranding.helperMachServiceName
+        )
         return true
     }
 }

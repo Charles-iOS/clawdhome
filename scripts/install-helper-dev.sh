@@ -4,12 +4,12 @@
 # 用途：在真机上测试，绕过 SMAppService 签名要求
 #
 # 用法：
-#   sudo bash apps/EZRWorker/scripts/install-helper-dev.sh           # 安装
-#   sudo bash apps/EZRWorker/scripts/install-helper-dev.sh uninstall # 卸载
+#   sudo bash scripts/install-helper-dev.sh           # 安装
+#   sudo bash scripts/install-helper-dev.sh uninstall # 卸载
 
 set -euo pipefail
 
-LABEL="ai.ezrworker.mac.helper"
+LABEL="${EZRWORKER_HELPER_LABEL:-ai.ezrworker.mac.dev.helper}"
 DEST_DIR="/Library/PrivilegedHelperTools"
 DEST_BINARY="$DEST_DIR/$LABEL"
 PLIST_PATH="/Library/LaunchDaemons/$LABEL.plist"
@@ -80,7 +80,7 @@ EOF
 
     launchctl bootstrap system "$PLIST_PATH"
 
-    echo "✅ EZRWorkerHelper 已安装并启动"
+    echo "✅ EZRWorkerHelper 已安装并启动：$LABEL"
     echo "   日志：tail -f /tmp/ezrworker-helper.log"
     echo "   现在可以运行 EZRWorker.app 进行测试"
     ;;
@@ -95,10 +95,10 @@ uninstall)
 # ── 状态 ──────────────────────────────────────────────────────────────────────
 status)
     if launchctl print "system/$LABEL" 2>/dev/null | grep -q "pid ="; then
-        echo "🟢 EZRWorkerHelper 正在运行"
+        echo "🟢 EZRWorkerHelper 正在运行：$LABEL"
         launchctl print "system/$LABEL" | grep -E "pid|state"
     else
-        echo "🔴 EZRWorkerHelper 未运行"
+        echo "🔴 EZRWorkerHelper 未运行：$LABEL"
     fi
     ;;
 

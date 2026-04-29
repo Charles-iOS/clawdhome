@@ -417,6 +417,7 @@
 		A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawInstanceDiscoveryService.swift; sourceTree = "<group>"; };
 		A245488B0EA1984454B05131 /* UserPasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPasswordStore.swift; sourceTree = "<group>"; };
 		A4250EB561AA0155DE283768 /* EZRWorker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorker.entitlements; sourceTree = "<group>"; };
+		A4250EB561AA0155DE283769 /* EZRWorkerDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorkerDebug.entitlements; sourceTree = "<group>"; };
 		A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailWindowLayout.swift; sourceTree = "<group>"; };
 		A688B4C885CF7D37CB17D07D /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
 		A6C93EE8F38EF2D49365E7F9 /* NodeDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeDownloader.swift; sourceTree = "<group>"; };
@@ -994,6 +995,7 @@
 				41729DA0971439D7C20400D0 /* AppIcon.icns */,
 				65DFDC9A5D564622349F186D /* Assets.xcassets */,
 				A4250EB561AA0155DE283768 /* EZRWorker.entitlements */,
+				A4250EB561AA0155DE283769 /* EZRWorkerDebug.entitlements */,
 				024A24C4A426107D68445692 /* Info.plist */,
 				03F20F22E1D3B0500B2B2F36 /* Stable.xcstrings */,
 				9B04B4EA7437AD00449F316E /* EZRWorker */,
@@ -1467,6 +1469,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_DISPLAY_NAME = EZRWorker;
 				APP_UPDATE_MANIFEST_URL = "https://imp-assets.ezrpro.com/ezrworker/updates/latest.json";
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -1507,7 +1510,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.helper;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.dev.helper;
 				PRODUCT_NAME = EZRWorkerHelper;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
@@ -1600,8 +1603,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_DISPLAY_NAME = "EZRWorker Dev";
 				APP_UPDATE_MANIFEST_URL = "https://imp-assets.ezrpro.com/ezrworker/updates/latest.json";
-				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
+				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorkerDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 9P6LY282WU;
@@ -1616,7 +1620,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.dev;
 				PRODUCT_NAME = EZRWorker;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -1663,7 +1667,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.supervisor;
+				PRODUCT_BUNDLE_IDENTIFIER = ai.ezrworker.mac.dev.supervisor;
 				PRODUCT_NAME = EZRWorkerSupervisor;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;

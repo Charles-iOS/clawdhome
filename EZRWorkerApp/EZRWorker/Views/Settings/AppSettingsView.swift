@@ -638,6 +638,12 @@ struct AppSettingsView: View {
                     L10n.k("settings.build", fallback: "构建号"),
                     value: updater.currentAppBuild
                 )
+                if EZRWorkerBuildFlavor.isDev {
+                    SettingsInfoRow(
+                        "运行身份",
+                        value: "Debug / Dev"
+                    )
+                }
 
                 Divider()
                     .padding(.vertical, 2)

@@ -1,6 +1,36 @@
 import Foundation
 
+enum EZRWorkerBuildFlavor {
+    #if DEBUG
+    static let isDev = true
+    #else
+    static let isDev = false
+    #endif
+}
+
 enum EZRWorkerBranding {
+    #if DEBUG
+    static let appName = "EZRWorker Dev"
+    static let appBundleIdentifier = "ai.ezrworker.mac.dev"
+    static let supervisorMachServiceName = "ai.ezrworker.mac.dev.supervisor"
+    static let supervisorLaunchAgentLabel = "ai.ezrworker.mac.dev.supervisor"
+    static let helperMachServiceName = "ai.ezrworker.mac.dev.helper"
+    static let osLogSubsystem = "ai.ezrworker.mac.dev"
+    static let userAgentPrefix = "EZRWorkerDev"
+
+    static let providerKeychainService = "ai.ezrworker.mac.dev"
+
+    static let accountKeychainService = "ai.ezrworker.mac.dev.accounts"
+
+    static let userPasswordKeychainService = "ai.ezrworker.mac.dev.user-pw"
+
+    static let appLockKeychainService = "ai.ezrworker.mac.dev.applock"
+    static let appLockEnabledDefaultsKey = "ai.ezrworker.mac.dev.applock.enabled"
+
+    static let lastSelectedProfileDefaultsKey = "ai.ezrworker.mac.dev.lastSelectedProfileID"
+
+    static let applicationSupportDirectoryName = "EZRWorker-Dev"
+    #else
     static let appName = "EZRWorker"
     static let appBundleIdentifier = "ai.ezrworker.mac"
     static let supervisorMachServiceName = "ai.ezrworker.mac.supervisor"
@@ -21,6 +51,7 @@ enum EZRWorkerBranding {
     static let lastSelectedProfileDefaultsKey = "ai.ezrworker.mac.lastSelectedProfileID"
 
     static let applicationSupportDirectoryName = "EZRWorker"
+    #endif
 }
 
 enum EZRWorkerPaths {

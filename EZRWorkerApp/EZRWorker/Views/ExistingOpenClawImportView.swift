@@ -19,9 +19,7 @@ struct ExistingOpenClawImportView: View {
         _selectedIDs = State(initialValue: selected)
         _managementModes = State(initialValue: Dictionary(
             uniqueKeysWithValues: candidates.map { candidate in
-                let defaultMode: GatewayProfileManagementMode = candidate.pid == nil && candidate.riskLevel == .safe
-                    ? .managedByEZRWorker
-                    : .observeOnly
+                let defaultMode = Self.defaultManagementMode(for: candidate)
                 return (candidate.id, defaultMode)
             }
         ))
@@ -102,6 +100,7 @@ struct ExistingOpenClawImportView: View {
     private func candidateRow(_ candidate: OpenClawInstanceCandidate) -> some View {
         let isBlocked = candidate.riskLevel == .blocked
         let isSelected = selectedIDs.contains(candidate.id)
+        let managementMode = managementModes[candidate.id] ?? .observeOnly
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
@@ -154,6 +153,16 @@ struct ExistingOpenClawImportView: View {
                             .font(.caption)
                             .foregroundStyle(candidate.riskLevel == .blocked ? .red : .orange)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if EZRWorkerBuildFlavor.isDev && managementMode == .managedByEZRWorker {
+                        Label(
+                            "Debug 版托管外部 OpenClaw 会写入该实例的 openclaw.json；仅观察不会写入配置。",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
@@ -208,6 +217,15 @@ struct ExistingOpenClawImportView: View {
 
     private var selectedImportableCandidates: [OpenClawInstanceCandidate] {
         candidates.filter { selectedIDs.contains($0.id) && $0.riskLevel != .blocked }
+    }
+
+    private static func defaultManagementMode(for candidate: OpenClawInstanceCandidate) -> GatewayProfileManagementMode {
+        if EZRWorkerBuildFlavor.isDev {
+            return .observeOnly
+        }
+        return candidate.pid == nil && candidate.riskLevel == .safe
+            ? .managedByEZRWorker
+            : .observeOnly
     }
 
     private func importSelected() {

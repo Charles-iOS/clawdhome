@@ -379,8 +379,13 @@ struct OpenClawInstanceCandidate: Codable, Identifiable, Hashable {
 }
 
 enum GatewayProfileResolver {
+    #if DEBUG
+    static let defaultGatewayPort = 19789
+    static let managedPortRange = 19789...19999
+    #else
     static let defaultGatewayPort = 18789
     static let managedPortRange = 18789...18999
+    #endif
     static let managedPortSpacing = 20
 
     static func normalizedSlug(_ raw: String) -> String {
