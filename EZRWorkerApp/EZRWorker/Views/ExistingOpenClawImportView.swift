@@ -286,6 +286,8 @@ struct ExistingOpenClawImportView: View {
         switch source {
         case .runningProcess:
             return "运行中"
+        case .launchAgent:
+            return "LaunchAgent"
         case .knownDirectory:
             return "本地目录"
         case .manualSelection:

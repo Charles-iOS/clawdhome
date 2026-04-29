@@ -3,7 +3,10 @@ import Foundation
 enum OpenClawInstanceDiscoveryService {
     static func scanLightweightCandidates() -> [OpenClawInstanceCandidate] {
         mergeCandidates(
-            scanRunningGatewayProcesses() + scanLegacyOpenClawDirectory()
+            scanRunningGatewayProcesses()
+                + scanLaunchAgents()
+                + scanCommonOpenClawDirectories()
+                + scanLegacyOpenClawDirectory()
         )
     }
 
@@ -73,11 +76,12 @@ enum OpenClawInstanceDiscoveryService {
             let openFiles = openFileNames(pid: pid)
             let configPath =
                 extractEnvironmentPath(named: "OPENCLAW_CONFIG_PATH", from: commandLine)
-                ?? openFiles.first(where: { $0.hasSuffix("/openclaw.json") })
+                ?? configPathFromHints([commandLine] + openFiles)
             guard let configPath else { continue }
 
             let stateDir =
                 extractEnvironmentPath(named: "OPENCLAW_STATE_DIR", from: commandLine)
+                ?? stateDirFromHints([commandLine] + openFiles)
                 ?? inferStateDir(configPath: configPath)
 
             let candidate = makeCandidate(
@@ -93,13 +97,150 @@ enum OpenClawInstanceDiscoveryService {
         return candidates
     }
 
+    private static func scanLaunchAgents() -> [OpenClawInstanceCandidate] {
+        let homeLaunchAgents = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+        let systemLaunchAgents = URL(fileURLWithPath: "/Library/LaunchAgents", isDirectory: true)
+
+        return [homeLaunchAgents, systemLaunchAgents].flatMap { directory -> [OpenClawInstanceCandidate] in
+            guard let urls = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil,
+                options: [.skipsHiddenFiles]
+            ) else {
+                return []
+            }
+
+            return urls.compactMap { url -> OpenClawInstanceCandidate? in
+                guard url.pathExtension == "plist" else { return nil }
+                return candidateFromLaunchAgent(url)
+            }
+        }
+    }
+
+    private static func candidateFromLaunchAgent(_ url: URL) -> OpenClawInstanceCandidate? {
+        guard let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else {
+            return nil
+        }
+
+        let label = (plist["Label"] as? String) ?? url.deletingPathExtension().lastPathComponent
+        let program = plist["Program"] as? String
+        let arguments = plist["ProgramArguments"] as? [String] ?? []
+        let environment = plist["EnvironmentVariables"] as? [String: Any] ?? [:]
+        let workingDirectory = (plist["WorkingDirectory"] as? String).flatMap(nonEmptyPath(_:))
+        let commandLine = ([program].compactMap { $0 } + arguments).joined(separator: " ")
+        let searchableText = ([label, commandLine] + environment.map { "\($0.key)=\($0.value)" })
+            .joined(separator: " ")
+
+        guard looksLikeOpenClawGateway(searchableText) else { return nil }
+
+        let stateDir = environmentPath(named: "OPENCLAW_STATE_DIR", in: environment)
+            ?? stateDirFromHints([commandLine, workingDirectory].compactMap { $0 })
+        let configPath =
+            environmentPath(named: "OPENCLAW_CONFIG_PATH", in: environment)
+            ?? configPathFromArguments(arguments)
+            ?? stateDir.flatMap(configPathFromStateDir(_:))
+            ?? workingDirectory.flatMap(configPathFromDirectory(_:))
+            ?? configPathFromHints([commandLine, workingDirectory].compactMap { $0 })
+
+        guard let configPath else { return nil }
+
+        return makeCandidate(
+            configURL: URL(fileURLWithPath: configPath),
+            source: .launchAgent,
+            confidence: FileManager.default.isReadableFile(atPath: configPath) ? .high : .medium,
+            pid: nil,
+            commandLine: commandLine.isEmpty ? nil : commandLine,
+            stateDirOverride: stateDir,
+            launchdLabel: label,
+            additionalWarnings: [
+                "检测到旧 LaunchAgent：\(label)，托管前建议先禁用旧自启项，避免双重拉起"
+            ]
+        )
+    }
+
+    private static func scanCommonOpenClawDirectories() -> [OpenClawInstanceCandidate] {
+        let fm = FileManager.default
+        let homeURL = fm.homeDirectoryForCurrentUser
+        var roots: [URL] = [
+            homeURL.appendingPathComponent(".openclaw", isDirectory: true),
+            homeURL
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
+                .appendingPathComponent("OpenClaw", isDirectory: true),
+        ]
+
+        if let homeEntries = try? fm.contentsOfDirectory(
+            at: homeURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsPackageDescendants]
+        ) {
+            for entry in homeEntries {
+                let name = entry.lastPathComponent.lowercased()
+                guard name.contains("openclaw") else { continue }
+                roots.append(entry)
+                roots.append(entry.appendingPathComponent(".openclaw", isDirectory: true))
+            }
+        }
+
+        var configURLs: [URL] = []
+        for root in roots {
+            configURLs.append(contentsOf: candidateConfigURLs(under: root))
+        }
+
+        return Array(Set(configURLs.map { $0.standardizedFileURL.path }))
+            .sorted()
+            .map { configPath in
+                makeCandidate(
+                    configURL: URL(fileURLWithPath: configPath),
+                    source: .knownDirectory,
+                    confidence: .high,
+                    pid: nil,
+                    commandLine: nil
+                )
+            }
+    }
+
+    private static func candidateConfigURLs(under root: URL) -> [URL] {
+        let fm = FileManager.default
+        var urls: [URL] = []
+        for candidate in [
+            root.appendingPathComponent("openclaw.json"),
+            root.appendingPathComponent(".openclaw", isDirectory: true).appendingPathComponent("openclaw.json"),
+        ] where fm.isReadableFile(atPath: candidate.path) {
+            urls.append(candidate)
+        }
+
+        guard let children = try? fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return urls
+        }
+
+        for child in children.prefix(200) {
+            for candidate in [
+                child.appendingPathComponent("openclaw.json"),
+                child.appendingPathComponent(".openclaw", isDirectory: true).appendingPathComponent("openclaw.json"),
+            ] where fm.isReadableFile(atPath: candidate.path) {
+                urls.append(candidate)
+            }
+        }
+
+        return urls
+    }
+
     private static func makeCandidate(
         configURL rawConfigURL: URL,
         source: OpenClawDiscoverySource,
         confidence: OpenClawDiscoveryConfidence,
         pid: Int32?,
         commandLine: String?,
-        stateDirOverride: String? = nil
+        stateDirOverride: String? = nil,
+        launchdLabel: String? = nil,
+        additionalWarnings: [String] = []
     ) -> OpenClawInstanceCandidate {
         let configURL = rawConfigURL.standardizedFileURL
         let configPath = configURL.path
@@ -108,12 +249,12 @@ enum OpenClawInstanceDiscoveryService {
             .path
         let port = readGatewayPort(configPath: configPath)
         let workspace = inferWorkspaceRoot(configPath: configPath, stateDir: stateDir)
-        let warnings = warningsForCandidate(
+        let warnings = Array(Set(warningsForCandidate(
             configPath: configPath,
             stateDir: stateDir,
             port: port,
             pid: pid
-        )
+        ) + additionalWarnings)).sorted()
         let risk = riskLevel(warnings: warnings, port: port)
         let displayName = displayNameSuggestion(configURL: configURL, source: source)
 
@@ -130,7 +271,7 @@ enum OpenClawInstanceDiscoveryService {
             port: port,
             pid: pid,
             commandLine: commandLine,
-            launchdLabel: nil,
+            launchdLabel: launchdLabel,
             warnings: warnings,
             detectedAt: Date()
         )
@@ -190,6 +331,8 @@ enum OpenClawInstanceDiscoveryService {
     private static func sourceRank(_ source: OpenClawDiscoverySource) -> Int {
         switch source {
         case .manualSelection:
+            return 3
+        case .launchAgent:
             return 3
         case .runningProcess:
             return 2
@@ -282,6 +425,8 @@ enum OpenClawInstanceDiscoveryService {
         switch source {
         case .runningProcess:
             return "Running OpenClaw"
+        case .launchAgent:
+            return "LaunchAgent OpenClaw"
         case .knownDirectory:
             return "Existing OpenClaw"
         case .manualSelection:
@@ -307,6 +452,104 @@ enum OpenClawInstanceDiscoveryService {
                 guard path.hasPrefix("/") else { return nil }
                 return path
             }
+    }
+
+    private static func environmentPath(named name: String, in environment: [String: Any]) -> String? {
+        guard let rawValue = environment[name] as? String else { return nil }
+        return nonEmptyPath(rawValue)
+    }
+
+    private static func configPathFromArguments(_ arguments: [String]) -> String? {
+        let names = ["--config", "--config-path", "--openclaw-config", "--openclaw-config-path"]
+        for index in arguments.indices {
+            let argument = arguments[index]
+            if names.contains(argument),
+               arguments.indices.contains(index + 1),
+               let path = nonEmptyPath(arguments[index + 1]) {
+                return path
+            }
+
+            for name in names {
+                if argument.hasPrefix("\(name)=") {
+                    return nonEmptyPath(String(argument.dropFirst(name.count + 1)))
+                }
+            }
+
+            if argument.hasPrefix("OPENCLAW_CONFIG_PATH=") {
+                return nonEmptyPath(String(argument.dropFirst("OPENCLAW_CONFIG_PATH=".count)))
+            }
+        }
+        return nil
+    }
+
+    private static func configPathFromHints(_ hints: [String]) -> String? {
+        for hint in hints {
+            if let directPath = firstOpenClawConfigPath(in: hint) {
+                return directPath
+            }
+            if let stateDir = inferredOpenClawStateDir(from: hint),
+               let configPath = configPathFromStateDir(stateDir) {
+                return configPath
+            }
+        }
+        return nil
+    }
+
+    private static func stateDirFromHints(_ hints: [String]) -> String? {
+        for hint in hints {
+            if let stateDir = inferredOpenClawStateDir(from: hint) {
+                return stateDir
+            }
+        }
+        return nil
+    }
+
+    private static func firstOpenClawConfigPath(in text: String) -> String? {
+        let pattern = #"(/[^\s"'<>]+/openclaw\.json)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: range),
+              let pathRange = Range(match.range(at: 1), in: text)
+        else {
+            return nil
+        }
+        return nonEmptyPath(String(text[pathRange]))
+    }
+
+    private static func inferredOpenClawStateDir(from pathLikeText: String) -> String? {
+        let expanded = NSString(string: pathLikeText).expandingTildeInPath
+        guard expanded.contains(".openclaw") else { return nil }
+
+        let path: String
+        if let browserRange = expanded.range(of: "/browser/openclaw/user-data") {
+            path = String(expanded[..<browserRange.lowerBound])
+        } else {
+            path = expanded
+        }
+
+        let components = URL(fileURLWithPath: path).standardizedFileURL.pathComponents
+        guard let openClawIndex = components.lastIndex(of: ".openclaw") else {
+            return nil
+        }
+        if openClawIndex == 0 {
+            return nil
+        }
+        let prefix = components[...openClawIndex]
+        return NSString.path(withComponents: Array(prefix))
+    }
+
+    private static func configPathFromStateDir(_ stateDir: String) -> String? {
+        configPathFromDirectory(stateDir)
+    }
+
+    private static func configPathFromDirectory(_ directory: String) -> String? {
+        let configURL = URL(fileURLWithPath: directory, isDirectory: true)
+            .appendingPathComponent("openclaw.json")
+            .standardizedFileURL
+        guard FileManager.default.isReadableFile(atPath: configURL.path) else {
+            return nil
+        }
+        return configURL.path
     }
 
     private static func extractEnvironmentPath(named name: String, from commandLine: String) -> String? {

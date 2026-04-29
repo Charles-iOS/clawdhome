@@ -344,6 +344,7 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
 
 enum OpenClawDiscoverySource: String, Codable, CaseIterable {
     case runningProcess
+    case launchAgent
     case knownDirectory
     case manualSelection
 }
