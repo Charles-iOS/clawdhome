@@ -30,6 +30,7 @@ struct AppSettingsView: View {
                 heroSection
                 statusOverviewGrid
                 profilesSection
+                gatewayDiagnosticsSection
                 toolGrid
                 systemInfoGrid
             }
@@ -624,6 +625,48 @@ struct AppSettingsView: View {
     }
 
     @ViewBuilder
+    private var gatewayDiagnosticsSection: some View {
+        let info = LegacyGatewayLaunchAgentInfo.load()
+        let diagnostic = legacyLaunchAgentDiagnostic(
+            info: info,
+            profile: profileStore.selectedProfile,
+            resolution: profileStore.selectedResolution
+        )
+
+        SettingsSectionCard(
+            "Gateway 诊断",
+            subtitle: "区分当前 Profile Gateway 与旧 OpenClaw launch agent。"
+        ) {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsInfoRow(
+                    "当前 Profile",
+                    value: profileStore.selectedProfile.map { "\($0.displayName) (\($0.slug))" } ?? "未选择"
+                )
+                SettingsInfoRow(
+                    "当前端口",
+                    value: profileStore.selectedResolution.map { String($0.resolvedPort) } ?? "—"
+                )
+                SettingsInfoRow(
+                    "旧 LaunchAgent",
+                    value: info.exists ? "已发现" : "未发现"
+                )
+                if info.exists {
+                    SettingsInfoRow(
+                        "旧端口",
+                        value: info.port.map(String.init) ?? "未识别"
+                    )
+                    SettingsCompactPathRow(title: "Plist", path: info.path)
+                }
+
+                Label(diagnostic.message, systemImage: diagnostic.icon)
+                    .font(.system(size: SettingsFont.detail, weight: .medium))
+                    .foregroundStyle(diagnostic.color)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var aboutSection: some View {
         SettingsSectionCard(
             L10n.k("settings.about", fallback: "关于"),
@@ -809,6 +852,58 @@ struct AppSettingsView: View {
     private var bundledOpenClawPathTitle: String {
         guard let version = OpenClawRuntime.bundledOpenClawVersion else { return "OpenClaw" }
         return "OpenClaw · v\(version)"
+    }
+
+    private func legacyLaunchAgentDiagnostic(
+        info: LegacyGatewayLaunchAgentInfo,
+        profile: GatewayProfile?,
+        resolution: GatewayProfileResolution?
+    ) -> LegacyGatewayLaunchAgentDiagnostic {
+        guard info.exists else {
+            return LegacyGatewayLaunchAgentDiagnostic(
+                message: "未检测到旧 OpenClaw launch agent，当前 Profile 生命周期由 EZRWorker 管理。",
+                icon: "checkmark.circle.fill",
+                color: .green
+            )
+        }
+
+        guard let profile, let resolution else {
+            return LegacyGatewayLaunchAgentDiagnostic(
+                message: "检测到旧 OpenClaw launch agent，但当前尚未选择 Profile。",
+                icon: "info.circle.fill",
+                color: .orange
+            )
+        }
+
+        if profile.sourceKind == .legacyReuse {
+            return LegacyGatewayLaunchAgentDiagnostic(
+                message: "当前 Profile 正在复用旧 ~/.openclaw；如旧 launch agent 仍 KeepAlive，它会继续管理该旧实例。",
+                icon: "arrow.triangle.2.circlepath",
+                color: .orange
+            )
+        }
+
+        if info.port == resolution.resolvedPort {
+            return LegacyGatewayLaunchAgentDiagnostic(
+                message: "旧 launch agent 与当前 Profile 使用同一端口 \(resolution.resolvedPort)，可能造成端口抢占或重启误判。",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+        }
+
+        if let legacyPort = info.port {
+            return LegacyGatewayLaunchAgentDiagnostic(
+                message: "检测到旧 OpenClaw launch agent 正在配置端口 \(legacyPort)，它不属于当前 Profile 端口 \(resolution.resolvedPort)。",
+                icon: "info.circle.fill",
+                color: .orange
+            )
+        }
+
+        return LegacyGatewayLaunchAgentDiagnostic(
+            message: "检测到旧 OpenClaw launch agent，但无法识别端口；如 Web UI 指向旧实例，可能与当前 Profile 不一致。",
+            icon: "info.circle.fill",
+            color: .orange
+        )
     }
 
     private var lastAppUpdateCheckLabel: String {
@@ -1266,6 +1361,56 @@ private enum ProfileLifecycleAction {
     case start
     case stop
     case restart
+}
+
+private struct LegacyGatewayLaunchAgentInfo {
+    let exists: Bool
+    let path: String
+    let port: Int?
+
+    static func load() -> LegacyGatewayLaunchAgentInfo {
+        let plistURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+            .appendingPathComponent("ai.openclaw.gateway.plist")
+        guard let data = try? Data(contentsOf: plistURL),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else {
+            return LegacyGatewayLaunchAgentInfo(exists: false, path: plistURL.path, port: nil)
+        }
+
+        return LegacyGatewayLaunchAgentInfo(
+            exists: true,
+            path: plistURL.path,
+            port: port(from: plist)
+        )
+    }
+
+    private static func port(from plist: [String: Any]) -> Int? {
+        if let environment = plist["EnvironmentVariables"] as? [String: Any],
+           let rawPort = environment["OPENCLAW_GATEWAY_PORT"] {
+            if let string = rawPort as? String, let port = Int(string) {
+                return port
+            }
+            if let number = rawPort as? NSNumber {
+                return number.intValue
+            }
+        }
+
+        guard let arguments = plist["ProgramArguments"] as? [String],
+              let portFlagIndex = arguments.firstIndex(of: "--port"),
+              arguments.indices.contains(arguments.index(after: portFlagIndex))
+        else {
+            return nil
+        }
+
+        return Int(arguments[arguments.index(after: portFlagIndex)])
+    }
+}
+
+private struct LegacyGatewayLaunchAgentDiagnostic {
+    let message: String
+    let icon: String
+    let color: Color
 }
 
 private enum SettingsFont {

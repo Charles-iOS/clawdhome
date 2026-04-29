@@ -1,6 +1,10 @@
 import Foundation
 import Observation
 
+private let appBootstrapGatewayReadyWaitAttempts = 30
+private let appBootstrapGatewayUnavailableConfirmAttempts = 3
+private let appBootstrapGatewayProbeIntervalNanoseconds: UInt64 = 1_000_000_000
+
 @MainActor
 @Observable
 final class AppBootstrapCoordinator {
@@ -16,6 +20,11 @@ final class AppBootstrapCoordinator {
         case appActivated = "app-activated"
         case systemWake = "system-wake"
         case screenUnlocked = "screen-unlocked"
+    }
+
+    private enum GatewayRecoveryMode: Equatable {
+        case reconnectOnly
+        case conservativeStart
     }
 
     enum ProgressStepID: String, CaseIterable {
@@ -55,7 +64,7 @@ final class AppBootstrapCoordinator {
                     ProgressStep(id: .environment, title: "检查运行环境", status: .pending),
                     ProgressStep(id: .supervisor, title: "连接本地守护进程", status: .pending),
                     ProgressStep(id: .runtime, title: "同步运行状态", status: .pending),
-                    ProgressStep(id: .gateway, title: "启动 Gateway", status: .pending),
+                    ProgressStep(id: .gateway, title: "检查 Gateway", status: .pending),
                     ProgressStep(id: .token, title: "读取认证令牌", status: .pending),
                     ProgressStep(id: .connection, title: "连接本地服务", status: .pending),
                     ProgressStep(id: .workspace, title: "加载工作区数据", status: .pending),
@@ -260,26 +269,13 @@ final class AppBootstrapCoordinator {
         updateProgress(.runtime, detail: "正在同步员工 Profile 和 Gateway 运行状态。")
         _ = await supervisorClient.reloadProfiles()
 
-        var runtimes = try await supervisorClient.listProfilesRuntime()
-        var runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
-
-        if runtime?.readyState != .ready {
-            updateProgress(
-                .gateway,
-                detail: runtimeProgressDetail(runtime) ?? "正在启动当前员工的 Gateway，本地依赖首次准备可能较久。"
-            )
-            try await startProfileWithProgressTracking(profileID: selectedProfile.id)
-            runtimes = try await supervisorClient.listProfilesRuntime()
-            runtime = runtimes.first(where: { $0.profileID == selectedProfile.id })
-        } else {
-            updateProgress(.gateway, detail: "Gateway 已在运行，准备连接本地服务。")
-        }
-
-        guard let runtime else {
-            throw NSError(domain: "AppBootstrapCoordinator", code: 7, userInfo: [
-                NSLocalizedDescriptionKey: "Supervisor 未返回当前 profile 运行态"
-            ])
-        }
+        let runtimes = try await supervisorClient.listProfilesRuntime()
+        let initialRuntime = runtimes.first(where: { $0.profileID == selectedProfile.id })
+        let runtime = try await resolveBootstrapRuntime(
+            profile: selectedProfile,
+            resolution: selectedResolution,
+            initialRuntime: initialRuntime
+        )
 
         let currentUsername = NSUserName()
         workspaceManager.configure(profile: selectedResolution)
@@ -338,6 +334,155 @@ final class AppBootstrapCoordinator {
         progressTask.cancel()
         let runtime = await selectedRuntime(profileID: profileID)
         applySupervisorRuntimeProgress(runtime)
+    }
+
+    private func resolveBootstrapRuntime(
+        profile: GatewayProfile,
+        resolution: GatewayProfileResolution,
+        initialRuntime: SupervisorProfileRuntime?
+    ) async throws -> SupervisorProfileRuntime {
+        let profileID = profile.id
+
+        guard let initialRuntime else {
+            updateProgress(.gateway, detail: "正在确认当前 Gateway 是否已在后台运行。")
+            return try await startGatewayIfConfirmedUnavailable(
+                profile: profile,
+                resolution: resolution,
+                lastKnownRuntime: nil
+            )
+        }
+
+        switch initialRuntime.readyState {
+        case .ready:
+            updateProgress(.gateway, detail: "Gateway 已在后台运行，准备连接本地服务。")
+            return initialRuntime
+
+        case .preparing, .starting:
+            updateProgress(
+                .gateway,
+                detail: runtimeProgressDetail(initialRuntime) ?? "Gateway 正在启动，等待本地服务就绪。"
+            )
+            if let refreshedRuntime = await waitForGatewayRuntimeReady(profileID: profileID) {
+                if refreshedRuntime.readyState == .failed {
+                    let message = refreshedRuntime.lastError ?? "Gateway 启动失败。"
+                    throw NSError(domain: "AppBootstrapCoordinator", code: 11, userInfo: [
+                        NSLocalizedDescriptionKey: message
+                    ])
+                }
+                return refreshedRuntime
+            }
+            return await selectedRuntime(profileID: profileID) ?? initialRuntime
+
+        case .stopped, .unknown:
+            return try await startGatewayIfConfirmedUnavailable(
+                profile: profile,
+                resolution: resolution,
+                lastKnownRuntime: initialRuntime
+            )
+
+        case .failed:
+            let probe = await GatewayClient.httpProbe(port: initialRuntime.resolvedPort)
+            if probe.alive {
+                updateProgress(.gateway, detail: "Gateway 端口仍有响应，先尝试重新连接控制接口。")
+                return initialRuntime
+            }
+
+            let message = initialRuntime.lastError ?? "Gateway 运行态异常，请在设置页检查后手动启动或重启。"
+            updateProgress(.gateway, detail: message)
+            throw NSError(domain: "AppBootstrapCoordinator", code: 10, userInfo: [
+                NSLocalizedDescriptionKey: message
+            ])
+        }
+    }
+
+    private func startGatewayIfConfirmedUnavailable(
+        profile: GatewayProfile,
+        resolution: GatewayProfileResolution,
+        lastKnownRuntime: SupervisorProfileRuntime?
+    ) async throws -> SupervisorProfileRuntime {
+        let port = lastKnownRuntime?.resolvedPort ?? resolution.resolvedPort
+
+        if profile.managementMode != .managedByEZRWorker {
+            updateProgress(.gateway, detail: "当前 Profile 为仅观察模式，等待外部 Gateway 在端口 \(port) 上运行。")
+            return lastKnownRuntime ?? SupervisorProfileRuntime(
+                profileID: profile.id,
+                slug: profile.slug,
+                displayName: profile.displayName,
+                sourceKind: profile.sourceKind,
+                managementMode: profile.managementMode,
+                resolvedConfigPath: resolution.resolvedConfigPath,
+                resolvedStateDir: resolution.resolvedStateDir,
+                resolvedWorkspaceRoot: resolution.resolvedWorkspaceRoot,
+                resolvedPort: port,
+                isPrepared: false,
+                isRunning: false,
+                pid: nil,
+                readyState: .stopped,
+                ownership: .none,
+                lastProbeAt: nil,
+                lastError: nil,
+                lastLifecycleMessage: nil
+            )
+        }
+
+        updateProgress(.gateway, detail: "正在确认端口 \(port) 是否已有 Gateway 响应。")
+        let unavailable = await Self.confirmGatewayUnavailable(port: port)
+        if !unavailable {
+            updateProgress(.gateway, detail: "Gateway 端口已有响应，准备重新连接控制接口。")
+            if let readyRuntime = await waitForGatewayRuntimeReady(profileID: profile.id, attempts: 8) {
+                return readyRuntime
+            }
+            return await selectedRuntime(profileID: profile.id) ?? lastKnownRuntime ?? SupervisorProfileRuntime(
+                profileID: profile.id,
+                slug: profile.slug,
+                displayName: profile.displayName,
+                sourceKind: profile.sourceKind,
+                managementMode: profile.managementMode,
+                resolvedConfigPath: resolution.resolvedConfigPath,
+                resolvedStateDir: resolution.resolvedStateDir,
+                resolvedWorkspaceRoot: resolution.resolvedWorkspaceRoot,
+                resolvedPort: port,
+                isPrepared: true,
+                isRunning: true,
+                pid: nil,
+                readyState: .starting,
+                ownership: .adopted,
+                lastProbeAt: Date(),
+                lastError: nil,
+                lastLifecycleMessage: nil
+            )
+        }
+
+        updateProgress(.gateway, detail: "Gateway 未运行，正在由 Supervisor 拉起本地服务。")
+        try await startProfileWithProgressTracking(profileID: profile.id)
+        guard let runtime = await selectedRuntime(profileID: profile.id) else {
+            throw NSError(domain: "AppBootstrapCoordinator", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "Supervisor 未返回当前 profile 运行态"
+            ])
+        }
+        return runtime
+    }
+
+    private func waitForGatewayRuntimeReady(
+        profileID: UUID,
+        attempts: Int = appBootstrapGatewayReadyWaitAttempts
+    ) async -> SupervisorProfileRuntime? {
+        for _ in 0..<attempts {
+            if Task.isCancelled { return nil }
+            if let runtime = await selectedRuntime(profileID: profileID) {
+                applySupervisorRuntimeProgress(runtime)
+                if runtime.readyState == .ready {
+                    return runtime
+                }
+                if runtime.readyState == .failed {
+                    return runtime
+                }
+            } else {
+                updateProgress(.gateway, detail: "正在等待 Supervisor 返回当前 Gateway 状态。")
+            }
+            try? await Task.sleep(nanoseconds: appBootstrapGatewayProbeIntervalNanoseconds)
+        }
+        return await selectedRuntime(profileID: profileID)
     }
 
     private func applySupervisorRuntimeProgress(_ runtime: SupervisorProfileRuntime?) {
@@ -414,6 +559,7 @@ final class AppBootstrapCoordinator {
         if trigger != .reconnectLoop {
             appLog("bootstrap: recovery triggered by \(trigger.rawValue)")
         }
+        let mode = recoveryMode(for: trigger)
 
         await profileStore.loadIfNeeded()
         guard profileStore.canBootstrap else {
@@ -425,6 +571,10 @@ final class AppBootstrapCoordinator {
 
         switch state {
         case .idle, .failed:
+            if state != .idle, mode == .reconnectOnly {
+                appLog("bootstrap: recovery skipped startIfNeeded for reconnect-only trigger \(trigger.rawValue)")
+                return
+            }
             await startIfNeeded()
             return
         case .starting:
@@ -453,57 +603,101 @@ final class AppBootstrapCoordinator {
             return
         }
 
-        let probe = await GatewayClient.httpProbe(port: resolvedPort)
-        if !probe.alive {
-            await gatewayService.disconnect()
-            agentStore.markGatewayDisconnected()
-            gatewayDependentStartupCompleted = false
-
-            do {
-                if runtime?.isRunning == true || runtime?.readyState == .ready {
-                    appLog("bootstrap: recovery restarting current gateway on port \(resolvedPort)")
-                    try await supervisorClient.restartProfile(profileID: selectedProfile.id)
-                } else {
-                    appLog("bootstrap: recovery starting current gateway on port \(resolvedPort)")
-                    try await supervisorClient.startProfile(profileID: selectedProfile.id)
-                }
-            } catch {
-                await processManager.refreshRuntimeState()
-                appLog("bootstrap: recovery lifecycle operation failed: \(error.localizedDescription)", level: .error)
-                return
-            }
-
-            runtime = await selectedRuntime(profileID: selectedProfile.id)
-            resolvedPort = runtime?.resolvedPort ?? resolvedPort
-        }
-
-        guard let token = await Self.waitForGatewayToken(configURLs: selectedResolution.localPaths.configSnapshotURLs) else {
-            appLog("bootstrap: recovery failed; gateway token is unavailable", level: .error)
+        if await reconnectGatewayService(
+            resolution: selectedResolution,
+            port: resolvedPort,
+            logFailure: trigger != .reconnectLoop
+        ) {
+            await completeGatewayDependentStartup(currentUsername: NSUserName())
+            await processManager.refreshRuntimeState()
             return
         }
 
-        await gatewayService.reconfigure(port: resolvedPort, token: token)
+        await gatewayService.disconnect()
+        agentStore.markGatewayDisconnected()
+        gatewayDependentStartupCompleted = false
+
+        if mode == .reconnectOnly {
+            appLog("bootstrap: reconnect-only recovery left gateway disconnected on port \(resolvedPort)", level: .warn)
+            await processManager.refreshRuntimeState()
+            return
+        }
+
+        guard await Self.confirmGatewayUnavailable(
+            port: resolvedPort,
+            attempts: appBootstrapGatewayUnavailableConfirmAttempts
+        ) else {
+            appLog("bootstrap: recovery skipped lifecycle operation; port \(resolvedPort) still responds", level: .warn)
+            await processManager.refreshRuntimeState()
+            return
+        }
+
+        runtime = await selectedRuntime(profileID: selectedProfile.id)
+        resolvedPort = runtime?.resolvedPort ?? resolvedPort
+
+        guard selectedProfile.managementMode == .managedByEZRWorker else {
+            appLog("bootstrap: recovery skipped start; profile is observe-only", level: .warn)
+            await processManager.refreshRuntimeState()
+            return
+        }
+
+        switch runtime?.readyState {
+        case .preparing, .starting:
+            appLog("bootstrap: recovery skipped start; gateway is already \(runtime?.readyState.rawValue ?? "starting")")
+        case .stopped, .unknown, nil:
+            do {
+                appLog("bootstrap: recovery starting current gateway on port \(resolvedPort)")
+                try await supervisorClient.startProfile(profileID: selectedProfile.id)
+            } catch {
+                appLog("bootstrap: recovery start failed: \(error.localizedDescription)", level: .error)
+            }
+        case .ready:
+            appLog("bootstrap: recovery skipped automatic restart for ready runtime on unavailable port \(resolvedPort)", level: .warn)
+        case .failed:
+            let message = runtime?.lastError ?? "unknown"
+            appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)
+        }
+
+        await processManager.refreshRuntimeState()
+    }
+
+    private func recoveryMode(for trigger: RecoveryTrigger) -> GatewayRecoveryMode {
+        switch trigger {
+        case .appActivated, .screenUnlocked:
+            return .reconnectOnly
+        case .systemWake, .reconnectLoop:
+            return .conservativeStart
+        }
+    }
+
+    private func reconnectGatewayService(
+        resolution: GatewayProfileResolution,
+        port: Int,
+        logFailure: Bool
+    ) async -> Bool {
+        guard let token = await Self.waitForGatewayToken(configURLs: resolution.localPaths.configSnapshotURLs) else {
+            if logFailure {
+                appLog("bootstrap: recovery failed; gateway token is unavailable", level: .error)
+            }
+            return false
+        }
+
+        await gatewayService.reconfigure(port: port, token: token)
 
         if gatewayService.isConnected {
             do {
                 _ = try await gatewayService.request(method: "health")
-                await completeGatewayDependentStartup(currentUsername: NSUserName())
-                await processManager.refreshRuntimeState()
-                return
+                return true
             } catch {
                 appLog("bootstrap: recovery detected stale gateway socket: \(error.localizedDescription)", level: .warn)
                 await gatewayService.disconnect()
-                agentStore.markGatewayDisconnected()
-                gatewayDependentStartupCompleted = false
             }
         }
 
-        if await Self.connectGatewayService(gatewayService: gatewayService, logFailure: trigger != .reconnectLoop) {
-            await completeGatewayDependentStartup(currentUsername: NSUserName())
-        } else {
-            agentStore.markGatewayDisconnected()
-        }
-        await processManager.refreshRuntimeState()
+        return await Self.connectGatewayService(
+            gatewayService: gatewayService,
+            logFailure: logFailure
+        )
     }
 
     private func ensureSupervisorConnected() async -> Bool {
@@ -557,6 +751,27 @@ final class AppBootstrapCoordinator {
             appLog("bootstrap: failed to connect current profile gateway", level: .error)
         }
         return false
+    }
+
+    private static func confirmGatewayUnavailable(
+        port: Int,
+        attempts: Int = appBootstrapGatewayUnavailableConfirmAttempts,
+        intervalNanoseconds: UInt64 = appBootstrapGatewayProbeIntervalNanoseconds
+    ) async -> Bool {
+        for attempt in 1...max(1, attempts) {
+            let probe = await GatewayClient.httpProbe(port: port)
+            appLog(
+                "bootstrap: probe \(attempt)/\(attempts) port \(port) alive=\(probe.alive) ready=\(probe.ready)",
+                level: .debug
+            )
+            if probe.alive {
+                return false
+            }
+            if attempt < attempts {
+                try? await Task.sleep(nanoseconds: intervalNanoseconds)
+            }
+        }
+        return true
     }
 
     private static func readGatewayToken(configURL: URL) -> String? {
