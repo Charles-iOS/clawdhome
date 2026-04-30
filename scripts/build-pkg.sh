@@ -510,14 +510,51 @@ if launchctl print "system/${HELPER_LABEL}" &>/dev/null 2>&1; then
 fi
 rm -f "/Library/LaunchDaemons/${HELPER_LABEL}.plist"
 rm -f "/Library/PrivilegedHelperTools/${HELPER_LABEL}"
+version_at_least() {
+  local current="\$1"
+  local minimum="\$2"
+  local current_major current_minor current_patch minimum_major minimum_minor minimum_patch
+  IFS=. read -r current_major current_minor current_patch _ <<< "\$current"
+  IFS=. read -r minimum_major minimum_minor minimum_patch _ <<< "\$minimum"
+  current_major="\${current_major%%[!0-9]*}"
+  current_minor="\${current_minor%%[!0-9]*}"
+  current_patch="\${current_patch%%[!0-9]*}"
+  minimum_major="\${minimum_major%%[!0-9]*}"
+  minimum_minor="\${minimum_minor%%[!0-9]*}"
+  minimum_patch="\${minimum_patch%%[!0-9]*}"
+  current_major="\${current_major:-0}"
+  current_minor="\${current_minor:-0}"
+  current_patch="\${current_patch:-0}"
+  minimum_major="\${minimum_major:-0}"
+  minimum_minor="\${minimum_minor:-0}"
+  minimum_patch="\${minimum_patch:-0}"
+  if [ "\$current_major" -gt "\$minimum_major" ]; then return 0; fi
+  if [ "\$current_major" -lt "\$minimum_major" ]; then return 1; fi
+  if [ "\$current_minor" -gt "\$minimum_minor" ]; then return 0; fi
+  if [ "\$current_minor" -lt "\$minimum_minor" ]; then return 1; fi
+  [ "\$current_patch" -ge "\$minimum_patch" ]
+}
 CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
 if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
   CONSOLE_UID=\$(id -u "\$CONSOLE_USER" 2>/dev/null || echo "")
   if [ -n "\$CONSOLE_UID" ]; then
     CONSOLE_HOME=\$(dscl . -read "/Users/\${CONSOLE_USER}" NFSHomeDirectory 2>/dev/null | awk '{print \$2}' || echo "")
+    OLD_APP_VERSION=\$(/usr/bin/defaults read "/Applications/${APP_NAME}.app/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "")
     OLD_SUPERVISOR="/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
-    if [ -x "\$OLD_SUPERVISOR" ] && [ -n "\$CONSOLE_HOME" ]; then
-      launchctl asuser "\$CONSOLE_UID" /usr/bin/env HOME="\$CONSOLE_HOME" USER="\$CONSOLE_USER" LOGNAME="\$CONSOLE_USER" "\$OLD_SUPERVISOR" --prepare-upgrade --timeout 10 2>/dev/null || true
+    if [ -x "\$OLD_SUPERVISOR" ] && [ -n "\$CONSOLE_HOME" ] && version_at_least "\$OLD_APP_VERSION" "1.2.0"; then
+      launchctl asuser "\$CONSOLE_UID" /usr/bin/env HOME="\$CONSOLE_HOME" USER="\$CONSOLE_USER" LOGNAME="\$CONSOLE_USER" "\$OLD_SUPERVISOR" --prepare-upgrade --timeout 8 2>/dev/null &
+      PREPARE_PID=\$!
+      PREPARE_WAITED=0
+      while kill -0 "\$PREPARE_PID" 2>/dev/null && [ "\$PREPARE_WAITED" -lt 12 ]; do
+        sleep 1
+        PREPARE_WAITED=\$((PREPARE_WAITED + 1))
+      done
+      if kill -0 "\$PREPARE_PID" 2>/dev/null; then
+        kill "\$PREPARE_PID" 2>/dev/null || true
+        sleep 1
+        kill -9 "\$PREPARE_PID" 2>/dev/null || true
+      fi
+      wait "\$PREPARE_PID" 2>/dev/null || true
     fi
     launchctl bootout "gui/\${CONSOLE_UID}" "/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" 2>/dev/null || true
   fi
