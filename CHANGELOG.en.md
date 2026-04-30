@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1] - 2026-04-30
+
+### Improvements & Fixes
+- Fixed a case where upgrades from older versions could get stuck during the preinstall phase.
+- Improved Supervisor handoff and health recovery during upgrades, reducing cases where Gateway or Profile runtimes were not taken over correctly.
+- Automatically starts the managed Profile after legacy autostart handoff, reducing the need for manual recovery after upgrades.
+
+
 ## [1.1.0] - 2026-04-30
 
 ### Features
