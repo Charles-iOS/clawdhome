@@ -61,10 +61,16 @@ final class GatewayProcessManager {
         guard let supervisorClient, let profileStore else { return }
         if !supervisorClient.isConnected {
             supervisorClient.connect()
-            _ = await supervisorClient.waitUntilConnected()
+            guard await supervisorClient.waitUntilConnected() else { return }
         }
 
-        let runtimes = await supervisorClient.refreshRuntimes()
+        let runtimes: [SupervisorProfileRuntime]
+        do {
+            runtimes = try await supervisorClient.listProfilesRuntime()
+        } catch {
+            return
+        }
+
         guard let selectedProfile = profileStore.selectedProfile else {
             applyRuntime(nil, fallbackPort: profileStore.selectedResolution?.resolvedPort)
             return

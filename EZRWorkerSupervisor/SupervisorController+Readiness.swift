@@ -63,7 +63,7 @@ extension EZRWorkerSupervisorController {
 
     private func refreshManagedRuntimeSnapshot(_ record: SupervisorRecord) async {
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
+        let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
         record.lastProbeAt = Date()
 
         let ownsProcess = record.process?.isRunning == true
@@ -71,6 +71,31 @@ extension EZRWorkerSupervisorController {
         let matchesProfile = listeningPID.map { gatewayProcessMatches(record: record, pid: $0) } ?? false
 
         guard probe.alive, ownsProcess || matchesProfile else {
+            if let process = record.process, process.isRunning {
+                record.isPrepared = true
+                record.isRunning = true
+                record.pid = process.processIdentifier
+                record.ownership = .supervised
+                record.readyState = .starting
+                record.lastError = nil
+                record.lastLifecycleMessage = listeningPID == process.processIdentifier
+                    ? "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应"
+                    : "Gateway 进程运行中，正在等待端口 \(record.resolution.resolvedPort)"
+                return
+            }
+
+            if let listeningPID, matchesProfile {
+                record.process = nil
+                record.isPrepared = true
+                record.isRunning = true
+                record.pid = listeningPID
+                record.ownership = .adopted
+                record.readyState = .starting
+                record.lastError = nil
+                record.lastLifecycleMessage = "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应"
+                return
+            }
+
             if record.process?.isRunning != true,
                record.isRunning,
                record.readyState != .failed {

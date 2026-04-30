@@ -589,6 +589,19 @@ final class AppBootstrapCoordinator {
         }
 
         guard await ensureSupervisorConnected() else {
+            let fallbackPort = gatewayService.port
+            appLog(
+                "bootstrap: supervisor unavailable; trying direct gateway reconnect on port \(fallbackPort)",
+                level: .warn
+            )
+            if await reconnectGatewayService(
+                resolution: selectedResolution,
+                port: fallbackPort,
+                logFailure: trigger != .reconnectLoop
+            ) {
+                await completeGatewayDependentStartup(currentUsername: NSUserName())
+                return
+            }
             appLog("bootstrap: recovery failed; supervisor is not connected", level: .error)
             return
         }
@@ -652,7 +665,12 @@ final class AppBootstrapCoordinator {
                 appLog("bootstrap: recovery start failed: \(error.localizedDescription)", level: .error)
             }
         case .ready:
-            appLog("bootstrap: recovery skipped automatic restart for ready runtime on unavailable port \(resolvedPort)", level: .warn)
+            do {
+                appLog("bootstrap: recovery restarting stale ready gateway on unavailable port \(resolvedPort)", level: .warn)
+                try await supervisorClient.restartProfile(profileID: selectedProfile.id)
+            } catch {
+                appLog("bootstrap: recovery restart failed: \(error.localizedDescription)", level: .error)
+            }
         case .failed:
             let message = runtime?.lastError ?? "unknown"
             appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)

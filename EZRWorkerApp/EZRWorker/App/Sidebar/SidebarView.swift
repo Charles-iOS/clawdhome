@@ -133,7 +133,7 @@ struct SidebarView: View {
         case .running:
             return gatewayService.isConnected
                 ? L10n.k("sidebar.status.running", fallback: "Gateway 运行中")
-                : L10n.k("models.not_connected", fallback: "Gateway 未连接")
+                : L10n.k("sidebar.status.running_disconnected", fallback: "进程运行中，WebSocket 未连接")
         case .stopping: return L10n.k("sidebar.status.stopping", fallback: "Gateway 停止中…")
         case .starting: return L10n.k("sidebar.status.starting", fallback: "Gateway 启动中…")
         case .stopped: return L10n.k("sidebar.status.stopped", fallback: "Gateway 已停止")

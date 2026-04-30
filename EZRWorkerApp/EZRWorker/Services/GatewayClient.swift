@@ -416,8 +416,7 @@ actor GatewayClient {
                 }
             } catch {
                 appLog("gateway receive error: \(error.localizedDescription)", level: .error)
-                isConnected = false
-                failAllPending(error)
+                markSocketDisconnected(error: error)
                 break
             }
         }
@@ -426,6 +425,15 @@ actor GatewayClient {
     // MARK: - 私有工具
 
     private func socketRef() -> URLSessionWebSocketTask? { socket }
+
+    private func markSocketDisconnected(error: Error) {
+        isConnected = false
+        let staleSocket = socket
+        socket = nil
+        session = nil
+        staleSocket?.cancel(with: .goingAway, reason: nil)
+        failAllPending(error)
+    }
 
     private func resumePending(id: String, throwing error: Error) {
         pending.removeValue(forKey: id)?.resume(throwing: error)
