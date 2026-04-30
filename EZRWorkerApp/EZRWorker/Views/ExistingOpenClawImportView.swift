@@ -137,6 +137,9 @@ struct ExistingOpenClawImportView: View {
                         if let workspaceRoot = candidate.workspaceRoot {
                             pathLine("Workspace", workspaceRoot)
                         }
+                        if let launchAgent = candidate.launchAgent {
+                            launchAgentInfoBlock(launchAgent)
+                        }
                     }
 
                     HStack(spacing: 14) {
@@ -153,6 +156,17 @@ struct ExistingOpenClawImportView: View {
                             .font(.caption)
                             .foregroundStyle(candidate.riskLevel == .blocked ? .red : .orange)
                             .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let launchAgent = candidate.launchAgent,
+                       managementMode == .managedByEZRWorker {
+                        Label(
+                            "导入为托管时会先停用旧 LaunchAgent：\(launchAgent.label)，并把 plist 改名为 .disabled-时间戳。",
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if EZRWorkerBuildFlavor.isDev && managementMode == .managedByEZRWorker {
@@ -206,6 +220,23 @@ struct ExistingOpenClawImportView: View {
         }
     }
 
+    private func launchAgentInfoBlock(_ launchAgent: OpenClawLaunchAgentInfo) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            pathLine("Plist", launchAgent.plistPath)
+            HStack(spacing: 10) {
+                Text("Label：\(launchAgent.label)")
+                Text("KeepAlive：\(launchAgent.keepAlive ? "开" : "关")")
+                Text("RunAtLoad：\(launchAgent.runAtLoad ? "开" : "关")")
+                if launchAgent.requiresAdminForDisable {
+                    Text("需管理员权限")
+                        .foregroundStyle(.orange)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     private func statusPill(_ title: String, color: Color) -> some View {
         Text(title)
             .font(.caption.weight(.semibold))
@@ -230,7 +261,8 @@ struct ExistingOpenClawImportView: View {
 
     private func importSelected() {
         guard !isSubmitting else { return }
-        guard !selectedImportableCandidates.isEmpty else {
+        let candidatesToImport = selectedImportableCandidates
+        guard !candidatesToImport.isEmpty else {
             errorMessage = "请选择至少一个可导入的 OpenClaw 实例"
             return
         }
@@ -238,16 +270,28 @@ struct ExistingOpenClawImportView: View {
         isSubmitting = true
         errorMessage = nil
 
-        do {
-            for candidate in selectedImportableCandidates {
-                let mode = managementModes[candidate.id] ?? .observeOnly
-                _ = try profileStore.importExternalProfile(
-                    candidate: candidate,
-                    autoStart: mode == .managedByEZRWorker,
-                    managementMode: mode
-                )
-            }
-            Task {
+        Task {
+            do {
+                for candidate in candidatesToImport {
+                    let mode = managementModes[candidate.id] ?? .observeOnly
+                    let handoff: GatewayProfileLaunchAgentHandoff?
+                    if mode == .managedByEZRWorker,
+                       let launchAgent = candidate.launchAgent {
+                        handoff = try await LaunchAgentHandoffService.disable(
+                            launchAgent,
+                            expectedConfigPath: candidate.configPath,
+                            expectedStateDir: candidate.stateDir
+                        )
+                    } else {
+                        handoff = nil
+                    }
+                    _ = try profileStore.importExternalProfile(
+                        candidate: candidate,
+                        autoStart: mode == .managedByEZRWorker,
+                        managementMode: mode,
+                        launchAgentHandoff: handoff
+                    )
+                }
                 var isSupervisorConnected = supervisorClient.isConnected
                 if !isSupervisorConnected {
                     isSupervisorConnected = await connectSupervisorIfPossible()
@@ -257,10 +301,10 @@ struct ExistingOpenClawImportView: View {
                     await processManager.refreshRuntimeState()
                 }
                 dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
+                isSubmitting = false
             }
-        } catch {
-            errorMessage = error.localizedDescription
-            isSubmitting = false
         }
     }
 

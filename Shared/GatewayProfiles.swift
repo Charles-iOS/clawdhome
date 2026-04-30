@@ -12,6 +12,45 @@ enum GatewayProfileManagementMode: String, Codable, CaseIterable {
     case observeOnly
 }
 
+enum OpenClawLaunchAgentDomain: String, Codable, CaseIterable {
+    case user
+    case systemLaunchAgent
+}
+
+struct OpenClawLaunchAgentInfo: Codable, Hashable {
+    var label: String
+    var plistPath: String
+    var domain: OpenClawLaunchAgentDomain
+    var programArguments: [String]
+    var environment: [String: String]
+    var workingDirectory: String?
+    var keepAlive: Bool
+    var runAtLoad: Bool
+    var isLoaded: Bool?
+    var isWritableByCurrentUser: Bool
+    var requiresAdminForDisable: Bool
+    var matchedConfigPath: String?
+    var matchedStateDir: String?
+    var matchReason: String
+}
+
+enum LaunchAgentHandoffStatus: String, Codable, CaseIterable {
+    case notRequired
+    case pending
+    case disabled
+    case manualRequired
+    case failed
+}
+
+struct GatewayProfileLaunchAgentHandoff: Codable, Hashable {
+    var originalLabel: String
+    var originalPlistPath: String
+    var disabledPlistPath: String?
+    var disabledAt: Date?
+    var status: LaunchAgentHandoffStatus
+    var message: String?
+}
+
 struct GatewayProfile: Codable, Identifiable, Hashable {
     var id: UUID
     var slug: String
@@ -24,6 +63,7 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
     var workspaceRootOverride: String?
     var portOverride: Int?
     var createdAt: Date
+    var launchAgentHandoff: GatewayProfileLaunchAgentHandoff?
 
     init(
         id: UUID,
@@ -36,7 +76,8 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
         stateDirOverride: String?,
         workspaceRootOverride: String?,
         portOverride: Int?,
-        createdAt: Date
+        createdAt: Date,
+        launchAgentHandoff: GatewayProfileLaunchAgentHandoff? = nil
     ) {
         let resolvedManagementMode = managementMode ?? Self.defaultManagementMode(for: sourceKind)
         self.id = id
@@ -50,6 +91,7 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
         self.workspaceRootOverride = workspaceRootOverride
         self.portOverride = portOverride
         self.createdAt = createdAt
+        self.launchAgentHandoff = launchAgentHandoff
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -64,6 +106,7 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
         case workspaceRootOverride
         case portOverride
         case createdAt
+        case launchAgentHandoff
     }
 
     init(from decoder: Decoder) throws {
@@ -86,6 +129,10 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
         self.workspaceRootOverride = try container.decodeIfPresent(String.self, forKey: .workspaceRootOverride)
         self.portOverride = try container.decodeIfPresent(Int.self, forKey: .portOverride)
         self.createdAt = try container.decode(Date.self, forKey: .createdAt)
+        self.launchAgentHandoff = try container.decodeIfPresent(
+            GatewayProfileLaunchAgentHandoff.self,
+            forKey: .launchAgentHandoff
+        )
     }
 
     func encode(to encoder: Encoder) throws {
@@ -101,6 +148,7 @@ struct GatewayProfile: Codable, Identifiable, Hashable {
         try container.encodeIfPresent(workspaceRootOverride, forKey: .workspaceRootOverride)
         try container.encodeIfPresent(portOverride, forKey: .portOverride)
         try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(launchAgentHandoff, forKey: .launchAgentHandoff)
     }
 
     static func defaultManagementMode(for sourceKind: GatewayProfileSourceKind) -> GatewayProfileManagementMode {
@@ -375,6 +423,7 @@ struct OpenClawInstanceCandidate: Codable, Identifiable, Hashable {
     var pid: Int32?
     var commandLine: String?
     var launchdLabel: String?
+    var launchAgent: OpenClawLaunchAgentInfo?
     var warnings: [String]
     var detectedAt: Date
 }

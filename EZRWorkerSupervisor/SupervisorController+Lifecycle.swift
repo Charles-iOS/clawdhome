@@ -13,6 +13,12 @@ extension EZRWorkerSupervisorController {
         record.lastLifecycleMessage = "正在检查 Profile 目录和 Gateway 配置"
 
         do {
+            if let handoffMessage = unresolvedLaunchAgentHandoffMessage(for: profile) {
+                throw NSError(domain: "EZRWorkerSupervisor", code: 41, userInfo: [
+                    NSLocalizedDescriptionKey: handoffMessage
+                ])
+            }
+
             if profile.sourceKind == .externalReuse,
                profile.managementMode == .observeOnly {
                 let configExists = FileManager.default.fileExists(
@@ -99,6 +105,14 @@ extension EZRWorkerSupervisorController {
             return (false, "未找到 profile: \(profileID.uuidString)")
         }
         let record = recordForProfile(profile)
+        if let handoffMessage = unresolvedLaunchAgentHandoffMessage(for: profile) {
+            record.lastError = handoffMessage
+            record.lastLifecycleMessage = handoffMessage
+            record.readyState = .failed
+            record.isRunning = false
+            record.ownership = .none
+            return (false, handoffMessage)
+        }
         record.lastLifecycleMessage = "正在检查是否已有可复用 Gateway"
         if let existingGatewayResult = await adoptExistingHealthyGatewayIfAvailable(for: record) {
             return existingGatewayResult
@@ -299,5 +313,29 @@ extension EZRWorkerSupervisorController {
         let stopResult = await stopProfile(profileID: profileID)
         guard stopResult.0 else { return stopResult }
         return await startProfile(profileID: profileID)
+    }
+
+    private func unresolvedLaunchAgentHandoffMessage(for profile: GatewayProfile) -> String? {
+        guard (profile.sourceKind == .externalReuse || profile.sourceKind == .legacyReuse),
+              profile.managementMode == .managedByEZRWorker,
+              let handoff = profile.launchAgentHandoff else {
+            return nil
+        }
+
+        let originalPlistExists = FileManager.default.fileExists(atPath: handoff.originalPlistPath)
+        switch handoff.status {
+        case .disabled:
+            if originalPlistExists {
+                return "检测到旧 LaunchAgent 仍在原路径启用：\(handoff.originalLabel)。请先交接或禁用旧自启项。"
+            }
+            return nil
+        case .notRequired:
+            return nil
+        case .pending, .manualRequired, .failed:
+            if originalPlistExists {
+                return "旧 LaunchAgent 尚未交接：\(handoff.originalLabel)。请先交接或改为仅观察模式。"
+            }
+            return nil
+        }
     }
 }

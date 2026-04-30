@@ -91,7 +91,7 @@ struct AppSettingsView: View {
             }
         }
         .alert(
-            "Profile 操作失败",
+            "Profile 操作提示",
             isPresented: Binding(
                 get: { profileErrorMessage != nil },
                 set: { if !$0 { profileErrorMessage = nil } }
@@ -376,6 +376,14 @@ struct AppSettingsView: View {
                         if profile.managementMode == .observeOnly {
                             profileBadge("仅观察", tint: .purple)
                         }
+                        if let handoff = profile.launchAgentHandoff {
+                            profileBadge(
+                                launchAgentHandoffLabel(handoff),
+                                tint: launchAgentHandoffColor(handoff)
+                            )
+                        } else if shouldShowLaunchAgentHandoffAction(for: profile) {
+                            profileBadge("旧自启待确认", tint: .orange)
+                        }
                         profileBadge(
                             profileRuntimeLabel(for: profile, runtime: runtime, resolution: resolution),
                             tint: profileRuntimeColor(for: profile, runtime: runtime, resolution: resolution)
@@ -574,6 +582,17 @@ struct AppSettingsView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .disabled(lifecycleDisabled)
+        }
+
+        if shouldShowLaunchAgentHandoffAction(for: profile) {
+            Button("交接旧自启") {
+                Task {
+                    await handoffLaunchAgent(for: profile)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(isBusy)
         }
 
         Button(role: .destructive) {
@@ -1029,6 +1048,51 @@ struct AppSettingsView: View {
         }
     }
 
+    private func launchAgentHandoffLabel(_ handoff: GatewayProfileLaunchAgentHandoff) -> String {
+        switch handoff.status {
+        case .disabled:
+            return "旧自启已交接"
+        case .pending:
+            return "旧自启保留"
+        case .manualRequired:
+            return "旧自启需手动"
+        case .failed:
+            return "旧自启交接失败"
+        case .notRequired:
+            return "无旧自启"
+        }
+    }
+
+    private func launchAgentHandoffColor(_ handoff: GatewayProfileLaunchAgentHandoff) -> Color {
+        switch handoff.status {
+        case .disabled, .notRequired:
+            return .green
+        case .pending, .manualRequired:
+            return .orange
+        case .failed:
+            return .red
+        }
+    }
+
+    private func shouldShowLaunchAgentHandoffAction(for profile: GatewayProfile) -> Bool {
+        guard (profile.sourceKind == .externalReuse || profile.sourceKind == .legacyReuse),
+              profile.managementMode == .managedByEZRWorker else {
+            return false
+        }
+        guard let handoff = profile.launchAgentHandoff else {
+            return true
+        }
+
+        switch handoff.status {
+        case .pending, .manualRequired, .failed:
+            return true
+        case .disabled:
+            return false
+        case .notRequired:
+            return handoff.originalPlistPath.isEmpty || handoff.originalLabel == "not-found"
+        }
+    }
+
     private func profileConfigurationLabel(
         for profile: GatewayProfile,
         runtime: SupervisorProfileRuntime?,
@@ -1047,6 +1111,7 @@ struct AppSettingsView: View {
         resolution: GatewayProfileResolution
     ) -> String {
         let externalConfigIsReusable = profile.sourceKind != .managed && legacyConfigExists(for: resolution)
+        let isSelectedProfile = profileStore.selectedProfile?.id == profile.id
         guard let runtime else { return "未同步" }
 
         switch runtime.readyState {
@@ -1060,7 +1125,10 @@ struct AppSettingsView: View {
         case .starting:
             return "启动中"
         case .ready:
-            return runtime.isRunning ? "运行中" : "已准备"
+            if runtime.isRunning {
+                return isSelectedProfile && !gatewayService.isConnected ? "进程运行中" : "运行中"
+            }
+            return "已准备"
         case .failed:
             return "异常"
         }
@@ -1072,10 +1140,14 @@ struct AppSettingsView: View {
         resolution: GatewayProfileResolution
     ) -> Color {
         let externalConfigIsReusable = profile.sourceKind != .managed && legacyConfigExists(for: resolution)
+        let isSelectedProfile = profileStore.selectedProfile?.id == profile.id
         guard let runtime else { return .secondary }
 
         switch runtime.readyState {
         case .ready:
+            if runtime.isRunning, isSelectedProfile, !gatewayService.isConnected {
+                return .orange
+            }
             return runtime.isRunning ? .green : .blue
         case .preparing, .starting:
             return .orange
@@ -1100,6 +1172,12 @@ struct AppSettingsView: View {
         if let lastError = runtime.lastError,
            !lastError.isEmpty {
             return "运行异常：\(lastError)"
+        }
+
+        if profileStore.selectedProfile?.id == profile.id,
+           runtime.isRunning,
+           !gatewayService.isConnected {
+            return "运行态：Gateway 进程运行中，WebSocket 未连接。"
         }
 
         return "运行态：\(profileRuntimeLabel(for: profile, runtime: runtime, resolution: resolution))"
@@ -1130,6 +1208,12 @@ struct AppSettingsView: View {
         if let lastError = runtime.lastError,
            !lastError.isEmpty {
             return "exclamationmark.triangle.fill"
+        }
+
+        if profileStore.selectedProfile?.id == profile.id,
+           runtime.isRunning,
+           !gatewayService.isConnected {
+            return "wifi.slash"
         }
 
         if profile.sourceKind != .managed,
@@ -1330,6 +1414,138 @@ struct AppSettingsView: View {
         } catch {
             profileErrorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func handoffLaunchAgent(for profile: GatewayProfile) async {
+        guard profileActionProfileID == nil else { return }
+
+        profileActionProfileID = profile.id
+        defer { profileActionProfileID = nil }
+
+        let resolution = GatewayProfileResolver.resolve(profile)
+        let launchAgent = matchingLaunchAgent(for: profile, resolution: resolution)
+
+        guard let launchAgent else {
+            do {
+                try profileStore.update(
+                    profileID: profile.id,
+                    launchAgentHandoff: GatewayProfileLaunchAgentHandoff(
+                        originalLabel: "not-found",
+                        originalPlistPath: "",
+                        disabledPlistPath: nil,
+                        disabledAt: Date(),
+                        status: .notRequired,
+                        message: "未发现与该 Profile 匹配的旧 LaunchAgent"
+                    )
+                )
+                _ = await supervisorClient.reloadProfiles()
+            } catch {
+                profileErrorMessage = error.localizedDescription
+                return
+            }
+            profileErrorMessage = "未发现与该 Profile 匹配的旧 LaunchAgent，已标记为无需交接。"
+            return
+        }
+
+        if launchAgent.requiresAdminForDisable {
+            let message = """
+            该旧 LaunchAgent 需要管理员权限手动停用：
+            \(LaunchAgentHandoffService.manualDisableCommands(for: launchAgent).joined(separator: "\n"))
+            """
+            do {
+                try profileStore.update(
+                    profileID: profile.id,
+                    launchAgentHandoff: GatewayProfileLaunchAgentHandoff(
+                        originalLabel: launchAgent.label,
+                        originalPlistPath: launchAgent.plistPath,
+                        disabledPlistPath: nil,
+                        disabledAt: nil,
+                        status: .manualRequired,
+                        message: message
+                    )
+                )
+                _ = await supervisorClient.reloadProfiles()
+            } catch {
+                profileErrorMessage = error.localizedDescription
+                return
+            }
+            profileErrorMessage = message
+            return
+        }
+
+        do {
+            let handoff = try await LaunchAgentHandoffService.disable(
+                launchAgent,
+                expectedConfigPath: resolution.resolvedConfigPath,
+                expectedStateDir: resolution.resolvedStateDir
+            )
+            try profileStore.update(profileID: profile.id, launchAgentHandoff: handoff)
+            _ = await supervisorClient.reloadProfiles()
+            _ = await supervisorClient.refreshRuntimes()
+            await processManager.refreshRuntimeState()
+        } catch {
+            try? profileStore.update(
+                profileID: profile.id,
+                launchAgentHandoff: GatewayProfileLaunchAgentHandoff(
+                    originalLabel: launchAgent.label,
+                    originalPlistPath: launchAgent.plistPath,
+                    disabledPlistPath: nil,
+                    disabledAt: nil,
+                    status: .failed,
+                    message: error.localizedDescription
+                )
+            )
+            _ = await supervisorClient.reloadProfiles()
+            profileErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func matchingLaunchAgent(
+        for profile: GatewayProfile,
+        resolution: GatewayProfileResolution
+    ) -> OpenClawLaunchAgentInfo? {
+        if let handoff = profile.launchAgentHandoff,
+           !handoff.originalPlistPath.isEmpty,
+           FileManager.default.fileExists(atPath: handoff.originalPlistPath),
+           let launchAgent = OpenClawInstanceDiscoveryService.launchAgentInfo(
+                at: URL(fileURLWithPath: handoff.originalPlistPath)
+           ) {
+            return launchAgent
+        }
+
+        return OpenClawInstanceDiscoveryService
+            .scanLightweightCandidates()
+            .compactMap(\.launchAgent)
+            .first { launchAgent in
+                launchAgentMatchesProfile(
+                    launchAgent,
+                    configPath: resolution.resolvedConfigPath,
+                    stateDir: resolution.resolvedStateDir
+                )
+            }
+    }
+
+    private func launchAgentMatchesProfile(
+        _ launchAgent: OpenClawLaunchAgentInfo,
+        configPath: String,
+        stateDir: String
+    ) -> Bool {
+        if let matchedConfigPath = launchAgent.matchedConfigPath,
+           standardizedLaunchAgentPath(matchedConfigPath) == standardizedLaunchAgentPath(configPath) {
+            return true
+        }
+        if let matchedStateDir = launchAgent.matchedStateDir,
+           standardizedLaunchAgentPath(matchedStateDir) == standardizedLaunchAgentPath(stateDir) {
+            return true
+        }
+        return false
+    }
+
+    private func standardizedLaunchAgentPath(_ path: String) -> String {
+        URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
+            .standardizedFileURL
+            .path
     }
 
     @MainActor

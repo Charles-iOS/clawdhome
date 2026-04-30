@@ -252,7 +252,8 @@ final class GatewayProfileStore {
         displayName: String? = nil,
         slug: String? = nil,
         autoStart: Bool = false,
-        managementMode: GatewayProfileManagementMode = .observeOnly
+        managementMode: GatewayProfileManagementMode = .observeOnly,
+        launchAgentHandoff: GatewayProfileLaunchAgentHandoff? = nil
     ) throws -> GatewayProfile {
         let normalizedConfigPath = try normalizedExistingConfigPath(candidate.configPath)
         let normalizedStateDir = try normalizedExternalDirectoryPath(
@@ -269,6 +270,11 @@ final class GatewayProfileStore {
         let resolvedPort = candidate.port
             ?? Self.readGatewayPort(configPath: normalizedConfigPath)
             ?? GatewayProfileResolver.defaultGatewayPort
+        let resolvedHandoff = try resolvedLaunchAgentHandoff(
+            candidate: candidate,
+            managementMode: managementMode,
+            launchAgentHandoff: launchAgentHandoff
+        )
 
         try validateExternalProfileImport(
             configPath: normalizedConfigPath,
@@ -299,7 +305,8 @@ final class GatewayProfileStore {
             stateDirOverride: normalizedStateDir,
             workspaceRootOverride: normalizedWorkspaceRoot,
             portOverride: resolvedPort,
-            createdAt: Date()
+            createdAt: Date(),
+            launchAgentHandoff: resolvedHandoff
         )
 
         profiles.append(profile)
@@ -310,9 +317,45 @@ final class GatewayProfileStore {
         return profile
     }
 
+    private func resolvedLaunchAgentHandoff(
+        candidate: OpenClawInstanceCandidate,
+        managementMode: GatewayProfileManagementMode,
+        launchAgentHandoff: GatewayProfileLaunchAgentHandoff?
+    ) throws -> GatewayProfileLaunchAgentHandoff? {
+        guard let launchAgent = candidate.launchAgent else {
+            return nil
+        }
+
+        if managementMode == .managedByEZRWorker {
+            guard let launchAgentHandoff,
+                  launchAgentHandoff.status == .disabled else {
+                throw NSError(domain: "GatewayProfileStore", code: 33, userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "该实例仍由旧 LaunchAgent 管理。请先完成交接旧自启项，或改为仅观察模式。"
+                ])
+            }
+            return launchAgentHandoff
+        }
+
+        return GatewayProfileLaunchAgentHandoff(
+            originalLabel: launchAgent.label,
+            originalPlistPath: launchAgent.plistPath,
+            disabledPlistPath: nil,
+            disabledAt: nil,
+            status: .pending,
+            message: "仅观察模式保留旧 LaunchAgent，由原启动链路继续管理"
+        )
+    }
+
     func update(profileID: UUID, autoStart: Bool) throws {
         guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
         profiles[index].autoStart = profiles[index].managementMode == .observeOnly ? false : autoStart
+        try persistProfiles()
+    }
+
+    func update(profileID: UUID, launchAgentHandoff: GatewayProfileLaunchAgentHandoff) throws {
+        guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+        profiles[index].launchAgentHandoff = launchAgentHandoff
         try persistProfiles()
     }
 

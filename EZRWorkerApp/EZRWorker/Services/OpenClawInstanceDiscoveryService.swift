@@ -118,7 +118,7 @@ enum OpenClawInstanceDiscoveryService {
         }
     }
 
-    private static func candidateFromLaunchAgent(_ url: URL) -> OpenClawInstanceCandidate? {
+    static func launchAgentInfo(at url: URL) -> OpenClawLaunchAgentInfo? {
         guard let data = try? Data(contentsOf: url),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else {
@@ -128,36 +128,77 @@ enum OpenClawInstanceDiscoveryService {
         let label = (plist["Label"] as? String) ?? url.deletingPathExtension().lastPathComponent
         let program = plist["Program"] as? String
         let arguments = plist["ProgramArguments"] as? [String] ?? []
-        let environment = plist["EnvironmentVariables"] as? [String: Any] ?? [:]
+        let rawEnvironment = plist["EnvironmentVariables"] as? [String: Any] ?? [:]
+        let environment = rawEnvironment.reduce(into: [String: String]()) { result, entry in
+            result[entry.key] = "\(entry.value)"
+        }
         let workingDirectory = (plist["WorkingDirectory"] as? String).flatMap(nonEmptyPath(_:))
+        let standardOutputPath = (plist["StandardOutPath"] as? String).flatMap(nonEmptyPath(_:))
+        let standardErrorPath = (plist["StandardErrorPath"] as? String).flatMap(nonEmptyPath(_:))
         let commandLine = ([program].compactMap { $0 } + arguments).joined(separator: " ")
         let searchableText = ([label, commandLine] + environment.map { "\($0.key)=\($0.value)" })
             .joined(separator: " ")
 
         guard looksLikeOpenClawGateway(searchableText) else { return nil }
 
+        let pathHints = [commandLine, workingDirectory, standardOutputPath, standardErrorPath].compactMap { $0 }
         let stateDir = environmentPath(named: "OPENCLAW_STATE_DIR", in: environment)
-            ?? stateDirFromHints([commandLine, workingDirectory].compactMap { $0 })
+            ?? stateDirFromHints(pathHints)
         let configPath =
             environmentPath(named: "OPENCLAW_CONFIG_PATH", in: environment)
             ?? configPathFromArguments(arguments)
             ?? stateDir.flatMap(configPathFromStateDir(_:))
             ?? workingDirectory.flatMap(configPathFromDirectory(_:))
-            ?? configPathFromHints([commandLine, workingDirectory].compactMap { $0 })
+            ?? configPathFromHints(pathHints)
+            ?? implicitLegacyConfigPathForLaunchAgent(
+                label: label,
+                standardOutputPath: standardOutputPath,
+                standardErrorPath: standardErrorPath
+            )
 
         guard let configPath else { return nil }
+        let domain = launchAgentDomain(for: url)
+        let isWritable = FileManager.default.isWritableFile(atPath: url.path)
+        let requiresAdmin = domain == .systemLaunchAgent || !isWritable
+
+        return OpenClawLaunchAgentInfo(
+            label: label,
+            plistPath: url.standardizedFileURL.path,
+            domain: domain,
+            programArguments: arguments.isEmpty ? [program].compactMap { $0 } : arguments,
+            environment: environment,
+            workingDirectory: workingDirectory,
+            keepAlive: launchAgentBoolean(plist["KeepAlive"]),
+            runAtLoad: launchAgentBoolean(plist["RunAtLoad"]),
+            isLoaded: isLaunchAgentLoaded(label: label),
+            isWritableByCurrentUser: isWritable,
+            requiresAdminForDisable: requiresAdmin,
+            matchedConfigPath: configPath,
+            matchedStateDir: stateDir,
+            matchReason: launchAgentMatchReason(
+                configPath: configPath,
+                stateDir: stateDir,
+                environment: environment,
+                arguments: arguments,
+                workingDirectory: workingDirectory
+            )
+        )
+    }
+
+    private static func candidateFromLaunchAgent(_ url: URL) -> OpenClawInstanceCandidate? {
+        guard let launchAgent = launchAgentInfo(at: url),
+              let configPath = launchAgent.matchedConfigPath else { return nil }
 
         return makeCandidate(
             configURL: URL(fileURLWithPath: configPath),
             source: .launchAgent,
             confidence: FileManager.default.isReadableFile(atPath: configPath) ? .high : .medium,
             pid: nil,
-            commandLine: commandLine.isEmpty ? nil : commandLine,
-            stateDirOverride: stateDir,
-            launchdLabel: label,
-            additionalWarnings: [
-                "检测到旧 LaunchAgent：\(label)，托管前建议先禁用旧自启项，避免双重拉起"
-            ]
+            commandLine: launchAgent.programArguments.joined(separator: " "),
+            stateDirOverride: launchAgent.matchedStateDir,
+            launchdLabel: launchAgent.label,
+            launchAgent: launchAgent,
+            additionalWarnings: launchAgentWarnings(launchAgent)
         )
     }
 
@@ -232,6 +273,120 @@ enum OpenClawInstanceDiscoveryService {
         return urls
     }
 
+    private static func launchAgentWarnings(_ launchAgent: OpenClawLaunchAgentInfo) -> [String] {
+        var warnings = [
+            "检测到旧 LaunchAgent：\(launchAgent.label)，托管前需要交接旧自启项，避免双重拉起"
+        ]
+        if launchAgent.keepAlive {
+            warnings.append("旧 LaunchAgent 启用了 KeepAlive")
+        }
+        if launchAgent.runAtLoad {
+            warnings.append("旧 LaunchAgent 启用了 RunAtLoad")
+        }
+        if launchAgent.requiresAdminForDisable {
+            warnings.append("该 LaunchAgent 位于系统目录或当前用户不可写，需要管理员权限或手动禁用")
+        }
+        return warnings
+    }
+
+    private static func launchAgentDomain(for url: URL) -> OpenClawLaunchAgentDomain {
+        let standardizedPath = url.standardizedFileURL.path
+        let userLaunchAgentsPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
+            .standardizedFileURL
+            .path
+        if standardizedPath.hasPrefix(userLaunchAgentsPath + "/") {
+            return .user
+        }
+        return .systemLaunchAgent
+    }
+
+    private static func launchAgentBoolean(_ value: Any?) -> Bool {
+        if let bool = value as? Bool {
+            return bool
+        }
+        if let number = value as? NSNumber {
+            return number.boolValue
+        }
+        if let dictionary = value as? [String: Any] {
+            return !dictionary.isEmpty
+        }
+        return false
+    }
+
+    private static func isLaunchAgentLoaded(label: String) -> Bool? {
+        guard !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        let serviceTarget = "gui/\(getuid())/\(label)"
+        guard let output = runCommand(
+            "/bin/launchctl",
+            arguments: ["print", serviceTarget],
+            timeout: 0.8
+        ) else {
+            return false
+        }
+        return output.localizedCaseInsensitiveContains(label)
+            || output.localizedCaseInsensitiveContains("state =")
+            || output.localizedCaseInsensitiveContains("pid =")
+    }
+
+    private static func launchAgentMatchReason(
+        configPath: String,
+        stateDir: String?,
+        environment: [String: String],
+        arguments: [String],
+        workingDirectory: String?
+    ) -> String {
+        if let environmentConfigPath = environment["OPENCLAW_CONFIG_PATH"],
+           standardizedPath(environmentConfigPath) == standardizedPath(configPath) {
+            return "EnvironmentVariables.OPENCLAW_CONFIG_PATH"
+        }
+        if let stateDir,
+           let environmentStateDir = environment["OPENCLAW_STATE_DIR"],
+           standardizedPath(environmentStateDir) == standardizedPath(stateDir) {
+            return "EnvironmentVariables.OPENCLAW_STATE_DIR"
+        }
+        if arguments.contains(where: { standardizedPath($0) == standardizedPath(configPath) || $0.contains(configPath) }) {
+            return "ProgramArguments"
+        }
+        if let workingDirectory,
+           let stateDir,
+           standardizedPath(workingDirectory) == standardizedPath(stateDir) {
+            return "WorkingDirectory"
+        }
+        return "OpenClaw path inference"
+    }
+
+    private static func implicitLegacyConfigPathForLaunchAgent(
+        label: String,
+        standardOutputPath: String?,
+        standardErrorPath: String?
+    ) -> String? {
+        let legacyConfigPath = EZRWorkerPaths.legacyOpenClawConfigURL.standardizedFileURL.path
+        guard FileManager.default.isReadableFile(atPath: legacyConfigPath) else {
+            return nil
+        }
+
+        let normalizedLabel = label.lowercased()
+        let defaultLabels = [
+            "ai.openclaw.gateway",
+            "com.openclaw.gateway",
+            "openclaw.gateway",
+        ]
+        if defaultLabels.contains(normalizedLabel) {
+            return legacyConfigPath
+        }
+
+        let legacyStateDir = EZRWorkerPaths.legacyOpenClawDirectory.standardizedFileURL.path
+        let outputPaths = [standardOutputPath, standardErrorPath].compactMap { $0 }
+        if outputPaths.contains(where: { standardizedPath($0).hasPrefix(legacyStateDir + "/") }) {
+            return legacyConfigPath
+        }
+
+        return nil
+    }
+
     private static func makeCandidate(
         configURL rawConfigURL: URL,
         source: OpenClawDiscoverySource,
@@ -240,6 +395,7 @@ enum OpenClawInstanceDiscoveryService {
         commandLine: String?,
         stateDirOverride: String? = nil,
         launchdLabel: String? = nil,
+        launchAgent: OpenClawLaunchAgentInfo? = nil,
         additionalWarnings: [String] = []
     ) -> OpenClawInstanceCandidate {
         let configURL = rawConfigURL.standardizedFileURL
@@ -272,6 +428,7 @@ enum OpenClawInstanceDiscoveryService {
             pid: pid,
             commandLine: commandLine,
             launchdLabel: launchdLabel,
+            launchAgent: launchAgent,
             warnings: warnings,
             detectedAt: Date()
         )
@@ -301,6 +458,7 @@ enum OpenClawInstanceDiscoveryService {
             existing.pid = existing.pid ?? candidate.pid
             existing.commandLine = existing.commandLine ?? candidate.commandLine
             existing.launchdLabel = existing.launchdLabel ?? candidate.launchdLabel
+            existing.launchAgent = existing.launchAgent ?? candidate.launchAgent
             existing.port = existing.port ?? candidate.port
             existing.workspaceRoot = existing.workspaceRoot ?? candidate.workspaceRoot
             existing.warnings = Array(Set(existing.warnings + candidate.warnings)).sorted()
@@ -456,6 +614,11 @@ enum OpenClawInstanceDiscoveryService {
 
     private static func environmentPath(named name: String, in environment: [String: Any]) -> String? {
         guard let rawValue = environment[name] as? String else { return nil }
+        return nonEmptyPath(rawValue)
+    }
+
+    private static func environmentPath(named name: String, in environment: [String: String]) -> String? {
+        guard let rawValue = environment[name] else { return nil }
         return nonEmptyPath(rawValue)
     }
 
