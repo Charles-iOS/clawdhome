@@ -98,7 +98,7 @@ log "安装 OpenClaw (npm install -g openclaw --ignore-scripts)..."
   --prefix "$OPENCLAW_PREFIX" \
   --loglevel warn \
   --ignore-scripts \
-  openclaw@latest
+  openclaw@2026.4.24
 
 BUILD_NODE_ABS="$BUILD_NODE_DIR/node"
 
