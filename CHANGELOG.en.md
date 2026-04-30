@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0] - 2026-04-30
+
+### Features
+- Added support for configuring multiple Feishu accounts or channels in the same environment.
+- Improved discovery and management of existing OpenClaw / Gateway instances so upgrades and recovery can take over running instances more smoothly.
+- Isolated Debug Run and installed production runtime environments to reduce interference between development builds and installed releases.
+
+### Improvements & Fixes
+- Improved Gateway startup, readiness checks, health state handling, and recovery to reduce false positives, stalls, and incorrect runtime reuse.
+- Added initialization progress feedback so startup and recovery are easier to follow.
+- Reduced startup impact from OpenClaw scans or refreshes triggered by pages such as model settings and scheduled tasks.
+- Pinned the OpenClaw runtime version for more consistent packaging and runtime behavior.
+
+
 ## [1.0.1] - 2026-04-28
 
 ### Improvements & Fixes
