@@ -432,6 +432,13 @@ final class SupervisorClient {
         guard let installed = installedEmbeddedSupervisorFingerprint() else {
             return true
         }
+        #if !DEBUG
+        if installed.isSystemLaunchAgent,
+           installed.executablePath == current.executablePath,
+           installed.versionStamp == nil {
+            return false
+        }
+        #endif
         return installed.executablePath != current.executablePath
             || installed.versionStamp != current.versionStamp
             || installed.executableModifiedAt != current.executableModifiedAt
@@ -455,14 +462,32 @@ final class SupervisorClient {
             executablePath: executableURL.path,
             versionStamp: embeddedSupervisorVersionStamp(),
             executableModifiedAt: modifiedAt ?? "",
-            executableSize: size ?? ""
+            executableSize: size ?? "",
+            isSystemLaunchAgent: false
         )
     }
 
     private static func installedEmbeddedSupervisorFingerprint() -> EmbeddedSupervisorFingerprint? {
+        #if !DEBUG
+        if let fingerprint = embeddedSupervisorFingerprint(
+            at: URL(fileURLWithPath: "/Library/LaunchAgents", isDirectory: true)
+                .appendingPathComponent("\(EZRWorkerBranding.supervisorLaunchAgentLabel).plist"),
+            isSystemLaunchAgent: true
+        ) {
+            return fingerprint
+        }
+        #endif
+
         let plistURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
             .appendingPathComponent("\(EZRWorkerBranding.supervisorLaunchAgentLabel).plist")
+        return embeddedSupervisorFingerprint(at: plistURL, isSystemLaunchAgent: false)
+    }
+
+    private static func embeddedSupervisorFingerprint(
+        at plistURL: URL,
+        isSystemLaunchAgent: Bool
+    ) -> EmbeddedSupervisorFingerprint? {
         guard let data = try? Data(contentsOf: plistURL),
               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else {
@@ -482,7 +507,8 @@ final class SupervisorClient {
             executablePath: executablePath,
             versionStamp: versionStamp,
             executableModifiedAt: executableModifiedAt,
-            executableSize: executableSize
+            executableSize: executableSize,
+            isSystemLaunchAgent: isSystemLaunchAgent
         )
     }
 
@@ -497,6 +523,21 @@ final class SupervisorClient {
         guard let fingerprint = currentEmbeddedSupervisorFingerprint() else {
             return nil
         }
+
+        #if !DEBUG
+        let systemPlistURL = URL(fileURLWithPath: "/Library/LaunchAgents", isDirectory: true)
+            .appendingPathComponent("\(EZRWorkerBranding.supervisorLaunchAgentLabel).plist")
+        if FileManager.default.fileExists(atPath: systemPlistURL.path) {
+            let uid = getuid()
+            let domain = "gui/\(uid)"
+            return EmbeddedLaunchAgentContext(
+                plistURL: systemPlistURL,
+                domain: domain,
+                serviceTarget: "\(domain)/\(EZRWorkerBranding.supervisorLaunchAgentLabel)"
+            )
+        }
+        #endif
+
         let executableURL = URL(fileURLWithPath: fingerprint.executablePath)
 
         let launchAgentsDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -643,6 +684,7 @@ private struct EmbeddedSupervisorFingerprint {
     let versionStamp: String?
     let executableModifiedAt: String
     let executableSize: String
+    let isSystemLaunchAgent: Bool
 }
 
 private struct ProcessResult {

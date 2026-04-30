@@ -514,6 +514,11 @@ CONSOLE_USER=\$(stat -f "%Su" /dev/console 2>/dev/null || echo "")
 if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
   CONSOLE_UID=\$(id -u "\$CONSOLE_USER" 2>/dev/null || echo "")
   if [ -n "\$CONSOLE_UID" ]; then
+    CONSOLE_HOME=\$(dscl . -read "/Users/\${CONSOLE_USER}" NFSHomeDirectory 2>/dev/null | awk '{print \$2}' || echo "")
+    OLD_SUPERVISOR="/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
+    if [ -x "\$OLD_SUPERVISOR" ] && [ -n "\$CONSOLE_HOME" ]; then
+      launchctl asuser "\$CONSOLE_UID" /usr/bin/env HOME="\$CONSOLE_HOME" USER="\$CONSOLE_USER" LOGNAME="\$CONSOLE_USER" "\$OLD_SUPERVISOR" --prepare-upgrade --timeout 10 2>/dev/null || true
+    fi
     launchctl bootout "gui/\${CONSOLE_UID}" "/Library/LaunchAgents/${SUPERVISOR_LABEL}.plist" 2>/dev/null || true
   fi
 fi

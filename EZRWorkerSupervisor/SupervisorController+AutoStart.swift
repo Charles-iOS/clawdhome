@@ -34,6 +34,7 @@ extension EZRWorkerSupervisorController {
     func reconcileAutoStartProfiles() async {
         for profileID in profileOrder {
             guard let profile = profiles[profileID], profile.autoStart else { continue }
+            guard persistentDesiredState(for: profileID) != .stopped else { continue }
             _ = await startProfile(profileID: profileID)
         }
     }

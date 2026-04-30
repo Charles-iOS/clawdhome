@@ -9,6 +9,9 @@ final class SupervisorRecord {
     var pid: Int32?
     var readyState: SupervisorReadyState = .stopped
     var ownership: SupervisorOwnership = .none
+    var portListeningPID: Int32?
+    var httpResponding: Bool?
+    var adoptionKind: SupervisorAdoptionKind = .none
     var lastProbeAt: Date?
     var healthState: SupervisorHealthState = .unknown
     var lastReadyAt: Date?
@@ -65,6 +68,9 @@ final class SupervisorRecord {
         isRunning = false
         pid = nil
         ownership = .none
+        portListeningPID = nil
+        httpResponding = false
+        adoptionKind = .none
         unhealthySince = nil
         lastUnhealthyReason = nil
         lastProbeAt = now
@@ -78,6 +84,7 @@ final class SupervisorRecord {
         isRunning = false
         pid = nil
         ownership = .none
+        adoptionKind = .none
         unhealthySince = unhealthySince ?? now
         lastUnhealthyReason = message
         lastError = message
@@ -114,6 +121,9 @@ final class SupervisorRecord {
             pid: pid,
             readyState: readyState,
             ownership: ownership,
+            portListeningPID: portListeningPID,
+            httpResponding: httpResponding,
+            adoptionKind: adoptionKind,
             lastProbeAt: lastProbeAt,
             healthState: healthState,
             lastReadyAt: lastReadyAt,

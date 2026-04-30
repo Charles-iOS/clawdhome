@@ -63,6 +63,13 @@ final class EZRWorkerSupervisorService: NSObject, EZRWorkerSupervisorProtocol {
         }
     }
 
+    func prepareForUpgrade(withReply reply: @escaping (Bool, String?) -> Void) {
+        Task {
+            let result = await controller.prepareForUpgrade()
+            reply(result.0, result.1)
+        }
+    }
+
     func reloadProfiles(withReply reply: @escaping (Bool, String?) -> Void) {
         Task {
             let result = await controller.reloadProfiles()

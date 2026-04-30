@@ -116,6 +116,11 @@ extension EZRWorkerSupervisorController {
         }
         let record = recordForProfile(profile)
         record.clearManualStopMarker()
+        setPersistentDesiredState(
+            profileID: profileID,
+            desiredState: .running,
+            userStoppedAt: nil
+        )
         if let handoffMessage = unresolvedLaunchAgentHandoffMessage(for: profile) {
             record.markFailed(handoffMessage)
             record.ownership = .none
@@ -189,19 +194,32 @@ extension EZRWorkerSupervisorController {
         process.arguments = [OpenClawRuntime.bundledOpenClawEntry.path, "gateway"]
         process.environment = OpenClawRuntime.buildEnvironment(profile: record.resolution)
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-        let startupOutput = ProcessOutputCollector()
-        let outputPipe = Pipe()
-        startupOutput.attach(
-            to: outputPipe,
-            teeTo: prepareGatewayOutputLog(for: record.resolution)
-        )
-        process.standardOutput = outputPipe
-        process.standardError = outputPipe
+        let startupLogURL = prepareGatewayOutputLog(for: record.resolution)
+        let startupOutput = ProcessOutputCollector(logURL: startupLogURL)
+        let outputPipe: Pipe?
+        let outputHandle: FileHandle?
+        if let startupLogURL,
+           let handle = try? FileHandle(forWritingTo: startupLogURL) {
+            outputHandle = handle
+            outputPipe = nil
+            process.standardOutput = handle
+            process.standardError = handle
+        } else {
+            let pipe = Pipe()
+            outputPipe = pipe
+            outputHandle = nil
+            startupOutput.attach(to: pipe)
+            process.standardOutput = pipe
+            process.standardError = pipe
+        }
 
         let controller = self
         let recordID = profileID
         process.terminationHandler = { terminated in
-            startupOutput.finishReading(from: outputPipe)
+            if let outputPipe {
+                startupOutput.finishReading(from: outputPipe)
+            }
+            try? outputHandle?.close()
             let terminatedPID = terminated.processIdentifier
             Task {
                 await controller.handleProcessTermination(
@@ -226,6 +244,7 @@ extension EZRWorkerSupervisorController {
             record.lastError = nil
             record.lastLifecycleMessage = "Gateway 进程已启动，正在等待本地服务响应"
         } catch {
+            try? outputHandle?.close()
             record.markFailed(error.localizedDescription)
             record.ownership = .none
             return (false, error.localizedDescription)
@@ -288,8 +307,7 @@ extension EZRWorkerSupervisorController {
         } else if let pid = gatewayPIDListening(onPort: record.resolution.resolvedPort),
                   let commandLine = processCommandLine(pid: pid),
                   looksLikeGatewayProcess(commandLine),
-                  record.profile.sourceKind == .legacyReuse
-                    || record.pid == pid
+                  record.pid == pid
                     || gatewayProcessMatches(record: record, pid: pid)
                     || (record.profile.sourceKind == .externalReuse
                         && externalGatewayProcessMatches(record: record, pid: pid, commandLine: commandLine)) {
@@ -311,10 +329,54 @@ extension EZRWorkerSupervisorController {
         record.ownership = .none
         if markUserStopped {
             record.markManuallyStopped()
+            setPersistentDesiredState(
+                profileID: record.profile.id,
+                desiredState: .stopped,
+                userStoppedAt: record.userStoppedAt
+            )
         } else {
             record.markNoProcess()
         }
         return (true, nil)
+    }
+
+    func prepareForUpgrade(timeoutSeconds: TimeInterval = 10) async -> (Bool, String?) {
+        let deadline = Date().addingTimeInterval(max(1, timeoutSeconds))
+        await refreshRuntimeSnapshotsBeforeListing()
+
+        var messages: [String] = []
+        var hadFailure = false
+
+        for profileID in profileOrder {
+            if Date() >= deadline {
+                hadFailure = true
+                messages.append("prepare-upgrade timeout before all profiles were processed")
+                break
+            }
+
+            guard let record = records[profileID],
+                  record.profile.managementMode == .managedByEZRWorker,
+                  record.profile.sourceKind == .managed,
+                  record.isRunning || record.pid != nil || record.portListeningPID != nil
+            else {
+                continue
+            }
+
+            let pid = record.pid ?? record.portListeningPID
+            recordUpgradeHandoff(profileID: profileID, pid: pid)
+            let result = await stopRecord(record, markUserStopped: false)
+            if result.0 {
+                messages.append("stopped managed profile \(record.profile.slug) pid=\(pid.map(String.init) ?? "unknown")")
+            } else {
+                hadFailure = true
+                messages.append("failed to stop managed profile \(record.profile.slug): \(result.1 ?? "unknown")")
+            }
+        }
+
+        let message = messages.isEmpty
+            ? "prepare-upgrade completed; no managed gateway needed handoff"
+            : messages.joined(separator: "\n")
+        return (!hadFailure, message)
     }
 
     func restartProfile(profileID: UUID) async -> (Bool, String?) {

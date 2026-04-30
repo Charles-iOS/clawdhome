@@ -355,6 +355,15 @@ enum SupervisorOwnership: String, Codable {
     case adopted
 }
 
+enum SupervisorAdoptionKind: String, Codable {
+    case none
+    case supervised
+    case managedAdopted
+    case legacyAdopted
+    case externalAdopted
+    case unknownAdopted
+}
+
 enum SupervisorHealthState: String, Codable {
     case unknown
     case noProcess
@@ -382,6 +391,9 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
     var pid: Int32?
     var readyState: SupervisorReadyState
     var ownership: SupervisorOwnership
+    var portListeningPID: Int32?
+    var httpResponding: Bool?
+    var adoptionKind: SupervisorAdoptionKind
     var lastProbeAt: Date?
     var healthState: SupervisorHealthState
     var lastReadyAt: Date?
@@ -407,6 +419,9 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
         pid: Int32?,
         readyState: SupervisorReadyState,
         ownership: SupervisorOwnership,
+        portListeningPID: Int32? = nil,
+        httpResponding: Bool? = nil,
+        adoptionKind: SupervisorAdoptionKind? = nil,
         lastProbeAt: Date?,
         healthState: SupervisorHealthState? = nil,
         lastReadyAt: Date? = nil,
@@ -431,6 +446,9 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
         self.pid = pid
         self.readyState = readyState
         self.ownership = ownership
+        self.portListeningPID = portListeningPID
+        self.httpResponding = httpResponding
+        self.adoptionKind = adoptionKind ?? Self.defaultAdoptionKind(ownership: ownership, sourceKind: sourceKind)
         self.lastProbeAt = lastProbeAt
         self.healthState = healthState ?? Self.defaultHealthState(
             readyState: readyState,
@@ -461,6 +479,10 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
         pid = try container.decodeIfPresent(Int32.self, forKey: .pid)
         readyState = try container.decode(SupervisorReadyState.self, forKey: .readyState)
         ownership = try container.decode(SupervisorOwnership.self, forKey: .ownership)
+        portListeningPID = try container.decodeIfPresent(Int32.self, forKey: .portListeningPID)
+        httpResponding = try container.decodeIfPresent(Bool.self, forKey: .httpResponding)
+        adoptionKind = try container.decodeIfPresent(SupervisorAdoptionKind.self, forKey: .adoptionKind)
+            ?? Self.defaultAdoptionKind(ownership: ownership, sourceKind: sourceKind)
         lastProbeAt = try container.decodeIfPresent(Date.self, forKey: .lastProbeAt)
         healthState = try container.decodeIfPresent(SupervisorHealthState.self, forKey: .healthState)
             ?? Self.defaultHealthState(readyState: readyState, isRunning: isRunning)
@@ -501,6 +523,27 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
             return .failed
         case .unknown:
             return .unknown
+        }
+    }
+
+    private static func defaultAdoptionKind(
+        ownership: SupervisorOwnership,
+        sourceKind: GatewayProfileSourceKind
+    ) -> SupervisorAdoptionKind {
+        switch ownership {
+        case .none:
+            return .none
+        case .supervised:
+            return .supervised
+        case .adopted:
+            switch sourceKind {
+            case .managed:
+                return .managedAdopted
+            case .legacyReuse:
+                return .legacyAdopted
+            case .externalReuse:
+                return .externalAdopted
+            }
         }
     }
 }

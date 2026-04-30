@@ -28,6 +28,7 @@ extension EZRWorkerSupervisorController {
         for profile in orderedProfiles {
             let record = records[profile.id] ?? SupervisorRecord(profile: profile)
             record.apply(profile: profile)
+            applyPersistentRuntimeState(to: record)
             records[profile.id] = record
         }
 
@@ -36,6 +37,7 @@ extension EZRWorkerSupervisorController {
         for recordID in Array(records.keys) where !knownIDs.contains(recordID) {
             if let record = records.removeValue(forKey: recordID) {
                 restartHandoffTimestamps.removeValue(forKey: recordID)
+                removePersistentRuntimeState(for: recordID)
                 removedRecords.append(record)
             }
         }
@@ -60,9 +62,11 @@ extension EZRWorkerSupervisorController {
     func recordForProfile(_ profile: GatewayProfile) -> SupervisorRecord {
         if let existing = records[profile.id] {
             existing.apply(profile: profile)
+            applyPersistentRuntimeState(to: existing)
             return existing
         }
         let created = SupervisorRecord(profile: profile)
+        applyPersistentRuntimeState(to: created)
         records[profile.id] = created
         return created
     }

@@ -7,6 +7,7 @@ import Foundation
     func startProfile(profileID: String, withReply reply: @escaping (Bool, String?) -> Void)
     func stopProfile(profileID: String, withReply reply: @escaping (Bool, String?) -> Void)
     func restartProfile(profileID: String, withReply reply: @escaping (Bool, String?) -> Void)
+    func prepareForUpgrade(withReply reply: @escaping (Bool, String?) -> Void)
     func reloadProfiles(withReply reply: @escaping (Bool, String?) -> Void)
 }
 

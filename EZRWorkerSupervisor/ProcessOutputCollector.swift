@@ -4,6 +4,11 @@ final class ProcessOutputCollector {
     private let lock = NSLock()
     private var data = Data()
     private var logHandle: FileHandle?
+    private let logURL: URL?
+
+    init(logURL: URL? = nil) {
+        self.logURL = logURL
+    }
 
     func attach(to pipe: Pipe, teeTo logURL: URL? = nil) {
         if let logURL {
@@ -29,8 +34,19 @@ final class ProcessOutputCollector {
 
     var output: String {
         lock.lock()
-        defer { lock.unlock() }
-        return String(data: data, encoding: .utf8) ?? ""
+        let snapshot = data
+        let logURL = logURL
+        lock.unlock()
+
+        if !snapshot.isEmpty {
+            return String(data: snapshot, encoding: .utf8) ?? ""
+        }
+        guard let logURL,
+              let fileData = try? Data(contentsOf: logURL)
+        else {
+            return ""
+        }
+        return String(data: fileData, encoding: .utf8) ?? ""
     }
 
     private func append(_ chunk: Data) {

@@ -20,8 +20,10 @@ extension EZRWorkerSupervisorController {
         let now = Date()
         let configExists = FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath)
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
+        let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
         record.lastProbeAt = now
+        record.portListeningPID = listeningPID
+        record.httpResponding = probe.alive
 
         if probe.alive {
             record.isPrepared = configExists
@@ -34,6 +36,7 @@ extension EZRWorkerSupervisorController {
                 record.process = nil
                 record.ownership = .adopted
             }
+            record.adoptionKind = adoptionKind(for: record, ownership: record.ownership)
             if probe.ready {
                 record.markHealthy(now: now)
             } else {
@@ -47,6 +50,22 @@ extension EZRWorkerSupervisorController {
                     now: now
                 )
             }
+            return
+        }
+
+        if let listeningPID,
+           let commandLine = processCommandLine(pid: listeningPID),
+           looksLikeGatewayProcess(commandLine) {
+            record.process = nil
+            applyUnhealthyRunningSnapshot(
+                record,
+                pid: listeningPID,
+                ownership: .adopted,
+                pendingHealthState: .portListening,
+                reason: "legacy gateway port is listening but health check is not responding",
+                pendingMessage: "Gateway 进程运行中，等待健康检查",
+                now: now
+            )
             return
         }
 
@@ -83,6 +102,8 @@ extension EZRWorkerSupervisorController {
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
         let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
         record.lastProbeAt = now
+        record.portListeningPID = listeningPID
+        record.httpResponding = probe.alive
 
         let ownsProcess = record.process?.isRunning == true
             && record.process?.processIdentifier == listeningPID
@@ -133,6 +154,7 @@ extension EZRWorkerSupervisorController {
         record.isRunning = true
         record.pid = listeningPID
         record.ownership = ownsProcess ? .supervised : .adopted
+        record.adoptionKind = adoptionKind(for: record, ownership: record.ownership)
         if probe.ready {
             record.markHealthy(now: now)
         } else {
@@ -152,11 +174,30 @@ extension EZRWorkerSupervisorController {
         let now = Date()
         let configExists = FileManager.default.fileExists(atPath: record.resolution.resolvedConfigPath)
         let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
-        let listeningPID = probe.alive ? gatewayPIDListening(onPort: record.resolution.resolvedPort) : nil
+        let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
         record.lastProbeAt = now
+        record.portListeningPID = listeningPID
+        record.httpResponding = probe.alive
         record.isPrepared = configExists
 
         guard probe.alive else {
+            if let listeningPID,
+               let commandLine = processCommandLine(pid: listeningPID),
+               looksLikeGatewayProcess(commandLine),
+               externalGatewayProcessMatches(record: record, pid: listeningPID, commandLine: commandLine) {
+                record.process = nil
+                applyUnhealthyRunningSnapshot(
+                    record,
+                    pid: listeningPID,
+                    ownership: .adopted,
+                    pendingHealthState: .portListening,
+                    reason: "external gateway port is listening but health check is not responding",
+                    pendingMessage: "外部 Gateway 已接入，但健康检查暂未响应",
+                    now: now
+                )
+                return
+            }
+
             if record.process?.isRunning != true {
                 record.process = nil
             }
@@ -181,6 +222,7 @@ extension EZRWorkerSupervisorController {
         record.isRunning = true
         record.pid = listeningPID
         record.ownership = .adopted
+        record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
         if probe.ready {
             record.markHealthy(now: now)
             record.lastLifecycleMessage = record.profile.managementMode == .observeOnly
@@ -214,6 +256,9 @@ extension EZRWorkerSupervisorController {
                 record.isRunning = true
                 record.ownership = .adopted
                 record.pid = pid
+                record.portListeningPID = pid
+                record.httpResponding = currentProbe.alive
+                record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
                 record.markHealthy()
                 return (true, nil)
             }
@@ -243,6 +288,7 @@ extension EZRWorkerSupervisorController {
         record.readyState = .starting
         record.healthState = .launching
         record.ownership = ownership
+        record.adoptionKind = adoptionKind(for: record, ownership: ownership)
         record.lastError = nil
         record.lastLifecycleMessage = "正在等待 Gateway 打开本地端口 \(record.resolution.resolvedPort)"
         let startupStartedAt = Date()
@@ -308,7 +354,11 @@ extension EZRWorkerSupervisorController {
 
                 record.isPrepared = true
                 record.isRunning = true
-                record.pid = currentPID ?? pid
+                let resolvedPID = currentPID ?? pid
+                record.pid = resolvedPID
+                record.portListeningPID = currentPID
+                record.httpResponding = true
+                record.adoptionKind = adoptionKind(for: record, ownership: ownership)
                 record.markHealthy()
                 return (true, nil)
             }
@@ -316,12 +366,9 @@ extension EZRWorkerSupervisorController {
             let probe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
             let probeAt = Date()
             record.lastProbeAt = probeAt
-            let currentPID: Int32?
-            if probe.alive {
-                currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
-            } else {
-                currentPID = nil
-            }
+            let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            record.portListeningPID = currentPID
+            record.httpResponding = probe.alive
             if probe.alive,
                requireSameListeningPID,
                let pid,
@@ -395,6 +442,9 @@ extension EZRWorkerSupervisorController {
             record.isPrepared = true
             record.isRunning = true
             record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
+            record.portListeningPID = record.pid
+            record.httpResponding = finalProbe.alive
+            record.adoptionKind = adoptionKind(for: record, ownership: ownership)
             record.markHealthy(now: finalProbeAt)
             return (true, nil)
         }
@@ -447,6 +497,9 @@ extension EZRWorkerSupervisorController {
                 record.isPrepared = true
                 record.isRunning = true
                 record.ownership = .adopted
+                record.portListeningPID = pid
+                record.httpResponding = probe.alive
+                record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
                 record.markHealthy(now: probeAt)
                 return
             case .relaunch:
@@ -474,6 +527,9 @@ extension EZRWorkerSupervisorController {
                 record.pid = pid
                 record.isRunning = true
                 record.ownership = .adopted
+                record.portListeningPID = pid
+                record.httpResponding = probe.alive
+                record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
                 applyUnhealthyRunningSnapshot(
                     record,
                     pid: pid,
@@ -561,6 +617,7 @@ extension EZRWorkerSupervisorController {
         record.isRunning = true
         record.pid = pid
         record.ownership = ownership
+        record.adoptionKind = adoptionKind(for: record, ownership: ownership)
         record.readyState = .starting
         record.lastError = nil
         record.markUnhealthy(now: now, reason: reason)
@@ -581,5 +638,26 @@ extension EZRWorkerSupervisorController {
         record.lastReadyAt == nil
             ? Self.gatewayFreshLaunchGracePeriod
             : Self.gatewayUnresponsiveThreshold
+    }
+
+    private func adoptionKind(
+        for record: SupervisorRecord,
+        ownership: SupervisorOwnership
+    ) -> SupervisorAdoptionKind {
+        switch ownership {
+        case .none:
+            return .none
+        case .supervised:
+            return .supervised
+        case .adopted:
+            switch record.profile.sourceKind {
+            case .managed:
+                return .managedAdopted
+            case .legacyReuse:
+                return .legacyAdopted
+            case .externalReuse:
+                return .externalAdopted
+            }
+        }
     }
 }

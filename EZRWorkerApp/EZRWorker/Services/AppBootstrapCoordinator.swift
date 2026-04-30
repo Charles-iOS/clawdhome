@@ -727,8 +727,8 @@ final class AppBootstrapCoordinator {
                 appLog("bootstrap: recovery start failed: \(error.localizedDescription)", level: .error)
             }
         case .unresponsive:
-            guard runtime?.ownership == .supervised else {
-                appLog("bootstrap: recovery skipped restart; unresponsive gateway is not supervised", level: .warn)
+            guard runtimeAllowsManagedRestart(runtime) else {
+                appLog("bootstrap: recovery skipped restart; unresponsive gateway is not confirmed managed", level: .warn)
                 break
             }
             guard runtimeHasExceededUnresponsiveThreshold(runtime) else {
@@ -737,8 +737,9 @@ final class AppBootstrapCoordinator {
             }
             do {
                 let unhealthySeconds = runtimeUnhealthyDuration(runtime).map { Int($0.rounded(.down)) }
+                let restartKind = runtime?.ownership == .supervised ? "supervised" : "managed-adopted"
                 appLog(
-                    "bootstrap: recovery restarting supervised unresponsive gateway on port \(resolvedPort)"
+                    "bootstrap: recovery restarting \(restartKind) unresponsive gateway on port \(resolvedPort)"
                     + (unhealthySeconds.map { " after \($0)s unhealthy" } ?? ""),
                     level: .warn
                 )
@@ -793,6 +794,24 @@ final class AppBootstrapCoordinator {
         guard runtime.healthState == .unresponsive else { return false }
         guard let duration = runtimeUnhealthyDuration(runtime) else { return true }
         return duration >= appBootstrapGatewayUnresponsiveRestartThreshold
+    }
+
+    private func runtimeAllowsManagedRestart(_ runtime: SupervisorProfileRuntime?) -> Bool {
+        guard let runtime,
+              runtime.managementMode == .managedByEZRWorker,
+              runtime.sourceKind == .managed,
+              runtime.healthState == .unresponsive
+        else {
+            return false
+        }
+
+        if runtime.ownership == .supervised {
+            return true
+        }
+
+        return runtime.ownership == .adopted
+            && runtime.adoptionKind == .managedAdopted
+            && runtime.pid != nil
     }
 
     private func runtimeUnhealthyDuration(_ runtime: SupervisorProfileRuntime?) -> TimeInterval? {

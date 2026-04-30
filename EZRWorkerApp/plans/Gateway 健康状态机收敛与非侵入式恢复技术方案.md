@@ -17,6 +17,21 @@ todos:
   - id: phase5-regression-matrix
     content: "Phase 5: 按 Debug Run、登录、激活、唤醒、端口假活、supervisor XPC 不可用等场景回归验证"
     status: pending
+  - id: phase6-managed-adopted-unresponsive-recovery
+    content: "Phase 6: 修复 managed profile 在 supervisor 重启后接管到 adopted gateway 时，unresponsive 不自动恢复的问题"
+    status: pending
+  - id: phase7-installer-upgrade-handoff
+    content: "Phase 7: 补齐安装/更新期间的 managed Gateway 生命周期交接，避免升级 supervisor 时留下孤儿 Gateway"
+    status: pending
+  - id: phase8-persisted-desired-runtime-state
+    content: "Phase 8: 持久化 profile 运行意图和 manual stop 状态，避免 supervisor 重启后误自动拉起"
+    status: pending
+  - id: phase9-launchagent-source-of-truth
+    content: "Phase 9: 统一 Release/Debug supervisor LaunchAgent 来源，清理 /Library 与 ~/Library 同 label 分叉"
+    status: pending
+  - id: phase10-ownership-probe-and-tests
+    content: "Phase 10: 强化 Gateway 归属证明、健康探针语义和生命周期回归测试矩阵"
+    status: pending
 isProject: false
 ---
 
@@ -45,6 +60,11 @@ OpenClaw Gateway
 - 登录完成后提示 `EZRWorkerSupervisor 未就绪`
 - 重新 Run 后 App 一直连接 `19789`
 - `19789` 有 Node 进程监听，但 HTTP 请求超时，WebSocket 握手超时
+- 安装版 Default 进程仍在、端口仍监听，但 `/readyz` 和 `/healthz` 持续超时，UI 从“等待健康检查”进入“健康检查未响应”
+- 安装/更新包重装 supervisor LaunchAgent 时，旧 supervisor 被 SIGTERM，但它拉起的 managed Gateway 没有被明确交接或停止，留下 PPID 1 的孤儿 Gateway
+- 用户手动 stop 只记录在 supervisor 内存里，supervisor 重启后该状态丢失，autoStart 可能把用户明确停止的 profile 又拉起来
+- Release 安装包部署 `/Library/LaunchAgents`，App 侧自举又可能写 `~/Library/LaunchAgents`，同 label 双来源会让 launchd/BTM 状态变复杂
+- managed Gateway 归属主要依赖 lsof open files，缺少稳定的 profile launch nonce/pidfile，遇到 PID 复用或进程不再打开 config 文件时容易误判
 - 左下角显示未连接，设置页显示运行中
 - Debug Run 替换 helper 后，launchd 中 supervisor 可能短时间处于未 ready、重启中或签名退出状态
 
@@ -54,6 +74,10 @@ OpenClaw Gateway
 - Supervisor 用 `readyState` 同时表达启动中、健康检查中、端口假活、失败等状态
 - UI 用不同来源的数据渲染，导致状态看起来互相矛盾
 - 自动恢复逻辑在少数路径里仍可能根据 `.ready`/`.starting` 这种粗状态决定 start/restart
+- managed Gateway 在 supervisor 重启后可能变成“匹配当前 profile 的 adopted PID”，现有策略又把所有 adopted 一律排除在自动 restart 之外，导致这类健康检查无响应无法恢复
+- pkg `preinstall` 现在会直接 `launchctl bootout` supervisor，但没有先让旧 supervisor 对 managed Gateway 做 upgrade handoff；这会把本来应由 EZRWorker 管理的 Gateway 留给 launchd 领养
+- 健康探针里的 `alive` 实际表示 HTTP `/readyz` 或 `/healthz` 有 200 响应，不表示 TCP 端口是否监听；这会把“无端口”和“端口监听但 event loop 卡死”混在一起
+- Gateway 子进程 stdout/stderr 通过 supervisor 里的 `Pipe` 承接，supervisor 被 SIGTERM 后 orphan Gateway 会保留没有读者的 pipe，存在 EPIPE/backpressure/日志丢失风险
 
 本方案是对既有《App 登录与激活 Gateway 非侵入式恢复技术方案》的补充和收敛，不推翻前一份方案。
 
@@ -270,6 +294,96 @@ trigger allows lifecycle operation
 
 这两个状态都可能是真的，但缺少分层说明。用户看到的是矛盾。
 
+### 6.5 安装版 Default 现场补充
+
+2026-04-30 现场排查安装版 Default 时，状态是：
+
+```text
+profile: Default
+config: /Users/charles/Library/Application Support/EZRWorker/profiles/default/state/openclaw.json
+port: 18809
+pid: 26596
+process: /Applications/EZRWorker.app/Contents/Resources/node/bin/node
+ppid: 1
+```
+
+关键事实：
+
+- `lsof` 显示 PID `26596` 仍监听 `127.0.0.1:18809`
+- `curl http://127.0.0.1:18809/readyz` 和 `/healthz` 在 2 秒内超时
+- 日志里曾出现 ready，说明不是简单的未启动
+- 当前 supervisor PID 晚于 Gateway PID 启动，Gateway 已 reparent 到 launchd
+- Gateway 打开的 config/state 路径匹配 Default profile
+- 这不是 external / observe-only，而是 managed profile 的 matching adopted Gateway
+
+安装链路也能解释 supervisor 为什么重启：
+
+```text
+2026-04-30 13:42:45  打开 EZRWorker-1.1.0-x64.pkg
+2026-04-30 13:44:19  执行 preinstall
+2026-04-30 13:44:20  launchd 给旧 supervisor PID 26483 发 SIGTERM
+2026-04-30 13:44:34  执行 postinstall
+2026-04-30 13:44:51  重新安装并拉起 EZRWorkerSupervisor LaunchAgent
+```
+
+这说明“升级时重启 supervisor”本身合理，但“managed Gateway 没有被交接或停止，随后变成 orphan/adopted”不合理。
+
+进程 sample 显示 Node 主线程长期停在 V8/JS Promise microtask、字符串/JSON 相关路径，HTTP 健康检查不能被及时服务。同期 `/tmp/openclaw` 日志里有飞书/channel 相关错误，需要作为可能诱因继续排查，但本方案只处理 EZRWorker 侧状态机与恢复边界。
+
+当前恢复缺口可以简化成：
+
+```text
+profile is managed
+matching PID exists
+ownership == adopted
+healthState == unresponsive
+userStoppedAt == nil
+trigger == reconnectLoop/systemWake
+=> 当前策略不会 restart，因为 adopted 被一律排除
+```
+
+因此需要把 adopted 细分成四类：
+
+- `adoptedManaged`: managed profile，监听 PID 的 config/state/env 匹配当前 profile，可以在严格条件下 restart
+- `adoptedLegacy`: legacy/imported 进程，只观测，不自动 restart
+- `adoptedExternal`: external/observe-only 进程，只观测，不自动 restart
+- `unknownAdopted`: 归属无法确认，只观测，不自动 restart
+
+短期不一定新增 enum case，可以先用：
+
+```text
+sourceKind == managed
+AND managementMode == managedByEZRWorker
+AND gatewayProcessMatches(record, pid)
+```
+
+识别 managed adopted runtime，并只在这个受限集合里允许自动恢复。
+
+### 6.6 系统性复盘问题矩阵
+
+这次不能只修 Default 的 unresponsive 表象。按完整生命周期复盘后，至少有这些系统性缺口：
+
+| 层级 | 当前行为 | 风险 | 处理优先级 |
+| --- | --- | --- | --- |
+| pkg preinstall | 直接退出 App 并 `launchctl bootout` supervisor | managed Gateway 变成 PPID 1 orphan | P0 |
+| supervisor restart | 新 supervisor 只能看到 adopted PID | managed profile 被当作外部 adopted，不自动恢复 | P0 |
+| manual stop | `userStoppedAt` 只在内存 | supervisor 重启/升级后用户停止意图丢失 | P0 |
+| LaunchAgent 来源 | Release pkg 用 `/Library/LaunchAgents`，App runtime bootstrap 用 `~/Library/LaunchAgents` | 同 label 双来源，BTM/launchd 状态不稳定 | P0 |
+| 健康探针 | `alive` 表示 HTTP 有响应，不表示端口监听 | 端口监听但 HTTP 卡死会被误当“不可用” | P1 |
+| 进程归属 | 依赖 PID、端口、lsof open files | PID 复用、文件未打开、同端口其他 Gateway 会误判 | P1 |
+| 子进程日志 | Gateway stdout/stderr 接到 supervisor Pipe | supervisor 退出后 orphan Gateway 日志 pipe 无读者 | P1 |
+| legacy 接管 | legacy 端口上任意 openclaw gateway 容易被 adopt/stop | imported legacy 可能误接管或误停其他实例 | P1 |
+| 常量与策略 | App/Supervisor 各自维护阈值与探针含义 | 90s/240s/180 attempts 等策略漂移 | P2 |
+| 测试覆盖 | lifecycle 场景缺少单测/脚本回归 | 继续靠现场现象补丁 | P0 |
+
+结论：
+
+```text
+Phase 6 解决“新 supervisor 起来后如何兜底恢复”。
+Phase 7 解决“安装/更新前如何不制造 orphan Gateway”。
+Phase 8/9/10 解决“运行意图、LaunchAgent 来源、归属证明、探针语义、测试覆盖”的系统性问题。
+```
+
 ## 七、目标状态模型
 
 ### 7.1 保持兼容的共享模型扩展
@@ -288,6 +402,21 @@ enum SupervisorHealthState: String, Codable {
 }
 ```
 
+建议后续补充：
+
+```swift
+enum SupervisorAdoptionKind: String, Codable {
+    case none
+    case supervised
+    case managedAdopted
+    case legacyAdopted
+    case externalAdopted
+    case unknownAdopted
+}
+```
+
+短期可先不改 enum ABI，用 `ownership + sourceKind + managementMode + PID 匹配结果` 计算；但日志、UI 和 recovery 必须有等价的分类语义。
+
 建议新增字段：
 
 ```swift
@@ -297,6 +426,9 @@ var unhealthySince: Date?
 var lastHealthyProbeAt: Date?
 var lastUnhealthyReason: String?
 var userStoppedAt: Date?
+var portListeningPID: Int32?
+var httpResponding: Bool?
+var adoptionKind: SupervisorAdoptionKind?
 ```
 
 短期兼容策略：
@@ -305,6 +437,8 @@ var userStoppedAt: Date?
 - 新 recovery 逻辑优先使用 `healthState`
 - `readyState` 由 `healthState` 映射生成
 - XPC JSON 编解码保持向后兼容，新增字段给默认值
+
+`userStoppedAt` 不能只放在 `SupervisorRecord` 内存中，必须进入持久化 runtime state。否则 supervisor 被 launchd、安装包或系统重启拉起后，manual stop 语义会丢失。
 
 ### 7.2 状态含义
 
@@ -381,16 +515,56 @@ func markManuallyStopped(now: Date)
 
 ```swift
 static let gatewayUnresponsiveThreshold: TimeInterval = 90
-static let gatewayFreshLaunchGracePeriod: TimeInterval = 180
+static let gatewayFreshLaunchGracePeriod: TimeInterval = 240
 ```
 
 含义：
 
-- 新启动后的 180 秒内，端口未 ready 仍可显示 `launching` 或 `portListening`
+- 新启动后的 240 秒内，端口未 ready 仍可显示 `launching` 或 `portListening`
 - 曾经 ready 过的进程，如果健康检查连续失败 90 秒，则标记 `unresponsive`
 - 未曾 ready 过但已经超过启动等待上限，则标记 `failed`
 
 Debug 首次启动插件依赖较慢，因此 fresh launch grace 不应短于现有等待上限。
+
+### 8.2.1 探针语义拆分
+
+当前 `GatewayHealthProbe.httpProbe` 返回：
+
+```text
+alive = /readyz 或 /healthz 返回 200
+ready = /readyz 返回 200
+```
+
+这个 `alive` 不是“端口监听”，而是“HTTP 有响应”。因此必须在 supervisor runtime 中拆开：
+
+```text
+portListening
+  lsof 能确认端口有 LISTEN PID
+
+httpResponding
+  /readyz 或 /healthz 在超时内返回 HTTP 200
+
+ready
+  /readyz 返回 HTTP 200
+```
+
+状态判定改为：
+
+```text
+portListening == false
+  -> noProcess 或 launching
+
+portListening == true && httpResponding == false
+  -> portListening，超过阈值后 unresponsive
+
+httpResponding == true && ready == false
+  -> portListening / warming up
+
+ready == true
+  -> healthy
+```
+
+App 侧 `confirmGatewayUnavailable` 也不能只看 `probe.alive == false`。它应优先使用 supervisor runtime 的 `portListeningPID/httpResponding/healthState`；只有 supervisor 不可用时，才降级为直接 HTTP probe。
 
 ### 8.3 Managed profile 刷新逻辑
 
@@ -423,9 +597,49 @@ no process, no matching pid
 - 即使 HTTP probe 失败，也要查端口监听 PID
 - 端口监听 PID 必须匹配当前 profile
 - 不匹配则是端口占用，不是 adopted healthy gateway
+- managed profile 的监听 PID 匹配当前 profile 时，即使 `record.process == nil` 或进程已 reparent，也要保留 PID/sourceKind/ownership 信息
+- matching adopted managed Gateway 使用与 supervised Gateway 相同的健康窗口，超过阈值后标记 `unresponsive`
 - `unhealthySince` 第一次失败时设置，恢复 healthy 时清空
 
-### 8.4 Legacy / External profile 边界
+### 8.4 Managed adopted profile 边界
+
+managed adopted 的来源通常是：
+
+- supervisor 自身被 launchd 重启，旧 Gateway 子进程继续运行并 reparent 到 launchd
+- Gateway 或外部工具绕过当前 `Process` 句柄启动了匹配当前 profile 的进程
+
+只有同时满足以下条件时，才视为 managed adopted：
+
+```text
+profile.sourceKind == managed
+profile.managementMode == managedByEZRWorker
+listeningPID exists
+looksLikeGatewayProcess(commandLine)
+gatewayProcessMatches(record, listeningPID)
+```
+
+满足时：
+
+- UI 可以显示 adopted 但仍属于当前 managed profile
+- stop/restart 可以通过 PID 与 profile 校验执行
+- conservative recovery 可以在 `unresponsive` 且超过阈值后 restart
+- 日志必须标注 `managed-adopted`，避免和 external/legacy 混淆
+
+不满足时：
+
+- 不接管
+- 不 restart
+- 只显示端口占用、legacy adopted、external adopted 或 unknown adopted 状态
+
+长期可以把 ownership 扩展为：
+
+```text
+none / supervised / adoptedManaged / adoptedLegacy / adoptedExternal
+```
+
+短期为降低改动面，保留现有 `supervised/adopted/none`，在 App recovery 和 supervisor lifecycle 中额外检查 `sourceKind`、`managementMode`、PID 匹配关系。
+
+### 8.5 Legacy / External profile 边界
 
 legacy / external 可以观测健康状态，但不能自动 restart：
 
@@ -439,7 +653,7 @@ sourceKind == externalReuse
   端口不响应也只显示异常，不 restart
 ```
 
-### 8.5 用户手动停止边界
+### 8.6 用户手动停止边界
 
 `stopProfile` 成功后：
 
@@ -456,6 +670,146 @@ record.readyState = .stopped
 - UI 显示 `已停止`
 
 用户手动点击 start/restart 或切换 profile 后清除该标记。
+
+### 8.7 安装/更新期间的 managed Gateway handoff
+
+安装/更新包重启 supervisor 是合理的，但不能直接留下 managed Gateway 孤儿。`scripts/build-pkg.sh` 生成的 `preinstall` 当前会先退出 App，再 `launchctl bootout` 旧 supervisor：
+
+```text
+preinstall
+  -> tell application EZRWorker to quit
+  -> launchctl bootout gui/<uid> /Library/LaunchAgents/ai.ezrworker.mac.supervisor.plist
+```
+
+这会让旧 supervisor 退出，但它已经拉起的 Gateway 进程可能继续运行并被 launchd 领养。正确顺序应该是：
+
+```text
+preinstall
+  -> 尝试调用旧 supervisor 的 prepareForUpgrade
+  -> 旧 supervisor 停止或记录所有 managedByEZRWorker Gateway
+  -> 再 bootout supervisor LaunchAgent
+
+postinstall
+  -> bootstrap/enable/kickstart 新 supervisor
+  -> 新 supervisor 做 upgrade reconcile
+  -> autoStart 的 managed profile 按新版本重新启动
+```
+
+`prepareForUpgrade` 的约束：
+
+- 只处理 `managementMode == managedByEZRWorker` 的 profile
+- 只停止 supervised 或 confirmed managed-adopted 的 Gateway
+- 不处理 `legacyReuse`、`externalReuse`、observe-only 或 unknown adopted
+- bounded timeout，不能无限阻塞安装
+- 写入 upgrade handoff 记录，包含 profile id、slug、port、pid、action、error
+- 如果旧版本不支持 `prepareForUpgrade`，preinstall 只能降级为当前 bootout 行为，后续依赖 Phase 6 的 managed-adopted 兜底恢复
+
+建议的实现方式：
+
+- 在 `Shared/SupervisorProtocol.swift` 增加 `prepareForUpgrade(withReply:)`
+- 在 `EZRWorkerSupervisor/EZRWorkerSupervisorService.swift` 暴露 XPC 方法
+- 在 `EZRWorkerSupervisor/SupervisorController+Lifecycle.swift` 实现 bounded graceful stop
+- 给 `EZRWorkerSupervisor` 增加 CLI 模式，例如 `--prepare-upgrade --timeout 10`，由 pkg `preinstall` 在 console user 上下文调用旧 App bundle 中的 supervisor binary
+- 在 `scripts/build-pkg.sh` 的 `preinstall` 中，先通过 `launchctl asuser <uid>` 或等价方式调用旧 binary 的 prepare-upgrade，并设置正确 `HOME`，再执行 `launchctl bootout`
+- 新 supervisor 启动时读取 handoff 记录，对 autoStart managed profile 做 reconcile；如果发现旧 PID 仍在且匹配当前 profile，则走 managed-adopted 兜底逻辑
+
+注意：pkg 脚本以 root 运行。任何读取 `~/Library/Application Support/EZRWorker` 的逻辑都必须显式切到 console user，否则会误读 `/var/root` 下的数据。
+
+### 8.8 运行意图与 manual stop 持久化
+
+`SupervisorRecord.userStoppedAt` 当前只存在内存里。只要 supervisor 因安装、launchd、重启或 App 自举被替换，这个状态就会丢失，`reconcileAutoStartProfiles` 会重新启动 `autoStart == true` 的 profile。
+
+需要新增持久化 runtime state，例如：
+
+```text
+~/Library/Application Support/EZRWorker/supervisor-state.json
+```
+
+字段建议：
+
+```json
+{
+  "profiles": {
+    "<profile-id>": {
+      "desiredState": "running|stopped",
+      "userStoppedAt": "2026-04-30T13:00:00Z",
+      "lastManagedPID": 26596,
+      "lastLaunchNonce": "..."
+    }
+  }
+}
+```
+
+规则：
+
+- 用户点击 stop：写入 `desiredState=stopped`、`userStoppedAt`
+- 用户点击 start/restart：清除 `userStoppedAt`，写入 `desiredState=running`
+- autoStart reconcile：必须同时满足 `autoStart == true` 且 `desiredState != stopped`
+- installer prepare-upgrade：不能把 upgrade stop 误写成 user stop，应使用单独 `upgradeHandoffAt`
+- profile 删除：清理对应 runtime state
+
+### 8.9 Supervisor LaunchAgent 单一来源
+
+Release 当前存在两个潜在来源：
+
+```text
+/Library/LaunchAgents/ai.ezrworker.mac.supervisor.plist
+~/Library/LaunchAgents/ai.ezrworker.mac.supervisor.plist
+```
+
+pkg 安装脚本部署 `/Library/LaunchAgents`。App 侧 `SupervisorClient.runtimeLaunchAgentContext()` 又会写 `~/Library/LaunchAgents`。同一个 label 出现在两个路径，会让 launchd、BTM 和升级脚本的判断变得不稳定。
+
+需要明确策略：
+
+```text
+Release installed build
+  以 /Library/LaunchAgents 为唯一来源
+  App 不主动写同 label 的 ~/Library/LaunchAgents
+  若发现用户目录同 label plist，先诊断并清理/禁用，再继续
+
+Debug build
+  以 ~/Library/LaunchAgents/ai.ezrworker.mac.dev.supervisor.plist 为唯一来源
+  不触碰 Release label
+```
+
+如果产品最终希望 Release 也使用用户目录 LaunchAgent，则 pkg 就不应再部署 `/Library/LaunchAgents`。不能两边同时存在。
+
+### 8.10 Gateway 归属证明
+
+仅靠 PID、端口和 lsof open files 不够。需要给 managed Gateway 一个稳定归属证明：
+
+- supervisor 启动 Gateway 前生成 `launchNonce`
+- 写入 profile state 中的 `supervisor-runtime.json`
+- Gateway 启动环境包含 `EZRWORKER_PROFILE_ID`、`EZRWORKER_LAUNCH_NONCE`
+- 记录 PID、进程启动时间、port、configPath、stateDir、supervisorPID
+- adopt/stop/restart 前同时校验 PID、启动时间、port、profileID、launchNonce/config/state
+
+这样可以覆盖：
+
+- PID 复用
+- Gateway 不再打开 config 文件
+- 同端口出现其他 OpenClaw Gateway
+- supervisor 重启后重新纳管 managed Gateway
+
+### 8.11 子进程 stdout/stderr
+
+Gateway 长期运行日志不能只依赖 supervisor 进程内的 `Pipe`。否则 supervisor 被 SIGTERM 后，orphan Gateway 会留下没有读者的 stdout/stderr pipe。
+
+建议：
+
+- Gateway stdout/stderr 直接重定向到 per-profile log file
+- startup output collector 读取同一日志文件尾部或使用有生命周期边界的 tee
+- supervisor 退出不影响 Gateway 写日志
+- restart/stop 时轮转 `gateway-current.log` / `gateway-previous.log`
+
+### 8.12 Legacy / External 收敛边界
+
+legacy / external 的接管和停止必须比 managed 更保守：
+
+- legacy 不应仅因“端口上是 openclaw gateway”就 adopt/stop
+- stop legacy/external 前也要匹配 config/state/launchAgent handoff 信息
+- observe-only 永远不 stop/restart
+- imported legacy 若要变成 managed，必须先完成旧 LaunchAgent handoff
 
 ## 九、App Recovery 策略
 
@@ -527,7 +881,10 @@ confirmGatewayUnavailable == true
 
 ```text
 profile.managementMode == managedByEZRWorker
-runtime.ownership == supervised
+(
+  runtime.ownership == supervised
+  OR runtime is confirmed managed-adopted for current profile
+)
 runtime.healthState == unresponsive
 runtime.unhealthySince 已超过阈值
 runtime.userStoppedAt == nil
@@ -540,7 +897,8 @@ confirmGatewayUnavailable == true
 trigger == appActivated
 trigger == screenUnlocked
 profile observe-only
-runtime ownership == adopted 且无法确认由当前 profile 管理
+runtime ownership == adopted 且无法确认由当前 managed profile 管理
+runtime sourceKind == legacyReuse/externalReuse
 runtime healthState == launching
 runtime healthState == portListening 且未超过阈值
 runtime userStoppedAt != nil
@@ -560,7 +918,9 @@ case .ready:
 
 ```text
 case healthState == .unresponsive && recovery mode allows restart:
-    supervisorClient.restartProfile(...)
+    if ownership == .supervised || isManagedAdoptedRuntime {
+        supervisorClient.restartProfile(...)
+    }
 
 case readyState == .ready:
     skip lifecycle operation; log stale runtime mismatch
@@ -571,6 +931,7 @@ case readyState == .ready:
 ```text
 bootstrap: recovery skipped restart for ready runtime without supervisor unresponsive state
 bootstrap: recovery restarting supervised unresponsive gateway on port 19789 after 94s unhealthy
+bootstrap: recovery restarting managed-adopted unresponsive gateway on port 18809 pid=26596 after 94s unhealthy
 ```
 
 ## 十、UI 状态统一
@@ -650,6 +1011,7 @@ App 连接状态：来自 GatewayService.isConnected
 - runtime healthState
 - readyState
 - ownership
+- adoption 分类
 - unhealthy duration
 - lifecycle decision
 
@@ -670,6 +1032,7 @@ bootstrap: recovery restarting supervised unresponsive gateway on port 19789
 - listening PID
 - recorded process PID
 - ownership
+- adoption 分类
 - health transition
 - unhealthySince
 - final readyState
@@ -709,7 +1072,7 @@ supervisor: profile=default port=19789 probe failed but process still running; w
 1. 先落状态模型和恢复策略，避免混入 UI 大改
 2. 再统一 UI 文案
 
-不要回滚无关文件，不要把 LaunchAgent handoff 相关改动混在本方案里。
+不要回滚无关文件。旧 OpenClaw LaunchAgent 迁移交接不要混进本方案；安装/更新期间的 EZRWorker supervisor handoff 属于 Phase 7，只处理 managed Gateway，不处理 legacy/external。
 
 ## 十四、实施步骤
 
@@ -765,7 +1128,7 @@ supervisor: profile=default port=19789 probe failed but process still running; w
 - 保留 supervisor 不可用时 direct reconnect
 - 保留 reconnectOnly/conservativeStart 区分
 - 移除 `.ready` 直接 restart
-- 只在 `healthState == .unresponsive` 且满足 managed/supervised/threshold 时 restart
+- 只在 `healthState == .unresponsive` 且满足 managed +（supervised 或 managed-adopted）+ threshold 时 restart
 - 登录 bootstrap 不自动 restart unresponsive gateway
 
 验收：
@@ -810,6 +1173,143 @@ supervisor: profile=default port=19789 probe failed but process still running; w
 10. managed profile 与 observe-only external profile
 11. adopted PID 与 recorded process PID 不一致
 12. 端口被非 Gateway 进程占用
+13. 安装版 supervisor 重启后，Default Gateway 变成 PPID 1 的 matching adopted PID
+14. matching adopted managed Gateway 端口监听但 `/readyz`/`/healthz` 连续超时
+15. Imported Legacy / external observe-only Gateway unresponsive 时只显示状态，不自动 restart
+16. pkg 更新时 preinstall 先做 managed Gateway handoff，再 bootout supervisor
+17. 旧版本不支持 handoff 的升级路径仍能通过 managed-adopted 兜底恢复
+18. 用户手动 stop 后重启 supervisor，autoStart profile 不被自动拉起
+19. Release 环境同时存在 `/Library` 和 `~/Library` 同 label LaunchAgent 时，能诊断并收敛到单一来源
+20. 端口监听但 HTTP health 超时，runtime 能区分 `portListening=true` 与 `httpResponding=false`
+21. PID 被复用或同端口出现其他 OpenClaw Gateway 时，不误判为当前 managed profile
+22. supervisor 被 SIGTERM 后，Gateway stdout/stderr 不再保留无读者 pipe
+23. legacy/imported profile 端口上出现其他 openclaw gateway 时，不自动 adopt/stop
+
+### Phase 6: Managed adopted unresponsive 自动恢复
+
+修改：
+
+- `EZRWorkerSupervisor/SupervisorController+Readiness.swift`
+- `EZRWorkerSupervisor/SupervisorController+GatewayProcess.swift`
+- `EZRWorkerApp/EZRWorker/Services/AppBootstrapCoordinator.swift`
+
+内容：
+
+- supervisor refresh 时保留 matching adopted managed runtime 的 PID、sourceKind、ownership 和 health window
+- App recovery 增加 `isManagedAdoptedRuntime` 判定
+- restart 条件从仅 `ownership == .supervised` 扩展为 `supervised OR managed-adopted`
+- legacy/external/observeOnly adopted 仍然只展示状态，不自动 restart
+- restart 前重新确认 PID 仍匹配当前 profile，避免误杀端口上的其他进程
+- 日志区分 `supervised`、`managed-adopted`、`legacy-adopted`、`external-adopted`、`unknown-adopted`
+
+验收：
+
+- 安装版 Default 变成 PPID 1 matching adopted PID 后，若健康检查持续超时，`reconnectLoop/systemWake` 可自动 restart
+- `appActivated/screenUnlocked` 仍只 reconnect，不做生命周期操作
+- imported legacy / external observe-only Gateway 不会被自动 restart
+- 非 Gateway 进程或其他 profile 进程占用端口时不会被 restart
+- 用户手动 stop 后不会被自动 start/restart
+
+### Phase 7: 安装/更新 handoff
+
+修改：
+
+- `scripts/build-pkg.sh`
+- `Shared/SupervisorProtocol.swift`
+- `EZRWorkerSupervisor/EZRWorkerSupervisorService.swift`
+- `EZRWorkerSupervisor/SupervisorController+Lifecycle.swift`
+- `EZRWorkerSupervisor/main.swift`
+
+内容：
+
+- 新增 supervisor XPC 方法 `prepareForUpgrade`
+- 新增 supervisor CLI 模式 `--prepare-upgrade --timeout <seconds>`，供 pkg `preinstall` 调用旧版本 supervisor
+- `prepareForUpgrade` 在 bounded timeout 内停止所有 confirmed managed Gateway，并写入 upgrade handoff 记录
+- `scripts/build-pkg.sh` 生成的 `preinstall` 在 `launchctl bootout` 之前先调用旧 App bundle 的 prepare-upgrade
+- `postinstall` 拉起新 supervisor 后，由新 supervisor 启动 reconcile，按 autoStart 与 userStoppedAt 恢复 managed profile
+- 如果旧 supervisor 不支持 prepare-upgrade，记录降级日志，不阻断安装；后续由 Phase 6 识别 managed-adopted 并恢复
+- 不在安装脚本里按端口裸 kill，不处理 legacy/external/observe-only profile
+
+验收：
+
+- 更新安装时，健康的 Default managed Gateway 不会被无声遗留为 PPID 1 orphan
+- preinstall 日志能看到 prepare-upgrade 是否执行、停止了哪些 PID、哪些失败
+- postinstall 后 autoStart managed profile 能由新 supervisor 重新启动或重新纳管
+- 旧版本升级到新版本时，即使旧 supervisor 无 prepare-upgrade，也不会误杀 external/legacy，且新版本能按 managed-adopted 兜底
+- 安装流程 bounded，不会因为 Gateway stop 卡住 pkg 安装
+
+### Phase 8: 持久化运行意图
+
+修改：
+
+- `Shared/GatewayProfiles.swift`
+- `EZRWorkerSupervisor/SupervisorRecord.swift`
+- `EZRWorkerSupervisor/SupervisorController+AutoStart.swift`
+- `EZRWorkerSupervisor/SupervisorController+Lifecycle.swift`
+
+内容：
+
+- 新增 supervisor runtime state 文件，持久化 `desiredState`、`userStoppedAt`、`lastManagedPID`、`lastLaunchNonce`
+- `stopProfile(markUserStopped: true)` 写入持久 manual stop
+- `startProfile/restartProfile` 清除 manual stop
+- `reconcileAutoStartProfiles` 跳过 `desiredState == stopped` 的 profile
+- upgrade handoff stop 与 user manual stop 分离
+
+验收：
+
+- 用户手动 stop 后，supervisor 重启、App 重启、pkg 更新都不会自动拉起该 profile
+- 用户手动 start/restart 后，autoStart 能恢复正常
+- 删除 profile 后 runtime state 被清理
+
+### Phase 9: LaunchAgent 来源收敛
+
+修改：
+
+- `scripts/build-pkg.sh`
+- `Shared/EZRWorkerBranding.swift`
+- `EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift`
+- `Resources/ai.ezrworker.mac.supervisor.plist`
+
+内容：
+
+- 明确 Release installed build 的 supervisor LaunchAgent 唯一来源
+- 如果选择 `/Library/LaunchAgents`，App release 运行时不再写 `~/Library/LaunchAgents` 同 label plist
+- 如果选择 `~/Library/LaunchAgents`，pkg 不再部署 `/Library/LaunchAgents` 同 label plist
+- Debug 继续使用独立 dev label 和用户目录 plist
+- 启动时诊断同 label 多来源，并给出可恢复路径
+
+验收：
+
+- `launchctl print gui/<uid>/ai.ezrworker.mac.supervisor` 的 path 稳定且唯一
+- 安装、更新、App 自举不会在两个目录间切换 supervisor 来源
+- Debug Run 不触碰 Release LaunchAgent
+
+### Phase 10: 归属、探针与测试矩阵硬化
+
+修改：
+
+- `Shared/GatewayHealthProbe.swift`
+- `Shared/GatewayProfiles.swift`
+- `EZRWorkerSupervisor/SupervisorController+GatewayProcess.swift`
+- `EZRWorkerSupervisor/SupervisorController+Readiness.swift`
+- `EZRWorkerSupervisor/ProcessOutputCollector.swift`
+- `tests/BootstrapCoordinatorTests.swift` 或新增 lifecycle 测试文件
+
+内容：
+
+- 拆分 `portListening/httpResponding/ready` 语义
+- 新增 managed Gateway launch nonce / runtime pidfile / PID 启动时间校验
+- stop/restart 前统一走 `confirmedManagedGateway` 校验
+- Gateway stdout/stderr 改为稳定文件日志，避免 orphan pipe
+- legacy/external adopt/stop 必须匹配 config/state/LaunchAgent handoff
+- 增加生命周期回归测试和脚本化现场探针
+
+验收：
+
+- 端口监听但 HTTP timeout 能稳定进入 `unresponsive`，不会被误判为无进程
+- PID 复用不导致误杀
+- legacy/external 不会被 managed recovery 误处理
+- lifecycle 关键路径有自动化覆盖，不再靠现场逐个发现
 
 ## 十五、风险与防护
 
@@ -842,8 +1342,9 @@ supervisor: profile=default port=19789 probe failed but process still running; w
 防护：
 
 - restart 必须满足 `managementMode == .managedByEZRWorker`
-- restart 必须满足 `ownership == .supervised`
-- adopted/external/observe-only 只显示状态，不自动 restart
+- restart 必须满足 `ownership == .supervised` 或明确的 managed-adopted
+- managed-adopted 必须在 restart 前重新确认 PID 的 config/state 匹配当前 profile
+- legacy/external/observe-only adopted 只显示状态，不自动 restart
 
 ### 15.5 风险：supervisor 不可用时状态停滞
 
@@ -852,6 +1353,62 @@ supervisor: profile=default port=19789 probe failed but process still running; w
 - App direct reconnect 成功后显示 Gateway 已连接
 - 设置页单独显示 supervisor 未就绪
 - 不用空 runtime 覆盖已有 running 状态
+
+### 15.6 风险：安装/更新 handoff 阻塞安装
+
+防护：
+
+- `prepareForUpgrade` 必须有短 timeout，例如 10 秒
+- 失败只记录日志并降级到 managed-adopted 兜底恢复，不让 pkg 安装无限等待
+- 安装脚本不直接裸 kill 端口 PID
+
+### 15.7 风险：升级时误停用户外部 Gateway
+
+防护：
+
+- handoff 只处理 `managementMode == .managedByEZRWorker`
+- 停止前必须确认 PID/config/state 匹配当前 profile
+- legacy/external/observe-only/unknown adopted 不进入 installer handoff 停止集合
+
+### 15.8 风险：manual stop 状态丢失
+
+防护：
+
+- manual stop 必须持久化到 supervisor runtime state
+- autoStart reconcile 必须检查持久 `desiredState`
+- upgrade handoff stop 不写成 manual stop
+
+### 15.9 风险：LaunchAgent 同 label 多来源
+
+防护：
+
+- Release 和 Debug 明确不同 label
+- Release 同一 label 只能有一个安装路径
+- 启动诊断发现 `/Library` 与 `~/Library` 同 label 时，不静默切换来源
+
+### 15.10 风险：PID/端口误归属
+
+防护：
+
+- 不只看端口和进程名
+- 归属确认必须包含 profileID、launchNonce 或 config/state 强匹配
+- stop/restart 前再次确认 PID 启动时间，避免 PID 复用
+
+### 15.11 风险：健康探针语义继续混淆
+
+防护：
+
+- `portListening`、`httpResponding`、`ready` 分字段记录
+- App lifecycle 决策优先使用 supervisor runtime，而不是直接把 HTTP timeout 当作无进程
+- UI 文案区分“端口未监听”和“端口监听但 HTTP 无响应”
+
+### 15.12 风险：缺少自动化回归
+
+防护：
+
+- 为 recovery mode、manual stop、managed-adopted、LaunchAgent 来源写单测或脚本测试
+- pkg upgrade 场景加入手工回归清单
+- 诊断命令输出纳入 issue 模板或 debug bundle
 
 ## 十六、最终判定规则
 
@@ -863,6 +1420,7 @@ AND mode == conservativeStart
 AND profile.managementMode == managedByEZRWorker
 AND runtime.healthState == noProcess
 AND runtime.userStoppedAt == nil
+AND persisted desiredState != stopped
 AND supervisor connected
 AND confirmGatewayUnavailable == true
 ```
@@ -873,10 +1431,15 @@ AND confirmGatewayUnavailable == true
 trigger in [systemWake, reconnectLoop]
 AND mode == conservativeStart
 AND profile.managementMode == managedByEZRWorker
-AND runtime.ownership == supervised
+AND (
+  runtime.ownership == supervised
+  OR runtime is confirmed managed-adopted for current profile
+)
 AND runtime.healthState == unresponsive
 AND runtime.unhealthySince older than threshold
 AND runtime.userStoppedAt == nil
+AND persisted desiredState != stopped
+AND PID ownership is re-confirmed immediately before restart
 AND supervisor connected
 AND confirmGatewayUnavailable == true
 ```
@@ -888,8 +1451,10 @@ trigger in [appActivated, screenUnlocked]
 OR login bootstrap
 OR supervisor unavailable
 OR profile observe-only
-OR ownership adopted/external
+OR ownership adopted but not confirmed managed-adopted for current profile
+OR sourceKind legacyReuse/externalReuse
 OR user stopped
+OR persisted desiredState == stopped
 OR healthState launching/portListening within grace period
 ```
 
@@ -912,6 +1477,35 @@ OR healthState launching/portListening within grace period
   -> 左下角显示 WebSocket 未连接
   -> 设置页显示 Gateway 健康/不健康与 supervisor 状态
   -> 两处文案不再互相否定
+
+安装版 Default 进程还在但健康检查未响应
+  -> supervisor 识别 PID 是否为当前 managed profile 的 adopted Gateway
+  -> 如果匹配，标记 managed-adopted unresponsive
+  -> conservative recovery 达到阈值后 restart
+  -> 如果是 legacy/external/unknown adopted，只展示异常，不自动 restart
+
+安装/更新包重启 supervisor
+  -> preinstall 先调用旧 supervisor prepareForUpgrade
+  -> 旧 supervisor 停止或记录 managed Gateway
+  -> 再 bootout supervisor LaunchAgent
+  -> postinstall 拉起新 supervisor
+  -> 新 supervisor reconcile autoStart managed profile
+  -> 如果旧版本不支持 handoff，则由 managed-adopted 兜底恢复
+
+用户手动停止 Default
+  -> desiredState=stopped 持久化
+  -> supervisor/App/pkg 更新后仍保持停止
+  -> 只有用户手动 start/restart 才清除停止意图
+
+Release supervisor LaunchAgent
+  -> 只有一个来源路径
+  -> 不在 /Library 与 ~/Library 之间静默切换
+  -> Debug 使用 dev label，互不影响
+
+端口监听但 HTTP 卡死
+  -> runtime 显示 portListening=true, httpResponding=false
+  -> 超过阈值进入 unresponsive
+  -> restart 前再次确认 managed ownership
 ```
 
 核心原则：
@@ -919,5 +1513,7 @@ OR healthState launching/portListening within grace period
 ```text
 App 负责连接和展示。
 Supervisor 负责进程归属和健康判定。
+Installer 负责升级前触发 managed Gateway handoff，不直接按端口裸 kill。
+持久化 desired state 负责表达用户意图，不能只存在内存里。
 Gateway restart 只能发生在明确、受限、可解释的恢复路径里。
 ```
