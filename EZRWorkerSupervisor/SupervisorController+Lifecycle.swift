@@ -9,6 +9,7 @@ extension EZRWorkerSupervisorController {
 
         let record = recordForProfile(profile)
         record.readyState = .preparing
+        record.healthState = .launching
         record.lastError = nil
         record.lastLifecycleMessage = "正在检查 Profile 目录和 Gateway 配置"
 
@@ -31,10 +32,14 @@ extension EZRWorkerSupervisorController {
                 }
 
                 record.isPrepared = true
-                record.readyState = record.isRunning ? .ready : .stopped
-                record.lastLifecycleMessage = record.isRunning
-                    ? "外部 Gateway 已接入（仅观察）"
-                    : "外部 Profile 已验证，等待外部 Gateway 启动"
+                if record.isRunning {
+                    record.markHealthy()
+                    record.lastLifecycleMessage = "外部 Gateway 已接入（仅观察）"
+                } else {
+                    record.healthState = .noProcess
+                    record.readyState = .stopped
+                    record.lastLifecycleMessage = "外部 Profile 已验证，等待外部 Gateway 启动"
+                }
                 return (true, nil)
             }
 
@@ -69,14 +74,19 @@ extension EZRWorkerSupervisorController {
             try normalizeConfig(for: record.resolution)
 
             record.isPrepared = true
-            record.readyState = record.isRunning ? .ready : .stopped
-            record.lastLifecycleMessage = record.isRunning ? "Gateway 已就绪" : "Profile 已准备，等待启动 Gateway"
+            if record.isRunning {
+                record.markHealthy()
+            } else {
+                record.healthState = .noProcess
+                record.readyState = .stopped
+                record.unhealthySince = nil
+                record.lastUnhealthyReason = nil
+                record.lastLifecycleMessage = "Profile 已准备，等待启动 Gateway"
+            }
             return (true, nil)
         } catch {
             record.isPrepared = false
-            record.readyState = .failed
-            record.lastError = error.localizedDescription
-            record.lastLifecycleMessage = error.localizedDescription
+            record.markFailed(error.localizedDescription)
             return (false, error.localizedDescription)
         }
     }
@@ -105,11 +115,9 @@ extension EZRWorkerSupervisorController {
             return (false, "未找到 profile: \(profileID.uuidString)")
         }
         let record = recordForProfile(profile)
+        record.clearManualStopMarker()
         if let handoffMessage = unresolvedLaunchAgentHandoffMessage(for: profile) {
-            record.lastError = handoffMessage
-            record.lastLifecycleMessage = handoffMessage
-            record.readyState = .failed
-            record.isRunning = false
+            record.markFailed(handoffMessage)
             record.ownership = .none
             return (false, handoffMessage)
         }
@@ -120,10 +128,12 @@ extension EZRWorkerSupervisorController {
 
         guard profile.managementMode == .managedByEZRWorker else {
             let message = "该 Profile 当前为仅观察模式，不会由 EZRWorker 启动 Gateway"
-            record.lastError = message
-            record.lastLifecycleMessage = message
-            record.readyState = record.isPrepared ? .stopped : .failed
-            record.isRunning = false
+            if record.isPrepared {
+                record.markNoProcess(message: message)
+                record.lastError = message
+            } else {
+                record.markFailed(message)
+            }
             record.ownership = .none
             return (false, message)
         }
@@ -168,10 +178,7 @@ extension EZRWorkerSupervisorController {
             case .relaunch:
                 break
             case .fail(let message):
-                record.lastError = message
-                record.lastLifecycleMessage = message
-                record.readyState = .failed
-                record.isRunning = false
+                record.markFailed(message)
                 record.ownership = .none
                 return (false, message)
             }
@@ -213,15 +220,14 @@ extension EZRWorkerSupervisorController {
             record.pid = process.processIdentifier
             record.isRunning = true
             record.readyState = .starting
+            record.healthState = .launching
+            record.markUnhealthy(reason: "gateway process has started and is waiting for health check")
             record.ownership = .supervised
             record.lastError = nil
             record.lastLifecycleMessage = "Gateway 进程已启动，正在等待本地服务响应"
         } catch {
-            record.lastError = error.localizedDescription
-            record.readyState = .failed
-            record.isRunning = false
+            record.markFailed(error.localizedDescription)
             record.ownership = .none
-            record.lastLifecycleMessage = error.localizedDescription
             return (false, error.localizedDescription)
         }
 
@@ -257,10 +263,10 @@ extension EZRWorkerSupervisorController {
             return (true, nil)
         }
 
-        return await stopRecord(record)
+        return await stopRecord(record, markUserStopped: true)
     }
 
-    func stopRecord(_ record: SupervisorRecord) async -> (Bool, String?) {
+    func stopRecord(_ record: SupervisorRecord, markUserStopped: Bool = false) async -> (Bool, String?) {
         guard record.profile.managementMode == .managedByEZRWorker else {
             let message = "该 Profile 当前为仅观察模式，不会由 EZRWorker 停止 Gateway"
             record.lastLifecycleMessage = message
@@ -303,14 +309,19 @@ extension EZRWorkerSupervisorController {
         record.pid = nil
         record.isRunning = false
         record.ownership = .none
-        record.readyState = .stopped
-        record.lastProbeAt = Date()
-        record.lastLifecycleMessage = "Gateway 已停止"
+        if markUserStopped {
+            record.markManuallyStopped()
+        } else {
+            record.markNoProcess()
+        }
         return (true, nil)
     }
 
     func restartProfile(profileID: UUID) async -> (Bool, String?) {
-        let stopResult = await stopProfile(profileID: profileID)
+        guard let record = records[profileID] else {
+            return await startProfile(profileID: profileID)
+        }
+        let stopResult = await stopRecord(record, markUserStopped: false)
         guard stopResult.0 else { return stopResult }
         return await startProfile(profileID: profileID)
     }

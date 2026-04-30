@@ -3,6 +3,8 @@ import Foundation
 actor EZRWorkerSupervisorController {
     static let gatewayStartupProbeAttempts = 240
     static let gatewayStartupProbeIntervalNanoseconds: UInt64 = 1_000_000_000
+    static let gatewayUnresponsiveThreshold: TimeInterval = 90
+    static let gatewayFreshLaunchGracePeriod: TimeInterval = 240
     static let gatewayRestartHandoffWindow: TimeInterval = 60
     static let maxGatewayRestartHandoffsInWindow = 3
     static let gatewayRestartHandoffLimitMessage =

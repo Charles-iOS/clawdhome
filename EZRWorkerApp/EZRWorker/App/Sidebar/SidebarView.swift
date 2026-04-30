@@ -123,6 +123,8 @@ struct SidebarView: View {
         case .running: return gatewayService.isConnected ? .green : .orange
         case .stopping: return .orange
         case .starting: return .orange
+        case .waitingForHealthCheck: return .orange
+        case .unresponsive: return .red
         case .stopped: return .secondary
         case .failed: return .red
         }
@@ -136,6 +138,10 @@ struct SidebarView: View {
                 : L10n.k("sidebar.status.running_disconnected", fallback: "进程运行中，WebSocket 未连接")
         case .stopping: return L10n.k("sidebar.status.stopping", fallback: "Gateway 停止中…")
         case .starting: return L10n.k("sidebar.status.starting", fallback: "Gateway 启动中…")
+        case .waitingForHealthCheck:
+            return L10n.k("sidebar.status.waiting_health", fallback: "进程运行中，等待健康检查")
+        case .unresponsive:
+            return L10n.k("sidebar.status.unresponsive", fallback: "Gateway 健康检查未响应")
         case .stopped: return L10n.k("sidebar.status.stopped", fallback: "Gateway 已停止")
         case .failed(let msg): return msg
         }

@@ -1114,6 +1114,21 @@ struct AppSettingsView: View {
         let isSelectedProfile = profileStore.selectedProfile?.id == profile.id
         guard let runtime else { return "未同步" }
 
+        switch runtime.healthState {
+        case .healthy:
+            return isSelectedProfile && !gatewayService.isConnected ? "进程运行中" : "运行中"
+        case .launching:
+            return "启动中"
+        case .portListening:
+            return "等待健康检查"
+        case .unresponsive:
+            return "健康检查未响应"
+        case .failed:
+            return "异常"
+        case .noProcess, .unknown:
+            break
+        }
+
         switch runtime.readyState {
         case .unknown:
             return runtime.isRunning ? "运行中" : "未知"
@@ -1142,6 +1157,17 @@ struct AppSettingsView: View {
         let externalConfigIsReusable = profile.sourceKind != .managed && legacyConfigExists(for: resolution)
         let isSelectedProfile = profileStore.selectedProfile?.id == profile.id
         guard let runtime else { return .secondary }
+
+        switch runtime.healthState {
+        case .healthy:
+            return runtime.isRunning && isSelectedProfile && !gatewayService.isConnected ? .orange : .green
+        case .launching, .portListening:
+            return .orange
+        case .unresponsive, .failed:
+            return .red
+        case .noProcess, .unknown:
+            break
+        }
 
         switch runtime.readyState {
         case .ready:
@@ -1172,6 +1198,22 @@ struct AppSettingsView: View {
         if let lastError = runtime.lastError,
            !lastError.isEmpty {
             return "运行异常：\(lastError)"
+        }
+
+        switch runtime.healthState {
+        case .unresponsive:
+            return "运行态：Gateway 进程运行中，健康检查未响应。"
+        case .portListening:
+            return "运行态：Gateway 进程运行中，等待健康检查。"
+        case .launching:
+            return "运行态：Gateway 正在启动。"
+        case .healthy:
+            if profileStore.selectedProfile?.id == profile.id,
+               !gatewayService.isConnected {
+                return "运行态：Gateway 健康，WebSocket 未连接。"
+            }
+        case .failed, .noProcess, .unknown:
+            break
         }
 
         if profileStore.selectedProfile?.id == profile.id,
@@ -1208,6 +1250,21 @@ struct AppSettingsView: View {
         if let lastError = runtime.lastError,
            !lastError.isEmpty {
             return "exclamationmark.triangle.fill"
+        }
+
+        switch runtime.healthState {
+        case .healthy:
+            if profileStore.selectedProfile?.id == profile.id,
+               !gatewayService.isConnected {
+                return "wifi.slash"
+            }
+            return "checkmark.circle.fill"
+        case .launching, .portListening:
+            return "arrow.triangle.2.circlepath"
+        case .unresponsive, .failed:
+            return "exclamationmark.triangle.fill"
+        case .noProcess, .unknown:
+            break
         }
 
         if profileStore.selectedProfile?.id == profile.id,
@@ -1261,6 +1318,12 @@ struct AppSettingsView: View {
 
     private func profileRuntimeIsTransitional(_ runtime: SupervisorProfileRuntime?) -> Bool {
         guard let runtime else { return false }
+        switch runtime.healthState {
+        case .launching, .portListening:
+            return true
+        case .healthy, .unresponsive, .failed, .noProcess, .unknown:
+            break
+        }
         switch runtime.readyState {
         case .preparing, .starting:
             return true

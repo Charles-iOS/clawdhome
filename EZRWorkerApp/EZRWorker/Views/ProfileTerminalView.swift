@@ -136,6 +136,10 @@ struct ProfileTerminalWindow: View {
             "停止中"
         case .starting:
             "启动中"
+        case .waitingForHealthCheck:
+            "等待健康检查"
+        case .unresponsive(let message):
+            message
         case .stopped:
             "已停止"
         case .failed(let message):

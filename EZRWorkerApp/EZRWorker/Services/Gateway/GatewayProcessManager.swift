@@ -9,7 +9,9 @@ final class GatewayProcessManager {
         case stopped
         case stopping
         case starting
+        case waitingForHealthCheck(String)
         case running
+        case unresponsive(String)
         case failed(String)
     }
 
@@ -30,7 +32,14 @@ final class GatewayProcessManager {
     @ObservationIgnored
     private var monitorTask: Task<Void, Never>?
 
-    var isRunning: Bool { state == .running }
+    var isRunning: Bool {
+        switch state {
+        case .running, .waitingForHealthCheck, .unresponsive:
+            return true
+        case .stopped, .stopping, .starting, .failed:
+            return false
+        }
+    }
 
     func bind(profileStore: GatewayProfileStore, supervisorClient: SupervisorClient) {
         self.profileStore = profileStore
@@ -148,15 +157,30 @@ final class GatewayProcessManager {
             .none
         }
 
-        state = switch runtime.readyState {
-        case .ready:
+        state = switch runtime.healthState {
+        case .healthy:
             runtime.isRunning ? .running : .stopped
-        case .preparing, .starting:
+        case .launching:
             .starting
+        case .portListening:
+            .waitingForHealthCheck(runtime.lastLifecycleMessage ?? "Gateway 已监听端口，正在等待健康检查")
+        case .unresponsive:
+            .unresponsive(runtime.lastLifecycleMessage ?? "Gateway 健康检查未响应")
+        case .noProcess:
+            .stopped
         case .failed:
-            .failed(runtime.lastError ?? "Gateway 运行失败")
-        case .stopped, .unknown:
-            runtime.isRunning ? .running : .stopped
+            .failed(runtime.lastError ?? runtime.lastLifecycleMessage ?? "Gateway 运行失败")
+        case .unknown:
+            switch runtime.readyState {
+            case .ready:
+                runtime.isRunning ? .running : .stopped
+            case .preparing, .starting:
+                .starting
+            case .failed:
+                .failed(runtime.lastError ?? "Gateway 运行失败")
+            case .stopped, .unknown:
+                runtime.isRunning ? .running : .stopped
+            }
         }
     }
 

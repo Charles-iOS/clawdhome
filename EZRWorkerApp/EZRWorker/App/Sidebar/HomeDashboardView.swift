@@ -60,6 +60,12 @@ struct HomeDashboardView: View {
         case .starting:
             ProgressView()
                 .controlSize(.large)
+        case .waitingForHealthCheck:
+            ProgressView()
+                .controlSize(.large)
+        case .unresponsive:
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
         case .stopped:
             Image(systemName: "stop.circle.fill")
                 .foregroundStyle(.secondary)
@@ -74,6 +80,8 @@ struct HomeDashboardView: View {
         case .running:    return L10n.k("dashboard.running", fallback: "运行中")
         case .stopping:   return L10n.k("dashboard.stopping", fallback: "正在停止…")
         case .starting:   return L10n.k("dashboard.starting", fallback: "正在启动…")
+        case .waitingForHealthCheck(let message): return message
+        case .unresponsive(let message): return message
         case .stopped:    return L10n.k("dashboard.stopped", fallback: "已停止")
         case .failed(let msg): return msg
         }
@@ -90,7 +98,7 @@ struct HomeDashboardView: View {
     private var gatewayControls: some View {
         HStack(spacing: 8) {
             switch processManager.state {
-            case .running:
+            case .running, .waitingForHealthCheck, .unresponsive:
                 Button(L10n.k("dashboard.restart", fallback: "重启")) {
                     processManager.restart()
                 }

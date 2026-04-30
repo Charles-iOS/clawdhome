@@ -355,6 +355,16 @@ enum SupervisorOwnership: String, Codable {
     case adopted
 }
 
+enum SupervisorHealthState: String, Codable {
+    case unknown
+    case noProcess
+    case launching
+    case portListening
+    case healthy
+    case unresponsive
+    case failed
+}
+
 struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
     var id: UUID { profileID }
 
@@ -373,8 +383,95 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
     var readyState: SupervisorReadyState
     var ownership: SupervisorOwnership
     var lastProbeAt: Date?
+    var healthState: SupervisorHealthState
+    var lastReadyAt: Date?
+    var unhealthySince: Date?
+    var lastHealthyProbeAt: Date?
+    var lastUnhealthyReason: String?
+    var userStoppedAt: Date?
     var lastError: String?
     var lastLifecycleMessage: String?
+
+    init(
+        profileID: UUID,
+        slug: String,
+        displayName: String,
+        sourceKind: GatewayProfileSourceKind,
+        managementMode: GatewayProfileManagementMode,
+        resolvedConfigPath: String,
+        resolvedStateDir: String,
+        resolvedWorkspaceRoot: String,
+        resolvedPort: Int,
+        isPrepared: Bool,
+        isRunning: Bool,
+        pid: Int32?,
+        readyState: SupervisorReadyState,
+        ownership: SupervisorOwnership,
+        lastProbeAt: Date?,
+        healthState: SupervisorHealthState? = nil,
+        lastReadyAt: Date? = nil,
+        unhealthySince: Date? = nil,
+        lastHealthyProbeAt: Date? = nil,
+        lastUnhealthyReason: String? = nil,
+        userStoppedAt: Date? = nil,
+        lastError: String?,
+        lastLifecycleMessage: String?
+    ) {
+        self.profileID = profileID
+        self.slug = slug
+        self.displayName = displayName
+        self.sourceKind = sourceKind
+        self.managementMode = managementMode
+        self.resolvedConfigPath = resolvedConfigPath
+        self.resolvedStateDir = resolvedStateDir
+        self.resolvedWorkspaceRoot = resolvedWorkspaceRoot
+        self.resolvedPort = resolvedPort
+        self.isPrepared = isPrepared
+        self.isRunning = isRunning
+        self.pid = pid
+        self.readyState = readyState
+        self.ownership = ownership
+        self.lastProbeAt = lastProbeAt
+        self.healthState = healthState ?? Self.defaultHealthState(
+            readyState: readyState,
+            isRunning: isRunning
+        )
+        self.lastReadyAt = lastReadyAt
+        self.unhealthySince = unhealthySince
+        self.lastHealthyProbeAt = lastHealthyProbeAt
+        self.lastUnhealthyReason = lastUnhealthyReason
+        self.userStoppedAt = userStoppedAt
+        self.lastError = lastError
+        self.lastLifecycleMessage = lastLifecycleMessage
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        profileID = try container.decode(UUID.self, forKey: .profileID)
+        slug = try container.decode(String.self, forKey: .slug)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        sourceKind = try container.decode(GatewayProfileSourceKind.self, forKey: .sourceKind)
+        managementMode = try container.decode(GatewayProfileManagementMode.self, forKey: .managementMode)
+        resolvedConfigPath = try container.decode(String.self, forKey: .resolvedConfigPath)
+        resolvedStateDir = try container.decode(String.self, forKey: .resolvedStateDir)
+        resolvedWorkspaceRoot = try container.decode(String.self, forKey: .resolvedWorkspaceRoot)
+        resolvedPort = try container.decode(Int.self, forKey: .resolvedPort)
+        isPrepared = try container.decode(Bool.self, forKey: .isPrepared)
+        isRunning = try container.decode(Bool.self, forKey: .isRunning)
+        pid = try container.decodeIfPresent(Int32.self, forKey: .pid)
+        readyState = try container.decode(SupervisorReadyState.self, forKey: .readyState)
+        ownership = try container.decode(SupervisorOwnership.self, forKey: .ownership)
+        lastProbeAt = try container.decodeIfPresent(Date.self, forKey: .lastProbeAt)
+        healthState = try container.decodeIfPresent(SupervisorHealthState.self, forKey: .healthState)
+            ?? Self.defaultHealthState(readyState: readyState, isRunning: isRunning)
+        lastReadyAt = try container.decodeIfPresent(Date.self, forKey: .lastReadyAt)
+        unhealthySince = try container.decodeIfPresent(Date.self, forKey: .unhealthySince)
+        lastHealthyProbeAt = try container.decodeIfPresent(Date.self, forKey: .lastHealthyProbeAt)
+        lastUnhealthyReason = try container.decodeIfPresent(String.self, forKey: .lastUnhealthyReason)
+        userStoppedAt = try container.decodeIfPresent(Date.self, forKey: .userStoppedAt)
+        lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
+        lastLifecycleMessage = try container.decodeIfPresent(String.self, forKey: .lastLifecycleMessage)
+    }
 
     var resolution: GatewayProfileResolution {
         GatewayProfileResolution(
@@ -387,6 +484,24 @@ struct SupervisorProfileRuntime: Codable, Identifiable, Equatable {
             resolvedWorkspaceRoot: resolvedWorkspaceRoot,
             resolvedPort: resolvedPort
         )
+    }
+
+    private static func defaultHealthState(
+        readyState: SupervisorReadyState,
+        isRunning: Bool
+    ) -> SupervisorHealthState {
+        switch readyState {
+        case .ready:
+            return isRunning ? .healthy : .unknown
+        case .preparing, .starting:
+            return isRunning ? .launching : .unknown
+        case .stopped:
+            return .noProcess
+        case .failed:
+            return .failed
+        case .unknown:
+            return .unknown
+        }
     }
 }
 
