@@ -15,6 +15,7 @@ struct ChannelBotConfigSheet: View {
     @State private var isLoadingConfig = false
     @State private var errorMessage: String?
     @State private var baseHash = ""
+    @State private var existingChannelConfig: [String: Any] = [:]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -103,10 +104,15 @@ struct ChannelBotConfigSheet: View {
             baseHash = hash
             let channelsDict = config["channels"] as? [String: Any] ?? [:]
             let chConfig = channelsDict[channelType.rawValue] as? [String: Any] ?? [:]
+            let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+                for: channelType,
+                from: chConfig
+            )
+            existingChannelConfig = chConfig
 
             var values: [String: String] = [:]
             for field in channelType.configFields {
-                if let value = chConfig[field.id] as? String {
+                if let value = resolvedConfig[field.id] as? String {
                     values[field.id] = value
                 }
             }
@@ -129,10 +135,15 @@ struct ChannelBotConfigSheet: View {
             let value = fieldValues[field.id]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             channelPatch[field.id] = value
         }
+        let resolvedChannelPatch = ChannelConfigSupport.credentialWritePatch(
+            for: channelType,
+            existingChannelConfig: existingChannelConfig,
+            credentials: channelPatch
+        )
 
         let patch: [String: Any] = [
             "channels": [
-                channelType.rawValue: channelPatch
+                channelType.rawValue: resolvedChannelPatch
             ]
         ]
 

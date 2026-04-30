@@ -561,8 +561,12 @@ private struct AddBindingSheet: View {
         if channel.configFields.isEmpty {
             return !config.isEmpty
         }
+        let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+            for: channel,
+            from: config
+        )
         return channel.configFields.contains { field in
-            isConfiguredLeafValue(config[field.id])
+            isConfiguredLeafValue(resolvedConfig[field.id])
         }
     }
 

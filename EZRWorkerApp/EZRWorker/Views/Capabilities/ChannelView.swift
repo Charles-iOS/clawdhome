@@ -251,13 +251,17 @@ struct ChannelView: View {
         for channel in ChannelType.enabledCases {
             var fields: [String: String] = [:]
             if let chConfig = channelsDict[channel.rawValue] as? [String: Any] {
+                let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+                    for: channel,
+                    from: chConfig
+                )
                 enabledStates[channel] = chConfig["enabled"] as? Bool ?? true
                 for field in channel.configFields {
-                    if let value = chConfig[field.id] as? String, !value.isEmpty {
+                    if let value = resolvedConfig[field.id] as? String, !value.isEmpty {
                         fields[field.id] = value
                     } else if channel == .feishu,
                               field.id == "appSecret",
-                              isConfiguredLeafValue(chConfig[field.id]) {
+                              isConfiguredLeafValue(resolvedConfig[field.id]) {
                         fields[field.id] = "provider"
                     }
                 }
@@ -314,8 +318,12 @@ struct ChannelView: View {
         if channel.configFields.isEmpty {
             return !config.isEmpty
         }
+        let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+            for: channel,
+            from: config
+        )
         return channel.configFields.contains { field in
-            isConfiguredLeafValue(config[field.id])
+            isConfiguredLeafValue(resolvedConfig[field.id])
         }
     }
 

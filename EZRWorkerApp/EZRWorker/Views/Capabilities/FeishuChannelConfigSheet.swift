@@ -361,12 +361,81 @@ enum ChannelConfigSupport {
         return channels[channel.rawValue] as? [String: Any] ?? [:]
     }
 
+    static func resolvedChannelConfig(
+        for channel: ChannelType,
+        from channelConfig: [String: Any]
+    ) -> [String: Any] {
+        guard channel == .feishu,
+              let accountConfig = defaultAccountConfig(in: channelConfig)
+        else {
+            return channelConfig
+        }
+
+        var mergedConfig = channelConfig
+        for (key, value) in accountConfig {
+            mergedConfig[key] = value
+        }
+        return mergedConfig
+    }
+
+    static func defaultAccountID(in channelConfig: [String: Any]) -> String {
+        if let configured = normalizedString(channelConfig["defaultAccount"]) {
+            return configured
+        }
+
+        guard let accounts = channelConfig["accounts"] as? [String: Any],
+              !accounts.isEmpty
+        else {
+            return "default"
+        }
+
+        if accounts["default"] != nil {
+            return "default"
+        }
+
+        if accounts.count == 1, let onlyAccountID = accounts.keys.first {
+            return onlyAccountID
+        }
+
+        return accounts.keys.sorted().first ?? "default"
+    }
+
+    static func usesDefaultAccountLayout(
+        for channel: ChannelType,
+        in channelConfig: [String: Any]
+    ) -> Bool {
+        guard channel == .feishu else { return false }
+        if let accounts = channelConfig["accounts"] as? [String: Any], !accounts.isEmpty {
+            return true
+        }
+        return normalizedString(channelConfig["defaultAccount"]) != nil
+    }
+
+    static func credentialWritePatch(
+        for channel: ChannelType,
+        existingChannelConfig: [String: Any],
+        credentials: [String: Any]
+    ) -> [String: Any] {
+        guard usesDefaultAccountLayout(for: channel, in: existingChannelConfig) else {
+            return credentials
+        }
+
+        let accountID = defaultAccountID(in: existingChannelConfig)
+        return [
+            "defaultAccount": accountID,
+            "accounts": [
+                accountID: credentials
+            ]
+        ]
+    }
+
     static func allowFromPeerIDs(
         for channel: ChannelType,
         localPaths: GatewayProfileLocalPaths?
     ) -> [String] {
         let channelConfig = loadLocalChannelConfig(for: channel, localPaths: localPaths)
-        return normalizeStringArray(from: channelConfig["allowFrom"])
+        let resolvedConfig = resolvedChannelConfig(for: channel, from: channelConfig)
+        return normalizeStringArray(from: resolvedConfig["allowFrom"])
     }
 
     @discardableResult
@@ -485,6 +554,32 @@ enum ChannelConfigSupport {
 
     private static func loadLocalConfigRoot(localPaths: GatewayProfileLocalPaths?) -> [String: Any] {
         localPaths?.loadConfigRoot() ?? [:]
+    }
+
+    private static func defaultAccountConfig(in channelConfig: [String: Any]) -> [String: Any]? {
+        guard let accounts = channelConfig["accounts"] as? [String: Any],
+              !accounts.isEmpty
+        else {
+            return nil
+        }
+
+        let accountID = defaultAccountID(in: channelConfig)
+        if let accountConfig = accounts[accountID] as? [String: Any] {
+            return accountConfig
+        }
+        if let defaultConfig = accounts["default"] as? [String: Any] {
+            return defaultConfig
+        }
+        if accounts.count == 1, let onlyConfig = accounts.values.first as? [String: Any] {
+            return onlyConfig
+        }
+        return nil
+    }
+
+    private static func normalizedString(_ rawValue: Any?) -> String? {
+        guard let string = rawValue as? String else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 
@@ -691,8 +786,12 @@ enum ChannelPairingMutationSupport {
         let (config, baseHash) = try await gateway.configGetFull()
         let channels = config["channels"] as? [String: Any] ?? [:]
         let channelConfig = channels[channel.rawValue] as? [String: Any] ?? [:]
+        let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+            for: channel,
+            from: channelConfig
+        )
         let currentAllowFrom = ChannelConfigSupport.normalizeStringArray(
-            from: channelConfig["allowFrom"],
+            from: resolvedConfig["allowFrom"],
             allowWildcard: true
         )
         let updatedAllowFrom = currentAllowFrom.filter {
@@ -704,11 +803,25 @@ enum ChannelPairingMutationSupport {
         }
 
         let allowFromPatchValue: Any = updatedAllowFrom.isEmpty ? NSNull() : updatedAllowFrom
+        let channelPatch: [String: Any]
+        if ChannelConfigSupport.usesDefaultAccountLayout(for: channel, in: channelConfig) {
+            let accountID = ChannelConfigSupport.defaultAccountID(in: channelConfig)
+            channelPatch = [
+                "defaultAccount": accountID,
+                "accounts": [
+                    accountID: [
+                        "allowFrom": allowFromPatchValue
+                    ]
+                ]
+            ]
+        } else {
+            channelPatch = [
+                "allowFrom": allowFromPatchValue
+            ]
+        }
         let patch: [String: Any] = [
             "channels": [
-                channel.rawValue: [
-                    "allowFrom": allowFromPatchValue
-                ]
+                channel.rawValue: channelPatch
             ]
         ]
 
@@ -747,11 +860,15 @@ private enum FeishuChannelConfigSupport {
         for feishuConfig: [String: Any],
         localPaths: GatewayProfileLocalPaths?
     ) -> ChannelCredentialMode {
-        if let appSecret = feishuConfig["appSecret"] as? String,
+        let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+            for: .feishu,
+            from: feishuConfig
+        )
+        if let appSecret = resolvedConfig["appSecret"] as? String,
            !appSecret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .manual
         }
-        if isQRCodeSecretReference(feishuConfig["appSecret"])
+        if isQRCodeSecretReference(resolvedConfig["appSecret"])
             || hasQRCodeCredentials(localPaths: localPaths) {
             return .qrCode
         }
@@ -790,6 +907,7 @@ struct FeishuChannelConfigSheet: View {
     @State private var successMessage: String?
     @State private var showOnboardingSheet = false
     @State private var showCredentialSheet = false
+    @State private var loadedFeishuConfig: [String: Any] = [:]
 
     private var selectedLocalPaths: GatewayProfileLocalPaths? { profileStore.selectedLocalPaths }
 
@@ -1151,19 +1269,24 @@ struct FeishuChannelConfigSheet: View {
             }
         }
 
+        loadedFeishuConfig = feishuConfig
         draft = makeDraft(from: feishuConfig, isReadOnly: readOnly)
         validateGroupsJSON()
     }
 
     private func makeDraft(from feishuConfig: [String: Any], isReadOnly: Bool) -> FeishuChannelConfigDraft {
-        let groupsObject = feishuConfig["groups"] as? [String: Any] ?? [:]
+        let resolvedConfig = ChannelConfigSupport.resolvedChannelConfig(
+            for: .feishu,
+            from: feishuConfig
+        )
+        let groupsObject = resolvedConfig["groups"] as? [String: Any] ?? [:]
         return FeishuChannelConfigDraft(
             isEnabled: feishuConfig["enabled"] as? Bool ?? true,
-            dmPolicy: ChannelDmPolicy(rawValue: (feishuConfig["dmPolicy"] as? String)?.lowercased() ?? "") ?? .pairing,
-            groupPolicy: ChannelGroupPolicy(rawValue: (feishuConfig["groupPolicy"] as? String)?.lowercased() ?? "") ?? .allowlist,
-            requireMention: feishuConfig["requireMention"] as? Bool ?? true,
+            dmPolicy: ChannelDmPolicy(rawValue: (resolvedConfig["dmPolicy"] as? String)?.lowercased() ?? "") ?? .pairing,
+            groupPolicy: ChannelGroupPolicy(rawValue: (resolvedConfig["groupPolicy"] as? String)?.lowercased() ?? "") ?? .allowlist,
+            requireMention: resolvedConfig["requireMention"] as? Bool ?? true,
             groupAllowFromText: ChannelConfigSupport.lineSeparatedText(
-                from: ChannelConfigSupport.normalizeStringArray(from: feishuConfig["groupAllowFrom"])
+                from: ChannelConfigSupport.normalizeStringArray(from: resolvedConfig["groupAllowFrom"])
             ),
             groupsJSONText: ChannelConfigSupport.prettyPrintedJSONText(from: groupsObject),
             credentialMode: FeishuChannelConfigSupport.credentialMode(
@@ -1212,17 +1335,16 @@ struct FeishuChannelConfigSheet: View {
         }
 
         do {
-            let (_, baseHash) = try await gateway.configGetFull()
+            let (config, baseHash) = try await gateway.configGetFull()
+            let channels = config["channels"] as? [String: Any] ?? [:]
+            let feishuConfig = channels[ChannelType.feishu.rawValue] as? [String: Any] ?? loadedFeishuConfig
+            let channelPatch = channelPatchForSave(
+                existingFeishuConfig: feishuConfig,
+                groupsObject: groupsObject
+            )
             let patch: [String: Any] = [
                 "channels": [
-                    ChannelType.feishu.rawValue: [
-                        "enabled": draft.isEnabled,
-                        "dmPolicy": draft.dmPolicy.rawValue,
-                        "groupPolicy": draft.groupPolicy.rawValue,
-                        "requireMention": draft.requireMention,
-                        "groupAllowFrom": ChannelConfigSupport.normalizeLineSeparatedIDs(draft.groupAllowFromText),
-                        "groups": groupsObject,
-                    ]
+                    ChannelType.feishu.rawValue: channelPatch
                 ]
             ]
 
@@ -1238,6 +1360,37 @@ struct FeishuChannelConfigSheet: View {
         } catch {
             errorMessage = "保存失败：\(error.localizedDescription)"
         }
+    }
+
+    private func channelPatchForSave(
+        existingFeishuConfig: [String: Any],
+        groupsObject: [String: Any]
+    ) -> [String: Any] {
+        let strategyPatch: [String: Any] = [
+            "dmPolicy": draft.dmPolicy.rawValue,
+            "groupPolicy": draft.groupPolicy.rawValue,
+            "requireMention": draft.requireMention,
+            "groupAllowFrom": ChannelConfigSupport.normalizeLineSeparatedIDs(draft.groupAllowFromText),
+            "groups": groupsObject,
+        ]
+
+        guard ChannelConfigSupport.usesDefaultAccountLayout(
+            for: .feishu,
+            in: existingFeishuConfig
+        ) else {
+            var legacyPatch = strategyPatch
+            legacyPatch["enabled"] = draft.isEnabled
+            return legacyPatch
+        }
+
+        let accountID = ChannelConfigSupport.defaultAccountID(in: existingFeishuConfig)
+        return [
+            "enabled": draft.isEnabled,
+            "defaultAccount": accountID,
+            "accounts": [
+                accountID: strategyPatch
+            ]
+        ]
     }
 
     private func refreshAfterExternalChange() async {
