@@ -541,7 +541,7 @@ if [ -n "\$CONSOLE_USER" ] && [ "\$CONSOLE_USER" != "root" ]; then
     CONSOLE_HOME=\$(dscl . -read "/Users/\${CONSOLE_USER}" NFSHomeDirectory 2>/dev/null | awk '{print \$2}' || echo "")
     OLD_APP_VERSION=\$(/usr/bin/defaults read "/Applications/${APP_NAME}.app/Contents/Info" CFBundleShortVersionString 2>/dev/null || echo "")
     OLD_SUPERVISOR="/Applications/${APP_NAME}.app/Contents/MacOS/EZRWorkerSupervisor"
-    if [ -x "\$OLD_SUPERVISOR" ] && [ -n "\$CONSOLE_HOME" ] && version_at_least "\$OLD_APP_VERSION" "1.2.0"; then
+    if [ -x "\$OLD_SUPERVISOR" ] && [ -n "\$CONSOLE_HOME" ] && version_at_least "\$OLD_APP_VERSION" "1.1.1"; then
       launchctl asuser "\$CONSOLE_UID" /usr/bin/env HOME="\$CONSOLE_HOME" USER="\$CONSOLE_USER" LOGNAME="\$CONSOLE_USER" "\$OLD_SUPERVISOR" --prepare-upgrade --timeout 8 2>/dev/null &
       PREPARE_PID=\$!
       PREPARE_WAITED=0
