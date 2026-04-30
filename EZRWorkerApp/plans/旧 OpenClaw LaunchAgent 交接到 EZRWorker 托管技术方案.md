@@ -87,6 +87,7 @@ EZRWorkerSupervisor    -> openclaw gateway
 3. 对带旧 LaunchAgent 的候选：
    - 默认选择 `仅观察`
    - 如果用户选择 `托管`，必须先完成交接或选择手动处理
+   - 用户点击交接后，用户态 plist 交接成功时自动由 EZRWorker 启动或重启该 profile，不再要求用户额外点击“启动/重启”
 4. 交接动作要可回滚：
    - 停止已加载的 launchd job
    - 禁用 job
@@ -420,7 +421,7 @@ RunAtLoad：开启
 
 ```text
 由 EZRWorker 托管前，需要禁用旧 LaunchAgent。
-[交接旧 LaunchAgent 并托管]
+[交接并启动]
 [我已手动禁用，重新检查]
 ```
 
@@ -437,7 +438,7 @@ RunAtLoad：开启
 
 ```text
 风险：旧 LaunchAgent 仍启用，可能导致双重拉起
-[交接旧 LaunchAgent]
+[交接并启动] 或 [交接并重启]
 ```
 
 ### 10.3 错误提示
@@ -600,14 +601,14 @@ com.openclaw.gateway3.plist loaded + KeepAlive
 操作：
 
 ```text
-扫描 -> 选择托管 -> 交接旧 LaunchAgent -> 启动
+扫描 -> 选择托管 -> 交接旧 LaunchAgent -> EZRWorker 自动启动/重启
 ```
 
 期望：
 
 - `launchctl print gui/<uid>/<label>` 不再显示 loaded job
 - plist 改名 `.disabled-<timestamp>`
-- EZRWorker 启动 gateway
+- EZRWorker 自动启动 gateway；如果该 profile 已经运行，则自动重启 gateway
 - ownership 为 `supervised`
 
 ### 场景 C：旧 plist 被手动恢复
@@ -690,5 +691,6 @@ EZRWorker 应做到：
 3. 默认仅观察，不改旧启动链路。
 4. 用户选择托管时，必须完成交接。
 5. 交接后旧 plist 不会再自动拉起 gateway。
-6. EZRWorker 托管启动后 ownership 为 `supervised`。
-7. 机器重启后不回到旧 LaunchAgent 启动链路。
+6. 用户点击“交接并启动/交接并重启”后，不需要再手动点启动或重启。
+7. EZRWorker 托管启动后 ownership 为 `supervised`。
+8. 机器重启后不回到旧 LaunchAgent 启动链路。

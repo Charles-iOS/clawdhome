@@ -585,7 +585,7 @@ struct AppSettingsView: View {
         }
 
         if shouldShowLaunchAgentHandoffAction(for: profile) {
-            Button("交接旧自启") {
+            Button(launchAgentHandoffActionTitle(for: profile, runtime: runtime)) {
                 Task {
                     await handoffLaunchAgent(for: profile)
                 }
@@ -1048,6 +1048,16 @@ struct AppSettingsView: View {
         }
     }
 
+    private func launchAgentHandoffActionTitle(
+        for profile: GatewayProfile,
+        runtime: SupervisorProfileRuntime?
+    ) -> String {
+        if runtime?.isRunning == true {
+            return "交接并重启"
+        }
+        return "交接并启动"
+    }
+
     private func launchAgentHandoffLabel(_ handoff: GatewayProfileLaunchAgentHandoff) -> String {
         switch handoff.status {
         case .disabled:
@@ -1489,6 +1499,13 @@ struct AppSettingsView: View {
         let resolution = GatewayProfileResolver.resolve(profile)
         let launchAgent = matchingLaunchAgent(for: profile, resolution: resolution)
 
+        do {
+            try await ensureSupervisorReady()
+        } catch {
+            profileErrorMessage = error.localizedDescription
+            return
+        }
+
         guard let launchAgent else {
             do {
                 try profileStore.update(
@@ -1502,12 +1519,12 @@ struct AppSettingsView: View {
                         message: "未发现与该 Profile 匹配的旧 LaunchAgent"
                     )
                 )
-                _ = await supervisorClient.reloadProfiles()
+                try await reloadProfilesAfterLaunchAgentHandoff()
+                let action = try await startOrRestartProfileAfterLaunchAgentHandoff(profile)
+                profileErrorMessage = "未发现与该 Profile 匹配的旧 LaunchAgent，已由 EZRWorker \(action)该 Profile。"
             } catch {
                 profileErrorMessage = error.localizedDescription
-                return
             }
-            profileErrorMessage = "未发现与该 Profile 匹配的旧 LaunchAgent，已标记为无需交接。"
             return
         }
 
@@ -1544,9 +1561,9 @@ struct AppSettingsView: View {
                 expectedStateDir: resolution.resolvedStateDir
             )
             try profileStore.update(profileID: profile.id, launchAgentHandoff: handoff)
-            _ = await supervisorClient.reloadProfiles()
-            _ = await supervisorClient.refreshRuntimes()
-            await processManager.refreshRuntimeState()
+            try await reloadProfilesAfterLaunchAgentHandoff()
+            let action = try await startOrRestartProfileAfterLaunchAgentHandoff(profile)
+            profileErrorMessage = "旧自启已交接，已由 EZRWorker \(action)该 Profile。"
         } catch {
             try? profileStore.update(
                 profileID: profile.id,
@@ -1562,6 +1579,29 @@ struct AppSettingsView: View {
             _ = await supervisorClient.reloadProfiles()
             profileErrorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func reloadProfilesAfterLaunchAgentHandoff() async throws {
+        guard await supervisorClient.reloadProfiles() else {
+            throw NSError(domain: "AppSettingsView", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "旧自启状态已写入，但 Supervisor 同步 Profile 失败"
+            ])
+        }
+    }
+
+    @MainActor
+    private func startOrRestartProfileAfterLaunchAgentHandoff(_ profile: GatewayProfile) async throws -> String {
+        _ = await supervisorClient.refreshRuntimes()
+        if runtime(for: profile)?.isRunning == true {
+            try await supervisorClient.restartProfile(profileID: profile.id)
+            await processManager.refreshRuntimeState()
+            return "重启"
+        }
+
+        try await supervisorClient.startProfile(profileID: profile.id)
+        await processManager.refreshRuntimeState()
+        return "启动"
     }
 
     private func matchingLaunchAgent(
