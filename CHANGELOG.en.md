@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2] - 2026-05-05
+
+### Improvements & Fixes
+- Relaxed port spacing validation when importing existing OpenClaw instances so valid existing setups are not blocked by managed-profile port rules.
+- Reuses the current Gateway port from the legacy `~/.openclaw` configuration when importing, making existing runtimes easier to take over.
+
+
 ## [1.1.1] - 2026-04-30
 
 ### Improvements & Fixes
