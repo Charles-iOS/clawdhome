@@ -679,6 +679,12 @@ enum GatewayProfileResolver {
         if let intValue = gateway["port"] as? Int {
             return intValue
         }
+        if let stringValue = gateway["port"] as? String {
+            let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let port = Int(trimmed), (1...65535).contains(port) {
+                return port
+            }
+        }
         return nil
     }
 

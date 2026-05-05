@@ -404,6 +404,8 @@ enum OpenClawInstanceDiscoveryService {
             .standardizedFileURL
             .path
         let port = readGatewayPort(configPath: configPath)
+            ?? launchAgent.flatMap(gatewayPort(from:))
+            ?? commandLine.flatMap(gatewayPort(fromCommandLine:))
         let workspace = inferWorkspaceRoot(configPath: configPath, stateDir: stateDir)
         let warnings = Array(Set(warningsForCandidate(
             configPath: configPath,
@@ -758,6 +760,11 @@ enum OpenClawInstanceDiscoveryService {
             .path
     }
 
+    static func gatewayPort(from launchAgent: OpenClawLaunchAgentInfo) -> Int? {
+        gatewayPort(fromEnvironment: launchAgent.environment)
+            ?? gatewayPort(fromArguments: launchAgent.programArguments)
+    }
+
     private static func readGatewayPort(configPath: String) -> Int? {
         guard let root = loadJSONObject(configPath: configPath),
               let gateway = root["gateway"] as? [String: Any]
@@ -770,7 +777,61 @@ enum OpenClawInstanceDiscoveryService {
         if let intValue = gateway["port"] as? Int {
             return intValue
         }
+        if let stringValue = gateway["port"] as? String {
+            return normalizedPort(stringValue)
+        }
         return nil
+    }
+
+    private static func gatewayPort(fromEnvironment environment: [String: String]) -> Int? {
+        for name in ["OPENCLAW_GATEWAY_PORT", "OPENCLAW_PORT"] {
+            if let port = normalizedPort(environment[name]) {
+                return port
+            }
+        }
+        return nil
+    }
+
+    private static func gatewayPort(fromArguments arguments: [String]) -> Int? {
+        let names = ["--port", "--gateway-port", "--openclaw-gateway-port"]
+        for index in arguments.indices {
+            let argument = arguments[index]
+            if names.contains(argument),
+               arguments.indices.contains(index + 1),
+               let port = normalizedPort(arguments[index + 1]) {
+                return port
+            }
+            for name in names where argument.hasPrefix("\(name)=") {
+                return normalizedPort(String(argument.dropFirst(name.count + 1)))
+            }
+        }
+        return nil
+    }
+
+    private static func gatewayPort(fromCommandLine commandLine: String) -> Int? {
+        let patterns = [
+            #"(?:(?:^|\s)(?:OPENCLAW_GATEWAY_PORT|OPENCLAW_PORT)=)(\d{1,5})(?:\s|$)"#,
+            #"(?:(?:^|\s)--(?:port|gateway-port|openclaw-gateway-port)(?:=|\s+))(\d{1,5})(?:\s|$)"#
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(commandLine.startIndex..<commandLine.endIndex, in: commandLine)
+            guard let match = regex.firstMatch(in: commandLine, range: range),
+                  let portRange = Range(match.range(at: 1), in: commandLine),
+                  let port = normalizedPort(String(commandLine[portRange]))
+            else {
+                continue
+            }
+            return port
+        }
+        return nil
+    }
+
+    private static func normalizedPort(_ raw: String?) -> Int? {
+        guard let raw else { return nil }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let port = Int(trimmed), (1...65535).contains(port) else { return nil }
+        return port
     }
 
     private static func inferWorkspaceRoot(configPath: String, stateDir: String) -> String? {

@@ -73,6 +73,9 @@ final class GatewayProfileStore {
                 restoreDefaultProfileAfterEmptyDocument()
                 return
             }
+            if refreshReusableProfilePortsFromSources() {
+                try? persistProfiles()
+            }
             ensureSelectedProfileExists()
             status = .ready
             return
@@ -725,6 +728,62 @@ final class GatewayProfileStore {
         return GatewayProfileResolver.nextAvailablePort(existingProfiles: candidateProfiles)
     }
 
+    private func refreshReusableProfilePortsFromSources() -> Bool {
+        var didChange = false
+
+        for index in profiles.indices {
+            guard profiles[index].sourceKind != .managed else { continue }
+            let resolution = GatewayProfileResolver.resolve(profiles[index])
+            guard let sourcePort = reusableProfilePort(
+                for: profiles[index],
+                resolution: resolution
+            ) else {
+                continue
+            }
+            if profiles[index].portOverride != sourcePort {
+                profiles[index].portOverride = sourcePort
+                didChange = true
+            }
+        }
+
+        return didChange
+    }
+
+    private func reusableProfilePort(
+        for profile: GatewayProfile,
+        resolution: GatewayProfileResolution
+    ) -> Int? {
+        if let configPort = Self.readGatewayPort(configPath: resolution.resolvedConfigPath) {
+            return configPort
+        }
+
+        guard let handoff = profile.launchAgentHandoff else { return nil }
+        let plistPath = handoff.disabledPlistPath ?? handoff.originalPlistPath
+        guard FileManager.default.fileExists(atPath: plistPath),
+              let launchAgent = OpenClawInstanceDiscoveryService.launchAgentInfo(at: URL(fileURLWithPath: plistPath)),
+              launchAgentMatchesProfile(launchAgent, resolution: resolution)
+        else {
+            return nil
+        }
+
+        return OpenClawInstanceDiscoveryService.gatewayPort(from: launchAgent)
+    }
+
+    private func launchAgentMatchesProfile(
+        _ launchAgent: OpenClawLaunchAgentInfo,
+        resolution: GatewayProfileResolution
+    ) -> Bool {
+        if let configPath = launchAgent.matchedConfigPath,
+           Self.standardizedPath(configPath) == Self.standardizedPath(resolution.resolvedConfigPath) {
+            return true
+        }
+        if let stateDir = launchAgent.matchedStateDir,
+           Self.standardizedPath(stateDir) == Self.standardizedPath(resolution.resolvedStateDir) {
+            return true
+        }
+        return false
+    }
+
     private func cleanupManagedProfileData(for profile: GatewayProfile) {
         guard profile.sourceKind == .managed else { return }
         let managedRootURL = EZRWorkerPaths.managedProfileRoot(slug: profile.slug)
@@ -748,6 +807,12 @@ final class GatewayProfileStore {
         }
         if let intValue = gateway["port"] as? Int {
             return intValue
+        }
+        if let stringValue = gateway["port"] as? String {
+            let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let port = Int(trimmed), (1...65535).contains(port) {
+                return port
+            }
         }
         return nil
     }
