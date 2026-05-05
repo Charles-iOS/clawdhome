@@ -235,7 +235,8 @@ final class GatewayProfileStore {
             workspaceRootOverride: EZRWorkerPaths.legacyOpenClawDirectory
                 .appendingPathComponent("workspace", isDirectory: true)
                 .path,
-            portOverride: try validatedLegacyPort(),
+            portOverride: GatewayProfileResolver.readLegacyGatewayPort()
+                ?? GatewayProfileResolver.defaultGatewayPort,
             createdAt: Date()
         )
         profiles.append(profile)
@@ -515,19 +516,7 @@ final class GatewayProfileStore {
             ])
         }
 
-        let usedPorts = profiles.map { GatewayProfileResolver.resolve($0).resolvedPort }
-        let conflictingPorts = GatewayProfileResolver.conflictingBasePorts(
-            for: port,
-            existingPorts: usedPorts
-        )
-        if !conflictingPorts.isEmpty {
-            let conflicts = conflictingPorts.map(String.init).joined(separator: ", ")
-            throw NSError(domain: "GatewayProfileStore", code: 22, userInfo: [
-                NSLocalizedDescriptionKey:
-                    "端口 \(port) 与现有 profile 基础端口 \(conflicts) 间距不足 \(GatewayProfileResolver.managedPortSpacing)，请先调整后再导入"
-            ])
-        }
-
+        // Existing OpenClaw instances already own their ports. Port spacing is only enforced for new managed profiles.
         if managementMode == .managedByEZRWorker {
             try validateOverridePath(
                 configPath,
@@ -734,23 +723,6 @@ final class GatewayProfileStore {
             )
         }
         return GatewayProfileResolver.nextAvailablePort(existingProfiles: candidateProfiles)
-    }
-
-    private func validatedLegacyPort() throws -> Int {
-        let legacyPort = GatewayProfileResolver.readLegacyGatewayPort() ?? GatewayProfileResolver.defaultGatewayPort
-        let usedPorts = profiles.map { GatewayProfileResolver.resolve($0).resolvedPort }
-        let conflictingPorts = GatewayProfileResolver.conflictingBasePorts(
-            for: legacyPort,
-            existingPorts: usedPorts
-        )
-        guard conflictingPorts.isEmpty else {
-            let conflicts = conflictingPorts.map(String.init).joined(separator: ", ")
-            throw NSError(domain: "GatewayProfileStore", code: 6, userInfo: [
-                NSLocalizedDescriptionKey:
-                    "旧 ~/.openclaw 当前端口 \(legacyPort) 与现有 profile 基础端口 \(conflicts) 间距不足 \(GatewayProfileResolver.managedPortSpacing)，请先调整后再导入"
-            ])
-        }
-        return legacyPort
     }
 
     private func cleanupManagedProfileData(for profile: GatewayProfile) {
