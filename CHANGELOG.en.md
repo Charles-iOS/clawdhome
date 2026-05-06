@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3] - 2026-05-06
+
+### Improvements & Fixes
+- Fixed a case where importing an existing OpenClaw instance could fall back to the default port instead of the actual Gateway port.
+- Detects Gateway ports from config files, LaunchAgent environment variables, launch arguments, and command lines for more accurate legacy runtime discovery.
+- Refreshes port sources for imported non-managed Profiles on load so stale port values are not kept after legacy configuration changes.
+
+
 ## [1.1.2] - 2026-05-05
 
 ### Improvements & Fixes
