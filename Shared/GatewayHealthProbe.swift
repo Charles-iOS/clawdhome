@@ -1,10 +1,12 @@
 import Foundation
 
 enum GatewayHealthProbe {
+    private static let probeTimeout: TimeInterval = 0.8
+
     private static let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 2
-        configuration.timeoutIntervalForResource = 2
+        configuration.timeoutIntervalForRequest = probeTimeout
+        configuration.timeoutIntervalForResource = probeTimeout
         return URLSession(configuration: configuration)
     }()
 

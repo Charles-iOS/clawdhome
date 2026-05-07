@@ -295,6 +295,35 @@ extension EZRWorkerSupervisorController {
             return (false, message)
         }
 
+        let port = record.resolution.resolvedPort
+        let expectedRootPID = record.process?.processIdentifier ?? record.pid
+
+        func ownedListeningPID(expectedRootPID: Int32?) -> Int32? {
+            guard let pid = gatewayPIDListening(onPort: port),
+                  let commandLine = processCommandLine(pid: pid),
+                  looksLikeGatewayProcess(commandLine)
+            else {
+                return nil
+            }
+
+            if listeningGatewayProcessBelongsToRecord(
+                pid: pid,
+                record: record,
+                expectedRootPID: expectedRootPID
+            ) {
+                return pid
+            }
+
+            if record.profile.sourceKind == .externalReuse,
+               externalGatewayProcessMatches(record: record, pid: pid, commandLine: commandLine) {
+                return pid
+            }
+
+            return nil
+        }
+
+        let listeningPIDBeforeStop = ownedListeningPID(expectedRootPID: expectedRootPID)
+
         if let process = record.process, process.isRunning {
             process.terminationHandler = nil
             process.terminate()
@@ -307,23 +336,15 @@ extension EZRWorkerSupervisorController {
             if process.isRunning {
                 kill(process.processIdentifier, SIGKILL)
             }
-        } else if let pid = gatewayPIDListening(onPort: record.resolution.resolvedPort),
-                  let commandLine = processCommandLine(pid: pid),
-                  looksLikeGatewayProcess(commandLine),
-                  record.pid == pid
-                    || gatewayProcessMatches(record: record, pid: pid)
-                    || (record.profile.sourceKind == .externalReuse
-                        && externalGatewayProcessMatches(record: record, pid: pid, commandLine: commandLine)) {
-            kill(pid, SIGTERM)
-            for _ in 0..<12 {
-                if gatewayPIDListening(onPort: record.resolution.resolvedPort) == nil {
-                    break
-                }
-                try? await Task.sleep(nanoseconds: 250_000_000)
-            }
-            if gatewayPIDListening(onPort: record.resolution.resolvedPort) != nil {
-                kill(pid, SIGKILL)
-            }
+        }
+
+        if let pid = listeningPIDBeforeStop,
+           expectedRootPID.map({ $0 != pid }) ?? true {
+            _ = await terminateGatewayProcess(pid: pid, port: port)
+        }
+
+        if let pid = ownedListeningPID(expectedRootPID: expectedRootPID) {
+            _ = await terminateGatewayProcess(pid: pid, port: port)
         }
 
         record.process = nil

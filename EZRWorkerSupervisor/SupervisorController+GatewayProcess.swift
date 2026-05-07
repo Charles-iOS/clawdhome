@@ -32,11 +32,21 @@ extension EZRWorkerSupervisorController {
             return .adopt(nil)
         }
 
-        let ownedByRecord =
-            (record.process?.isRunning == true && record.process?.processIdentifier == listeningPID)
-            || record.pid == listeningPID
+        let ownedByRecord = listeningGatewayProcessBelongsToRecord(
+            pid: listeningPID,
+            record: record,
+            expectedRootPID: record.process?.processIdentifier ?? record.pid
+        )
         if ownedByRecord {
-            return .adopt(listeningPID)
+            if await terminateGatewayProcess(pid: listeningPID, port: record.resolution.resolvedPort) {
+                clearRuntimeStateForGateway(
+                    pid: listeningPID,
+                    port: record.resolution.resolvedPort,
+                    excluding: record.profile.id
+                )
+                return .relaunch
+            }
+            return .fail("端口 \(record.resolution.resolvedPort) 上存在无法接管的旧 Gateway 进程")
         }
 
         guard let commandLine = processCommandLine(pid: listeningPID) else {
@@ -95,9 +105,11 @@ extension EZRWorkerSupervisorController {
             return .adopt(nil)
         }
 
-        let ownedByRecord =
-            (record.process?.isRunning == true && record.process?.processIdentifier == listeningPID)
-            || record.pid == listeningPID
+        let ownedByRecord = listeningGatewayProcessBelongsToRecord(
+            pid: listeningPID,
+            record: record,
+            expectedRootPID: record.process?.processIdentifier ?? record.pid
+        )
         if ownedByRecord {
             return .adopt(listeningPID)
         }
@@ -137,7 +149,7 @@ extension EZRWorkerSupervisorController {
         }
     }
 
-    private func terminateGatewayProcess(pid: Int32, port: Int) async -> Bool {
+    func terminateGatewayProcess(pid: Int32, port: Int) async -> Bool {
         kill(pid, SIGTERM)
         for _ in 0..<12 {
             let currentPID = gatewayPIDListening(onPort: port)
@@ -186,6 +198,27 @@ extension EZRWorkerSupervisorController {
     func gatewayProcessMatches(record: SupervisorRecord, pid: Int32) -> Bool {
         gatewayProcessOpenFileNames(pid: pid)
             .contains(where: { gatewayOpenFile($0, matches: record.resolution) })
+    }
+
+    func listeningGatewayProcessBelongsToRecord(
+        pid listeningPID: Int32,
+        record: SupervisorRecord,
+        expectedRootPID: Int32?
+    ) -> Bool {
+        if let expectedRootPID, listeningPID == expectedRootPID {
+            return true
+        }
+        if record.pid == listeningPID {
+            return true
+        }
+        if gatewayProcessMatches(record: record, pid: listeningPID) {
+            return true
+        }
+        if let expectedRootPID,
+           processIsDescendant(pid: listeningPID, of: expectedRootPID) {
+            return true
+        }
+        return false
     }
 
     func externalGatewayProcessMatches(
@@ -262,6 +295,38 @@ extension EZRWorkerSupervisorController {
 
     private func normalizedPathLikeText(_ text: String) -> String {
         NSString(string: text).expandingTildeInPath
+    }
+
+    private func processIsDescendant(pid: Int32, of ancestorPID: Int32) -> Bool {
+        guard pid > 1, ancestorPID > 1 else {
+            return false
+        }
+        if pid == ancestorPID {
+            return true
+        }
+
+        var currentPID = pid
+        var seen = Set<Int32>()
+        for _ in 0..<32 {
+            guard let parentPID = parentProcessID(pid: currentPID),
+                  parentPID > 1,
+                  seen.insert(parentPID).inserted
+            else {
+                return false
+            }
+            if parentPID == ancestorPID {
+                return true
+            }
+            currentPID = parentPID
+        }
+        return false
+    }
+
+    private func parentProcessID(pid: Int32) -> Int32? {
+        guard let output = runLocalCommand("/bin/ps", arguments: ["-o", "ppid=", "-p", "\(pid)"]) else {
+            return nil
+        }
+        return Int32(output.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private func runLocalCommand(

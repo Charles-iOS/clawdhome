@@ -753,7 +753,23 @@ final class AppBootstrapCoordinator {
             appLog("bootstrap: recovery skipped restart for healthy runtime on unavailable port \(resolvedPort)", level: .warn)
         case .failed:
             let message = runtime?.lastError ?? "unknown"
-            appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)
+            guard runtimeAllowsManagedFailedRestart(runtime) else {
+                appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)
+                break
+            }
+            guard runtimeHasExceededFailedRestartThreshold(runtime) else {
+                appLog("bootstrap: recovery skipped restart; failed runtime cooldown not reached: \(message)", level: .warn)
+                break
+            }
+            do {
+                appLog(
+                    "bootstrap: recovery restarting failed managed gateway on port \(resolvedPort): \(message)",
+                    level: .warn
+                )
+                try await supervisorClient.restartProfile(profileID: selectedProfile.id)
+            } catch {
+                appLog("bootstrap: recovery restart failed: \(error.localizedDescription)", level: .error)
+            }
         case .unknown, nil:
             switch runtime?.readyState {
             case .stopped, .unknown, nil:
@@ -769,7 +785,23 @@ final class AppBootstrapCoordinator {
                 appLog("bootstrap: recovery skipped restart for ready runtime without supervisor unresponsive state", level: .warn)
             case .failed:
                 let message = runtime?.lastError ?? "unknown"
-                appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)
+                guard runtimeAllowsManagedFailedRestart(runtime) else {
+                    appLog("bootstrap: recovery skipped automatic restart for failed runtime: \(message)", level: .warn)
+                    break
+                }
+                guard runtimeHasExceededFailedRestartThreshold(runtime) else {
+                    appLog("bootstrap: recovery skipped restart; failed runtime cooldown not reached: \(message)", level: .warn)
+                    break
+                }
+                do {
+                    appLog(
+                        "bootstrap: recovery restarting failed managed gateway on port \(resolvedPort): \(message)",
+                        level: .warn
+                    )
+                    try await supervisorClient.restartProfile(profileID: selectedProfile.id)
+                } catch {
+                    appLog("bootstrap: recovery restart failed: \(error.localizedDescription)", level: .error)
+                }
             }
         }
 
@@ -796,6 +828,13 @@ final class AppBootstrapCoordinator {
         return duration >= appBootstrapGatewayUnresponsiveRestartThreshold
     }
 
+    private func runtimeHasExceededFailedRestartThreshold(_ runtime: SupervisorProfileRuntime?) -> Bool {
+        guard let runtime else { return false }
+        guard runtime.healthState == .failed || runtime.readyState == .failed else { return false }
+        guard let duration = runtimeUnhealthyDuration(runtime) else { return true }
+        return duration >= appBootstrapGatewayUnresponsiveRestartThreshold
+    }
+
     private func runtimeAllowsManagedRestart(_ runtime: SupervisorProfileRuntime?) -> Bool {
         guard let runtime,
               runtime.managementMode == .managedByEZRWorker,
@@ -812,6 +851,18 @@ final class AppBootstrapCoordinator {
         return runtime.ownership == .adopted
             && runtime.adoptionKind == .managedAdopted
             && runtime.pid != nil
+    }
+
+    private func runtimeAllowsManagedFailedRestart(_ runtime: SupervisorProfileRuntime?) -> Bool {
+        guard let runtime,
+              runtime.managementMode == .managedByEZRWorker,
+              runtime.sourceKind == .managed,
+              runtime.userStoppedAt == nil
+        else {
+            return false
+        }
+
+        return runtime.healthState == .failed || runtime.readyState == .failed
     }
 
     private func runtimeUnhealthyDuration(_ runtime: SupervisorProfileRuntime?) -> TimeInterval? {

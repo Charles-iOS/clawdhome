@@ -531,15 +531,17 @@ actor GatewayClient {
 
     // MARK: - HTTP 探活（无需 WebSocket 连接）
 
+    private static let probeTimeout: TimeInterval = 0.8
+
     /// 共享探活 session，仅创建一次（探活不需要 cookie / 缓存）
     private static let probeSession: URLSession = {
         let config = URLSessionConfiguration.ephemeral
-        config.timeoutIntervalForRequest = 2
-        config.timeoutIntervalForResource = 2
+        config.timeoutIntervalForRequest = probeTimeout
+        config.timeoutIntervalForResource = probeTimeout
         return URLSession(configuration: config)
     }()
 
-    /// 快速探活：先 /readyz，再 /healthz，均 2s 超时
+    /// 快速探活：并发检查 /readyz 和 /healthz，避免坏 Gateway 长时间拖住登录。
     /// - Returns: (alive: Bool, ready: Bool)
     ///   - (false, false): 端口无响应
     ///   - (true, false):  healthz OK，readyz 未通（启动中）

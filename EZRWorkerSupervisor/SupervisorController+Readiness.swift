@@ -105,37 +105,46 @@ extension EZRWorkerSupervisorController {
         record.portListeningPID = listeningPID
         record.httpResponding = probe.alive
 
-        let ownsProcess = record.process?.isRunning == true
-            && record.process?.processIdentifier == listeningPID
+        let ownsProcess = listeningPID.map { pid in
+            guard let process = record.process, process.isRunning else {
+                return false
+            }
+            return listeningGatewayProcessBelongsToRecord(
+                pid: pid,
+                record: record,
+                expectedRootPID: process.processIdentifier
+            )
+        } ?? false
         let matchesProfile = listeningPID.map { gatewayProcessMatches(record: record, pid: $0) } ?? false
+        let ownsOrMatchesProfile = ownsProcess || matchesProfile
 
-        guard probe.alive, ownsProcess || matchesProfile else {
-            if let process = record.process, process.isRunning {
+        guard probe.alive, ownsOrMatchesProfile else {
+            if let listeningPID, ownsOrMatchesProfile {
+                if !ownsProcess {
+                    record.process = nil
+                }
                 applyUnhealthyRunningSnapshot(
                     record,
-                    pid: process.processIdentifier,
-                    ownership: .supervised,
-                    pendingHealthState: listeningPID == process.processIdentifier ? .portListening : .launching,
-                    reason: listeningPID == process.processIdentifier
-                        ? "gateway health check is not responding"
-                        : "gateway process is running but port is unavailable",
-                    pendingMessage: listeningPID == process.processIdentifier
-                        ? "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应"
-                        : "Gateway 进程运行中，正在等待端口 \(record.resolution.resolvedPort)",
+                    pid: listeningPID,
+                    ownership: ownsProcess ? .supervised : .adopted,
+                    pendingHealthState: .portListening,
+                    reason: ownsProcess
+                        ? "gateway port is listening but health check is not responding"
+                        : "adopted gateway health check is not responding",
+                    pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应",
                     now: now
                 )
                 return
             }
 
-            if let listeningPID, matchesProfile {
-                record.process = nil
+            if let process = record.process, process.isRunning {
                 applyUnhealthyRunningSnapshot(
                     record,
-                    pid: listeningPID,
-                    ownership: .adopted,
-                    pendingHealthState: .portListening,
-                    reason: "adopted gateway health check is not responding",
-                    pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应",
+                    pid: process.processIdentifier,
+                    ownership: .supervised,
+                    pendingHealthState: .launching,
+                    reason: "gateway process is running but port is unavailable",
+                    pendingMessage: "Gateway 进程运行中，正在等待端口 \(record.resolution.resolvedPort)",
                     now: now
                 )
                 return
@@ -343,10 +352,16 @@ extension EZRWorkerSupervisorController {
                startupOutputIndicatesGatewayReady(startupOutput?.output) {
                 let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
                 if requireSameListeningPID,
-                   let pid,
                    let currentPID,
-                   currentPID != pid {
+                   !listeningGatewayProcessBelongsToRecord(
+                       pid: currentPID,
+                       record: record,
+                       expectedRootPID: pid
+                   ) {
                     let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                    if ownership == .supervised {
+                        _ = await stopRecord(record)
+                    }
                     record.markFailed(message)
                     record.ownership = .none
                     return (false, message)
@@ -369,12 +384,20 @@ extension EZRWorkerSupervisorController {
             let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
             record.portListeningPID = currentPID
             record.httpResponding = probe.alive
-            if probe.alive,
-               requireSameListeningPID,
-               let pid,
-               let currentPID,
-               currentPID != pid {
+            let currentPIDBelongsToRecord = currentPID.map {
+                listeningGatewayProcessBelongsToRecord(
+                    pid: $0,
+                    record: record,
+                    expectedRootPID: pid
+                )
+            } ?? false
+            if requireSameListeningPID,
+               currentPID != nil,
+               !currentPIDBelongsToRecord {
                 let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                if ownership == .supervised {
+                    _ = await stopRecord(record)
+                }
                 record.markFailed(message)
                 record.ownership = .none
                 return (false, message)
@@ -384,6 +407,9 @@ extension EZRWorkerSupervisorController {
                 record.isPrepared = true
                 record.isRunning = true
                 record.pid = currentPID ?? pid
+                record.portListeningPID = currentPID
+                record.httpResponding = probe.alive
+                record.adoptionKind = adoptionKind(for: record, ownership: ownership)
                 record.markHealthy(now: probeAt)
                 return (true, nil)
             }
@@ -399,6 +425,16 @@ extension EZRWorkerSupervisorController {
                     pendingHealthState: .portListening,
                     reason: "gateway health check is not ready during startup",
                     pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在等待健康检查",
+                    now: probeAt
+                )
+            } else if currentPIDBelongsToRecord {
+                applyUnhealthyRunningSnapshot(
+                    record,
+                    pid: currentPID,
+                    ownership: ownership,
+                    pendingHealthState: .portListening,
+                    reason: "gateway port is listening but health check is not responding during startup",
+                    pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，但健康检查暂未响应",
                     now: probeAt
                 )
             } else if elapsedSeconds >= 30 {
@@ -439,9 +475,25 @@ extension EZRWorkerSupervisorController {
         let finalProbeAt = Date()
         record.lastProbeAt = finalProbeAt
         if finalProbe.ready {
+            let finalPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+            if requireSameListeningPID,
+               let finalPID,
+               !listeningGatewayProcessBelongsToRecord(
+                   pid: finalPID,
+                   record: record,
+                   expectedRootPID: pid
+               ) {
+                let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                if ownership == .supervised {
+                    _ = await stopRecord(record)
+                }
+                record.markFailed(message, now: finalProbeAt)
+                record.ownership = .none
+                return (false, message)
+            }
             record.isPrepared = true
             record.isRunning = true
-            record.pid = gatewayPIDListening(onPort: record.resolution.resolvedPort) ?? pid
+            record.pid = finalPID ?? pid
             record.portListeningPID = record.pid
             record.httpResponding = finalProbe.alive
             record.adoptionKind = adoptionKind(for: record, ownership: ownership)
@@ -451,7 +503,7 @@ extension EZRWorkerSupervisorController {
 
         if ownership == .supervised, record.process?.isRunning == true {
             let capturedOutput = startupOutput?.output
-            _ = await stopProfile(profileID: record.profile.id)
+            _ = await stopRecord(record, markUserStopped: false)
             let message =
                 extractStartupFailureMessage(from: capturedOutput)
                 ?? "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
@@ -558,6 +610,20 @@ extension EZRWorkerSupervisorController {
                 record.ownership = .none
             }
             return
+        }
+
+        if let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort),
+           listeningGatewayProcessBelongsToRecord(
+               pid: currentPID,
+               record: record,
+               expectedRootPID: terminatedPID
+           ) {
+            _ = await terminateGatewayProcess(
+                pid: currentPID,
+                port: record.resolution.resolvedPort
+            )
+            record.portListeningPID = nil
+            record.httpResponding = false
         }
 
         if record.readyState != .stopped,
