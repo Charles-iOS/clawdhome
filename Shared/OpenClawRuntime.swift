@@ -1,6 +1,11 @@
 import Foundation
 
 enum OpenClawRuntime {
+    enum EnvironmentPurpose {
+        case gateway
+        case command
+    }
+
     private static let inheritedSupervisorMarkerKeys = [
         "LAUNCH_JOB_LABEL",
         "LAUNCH_JOB_NAME",
@@ -41,7 +46,10 @@ enum OpenClawRuntime {
         runtimeRootURL.appendingPathComponent("node/bin/npx")
     }
 
-    static func buildEnvironment(profile: GatewayProfileResolution? = nil) -> [String: String] {
+    static func buildEnvironment(
+        profile: GatewayProfileResolution? = nil,
+        purpose: EnvironmentPurpose = .command
+    ) -> [String: String] {
         let home = NSHomeDirectory()
         let nodeBin = bundledNodeURL.deletingLastPathComponent().path
         let openClawBin = runtimeRootURL.appendingPathComponent("openclaw/bin").path
@@ -60,7 +68,13 @@ enum OpenClawRuntime {
             environment.removeValue(forKey: key)
         }
         environment["EZRWORKER_SUPERVISOR_CHILD"] = "1"
-        environment["OPENCLAW_NO_RESPAWN"] = "1"
+        switch purpose {
+        case .gateway:
+            environment.removeValue(forKey: "OPENCLAW_NO_RESPAWN")
+            environment["OPENCLAW_LAUNCHD_LABEL"] = EZRWorkerBranding.supervisorLaunchAgentLabel
+        case .command:
+            environment["OPENCLAW_NO_RESPAWN"] = "1"
+        }
         // Avoid blocking gateway readiness on Codex app-server live model discovery.
         environment["OPENCLAW_CODEX_DISCOVERY_LIVE"] = "0"
         // EZRWorker manages local profiles directly by port/token. Bonjour LAN

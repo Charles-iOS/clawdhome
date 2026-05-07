@@ -192,7 +192,10 @@ extension EZRWorkerSupervisorController {
         let process = Process()
         process.executableURL = OpenClawRuntime.bundledNodeURL
         process.arguments = [OpenClawRuntime.bundledOpenClawEntry.path, "gateway"]
-        process.environment = OpenClawRuntime.buildEnvironment(profile: record.resolution)
+        process.environment = OpenClawRuntime.buildEnvironment(
+            profile: record.resolution,
+            purpose: .gateway
+        )
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         let startupLogURL = prepareGatewayOutputLog(for: record.resolution)
         let startupOutput = ProcessOutputCollector(logURL: startupLogURL)
