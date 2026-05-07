@@ -50,40 +50,42 @@ There are no unit tests configured in this project.
 
 ## Architecture
 
-### Privilege Separation (Core Design)
+### Runtime Topology (Core Design)
 
 ```
 EZRWorker.app (user context, SwiftUI)
-    └── XPC (NSXPCConnection, Mach service) ──→ EZRWorkerHelper (root LaunchDaemon)
-                                                   └── per-user OpenClaw gateway instances
+    └── XPC (NSXPCConnection, Mach service) ──→ EZRWorkerSupervisor (user LaunchAgent)
+                                                   └── per-profile OpenClaw gateway instances
 ```
 
-The app **never** performs privileged operations directly. All system-level actions route through the XPC helper.
+The current mainline routes gateway runtime management through the user-level supervisor. The root helper target still exists for legacy/system-level operations, but the main app UI no longer creates `HelperClient`/`ShrimpPool`/`GatewayHub`.
 
-### Two Targets (defined in `project.yml`, built via XcodeGen)
+### Targets (defined in `project.yml`, built via XcodeGen)
 
 | Target | Type | Bundle ID | Role |
 |--------|------|-----------|------|
 | `EZRWorker` | .app | `ai.ezrworker.mac` | Admin UI — SwiftUI frontend, state management, XPC client |
-| `EZRWorkerHelper` | tool | `ai.ezrworker.mac.helper` | Privileged daemon — user/process/file ops as root |
+| `EZRWorkerSupervisor` | tool | `ai.ezrworker.mac.supervisor` | User LaunchAgent — owns profile gateway runtimes |
+| `EZRWorkerHelper` | tool | `ai.ezrworker.mac.helper` | Legacy/system-level daemon — privileged user/process/file ops |
 
-The helper binary is embedded into the app bundle at `Contents/Library/LaunchDaemons/` via a post-build script.
+The supervisor binary and LaunchAgent plist are embedded into the app bundle via a post-build script.
 
 ### Shared Code (`Shared/`)
 
-- `HelperProtocol.swift` — the **single XPC interface** (`EZRWorkerHelperProtocol`, `@objc` protocol). All app↔helper communication goes through this protocol. XPC methods must use ObjC-compatible types only.
+- `SupervisorProtocol.swift` — App↔Supervisor XPC protocol.
+- `HelperProtocol.swift` — legacy/system-level helper protocol. XPC methods must use ObjC-compatible types only.
 - `*Models.swift` — Codable model types shared between both targets (Dashboard, Process, File, Network, HealthCheck, CloneClaw, LocalAI).
 
 ### App Layer (`EZRWorkerApp/`)
 
 - **Services/** — business logic and infrastructure:
-  - `HelperClient` — XPC connection manager with **5 dedicated connections** (control, dashboard, install, file, process) to avoid blocking.
-  - `ShrimpPool` — manages the collection of Shrimp instances and their lifecycle state.
-  - `GatewayHub` / `GatewayClient` — HTTP clients for communicating with running gateway instances.
+  - `SupervisorClient` — XPC client for the user-level supervisor.
+  - `GatewayProfileStore` / `GatewayProcessManager` — profile configuration and runtime orchestration.
+  - `GatewayService` / `GatewayClient` — HTTP/WebSocket clients for communicating with running gateway instances.
   - `ProviderKeychainStore` / `UserPasswordStore` — Keychain-backed credential storage.
-  - `WizardConnection` — manages the init wizard flow for new Shrimps.
-- **Models/** — app-side state objects (`ManagedUser`, `GlobalModelStore`, `GlobalSecretsStore`, `AccountKeychain`, `ProviderKeyConfig`).
-- **Views/** — SwiftUI views. Key screens: `DashboardView`, `UserDetailView`, `UserInitWizardView`, `ClawPoolView`, `ModelManagerView`, `UserFilesView`.
+  - `AgentStore` / `AgentWorkspaceManager` — agent metadata, bindings, and workspace files.
+- **Models/** — app-side state objects (`GlobalModelStore`, `GlobalSecretsStore`, `AccountKeychain`, `ProviderKeyConfig`).
+- **Views/** — SwiftUI views. Key screens: agent grid/workspace, capabilities, channels, model config, settings, and profile terminal.
 
 ### Helper Layer (`EZRWorkerHelper/`)
 
@@ -101,7 +103,7 @@ The helper binary is embedded into the app bundle at `Contents/Library/LaunchDae
 
 ### State Management
 
-Uses Swift `@Observable` (Observation framework) throughout. Key observable objects are injected via SwiftUI `.environment()` from `EZRWorkerApp.swift`: `HelperClient`, `ShrimpPool`, `UpdateChecker`, `GlobalModelStore`, `ProviderKeychainStore`, `GatewayHub`, `AppLockStore`.
+Uses Swift `@Observable` (Observation framework) throughout. Key observable objects are injected via SwiftUI `.environment()` from `EZRWorkerApp.swift`: `GatewayProcessManager`, `GatewayService`, `AgentStore`, `AgentWorkspaceManager`, `ProviderKeychainStore`, `AuthSessionStore`, `GatewayProfileStore`, `SupervisorClient`, `UpdateChecker`, `GlobalModelStore`, and `AppLockStore`.
 
 ### Versioning
 

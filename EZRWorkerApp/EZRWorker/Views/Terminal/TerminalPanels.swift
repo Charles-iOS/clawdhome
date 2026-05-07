@@ -1,10 +1,7 @@
-// EZRWorkerApp/Views/TerminalLogView.swift
-// 两种模式：
-//   TerminalLogPanel       — 只读，轮询日志文件（auto 安装步骤用）
-//   InteractiveTerminalPanel — 交互，LocalProcessTerminalView 跑 openclaw 向导
-
-import SwiftUI
+import AppKit
+import Foundation
 import SwiftTerm
+import SwiftUI
 
 private func firstOAuthAuthorizeURL(in text: String) -> URL? {
     for token in text.split(whereSeparator: { $0.isWhitespace }) {
@@ -35,8 +32,6 @@ private func writeToPasteboard(_ content: Data) {
         }
     }
 }
-
-// MARK: - 对外接口（与原 InitLogPanel 接口兼容）
 
 final class LocalTerminalControl: ObservableObject {
     fileprivate weak var terminalView: LocalProcessTerminalView?
@@ -70,13 +65,6 @@ final class LocalTerminalControl: ObservableObject {
         terminateHandler = { [weak view] in
             view?.terminate()
         }
-        flushPendingInputsIfNeeded()
-    }
-
-    fileprivate func attachHandlers(sendRaw: ((Data) -> Void)?, terminate: (() -> Void)?) {
-        terminalView = nil
-        sendRawHandler = sendRaw
-        terminateHandler = terminate
         flushPendingInputsIfNeeded()
     }
 
@@ -154,7 +142,7 @@ struct TerminalLogPanel: View {
                 searchText: $searchText,
                 searchRequest: $searchRequest
             )
-                .frame(height: 180)
+            .frame(height: 180)
         }
         .background(Color(nsColor: .textBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -165,8 +153,6 @@ struct TerminalLogPanel: View {
         searchRequest = LogSearchRequest(token: searchRequest.token + 1, direction: direction)
     }
 }
-
-// MARK: - NSViewRepresentable
 
 private enum LogSearchDirection {
     case next
@@ -224,9 +210,7 @@ private struct LogTextNSView: NSViewRepresentable {
     }
 }
 
-// MARK: - 协调器：轮询日志文件，增量写入文本视图
-
-final class LogFeedCoordinator: NSObject {
+private final class LogFeedCoordinator: NSObject {
     let username: String
     var autoScroll = true
 
@@ -250,7 +234,6 @@ final class LogFeedCoordinator: NSObject {
     func start(scrollView: NSScrollView, textView: NSTextView) {
         self.scrollView = scrollView
         self.textView = textView
-        // 0.3s 轮询，进度条动画流畅
         let timer = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in
             self?.pollLog()
         }
@@ -383,40 +366,9 @@ final class LogFeedCoordinator: NSObject {
     }
 }
 
-// MARK: - 交互终端面板（运行 openclaw 向导）
-
-struct InteractiveTerminalPanel: View {
+private struct LocalProcessNSView: NSViewRepresentable {
     let username: String
-    var onExit: ((Int32?) -> Void)? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(L10n.k("auto.terminal_log_view.command_output", fallback: "命令输出"))
-                    .font(.caption).fontWeight(.medium).foregroundStyle(.secondary)
-                Spacer()
-                Label(L10n.k("auto.terminal_log_view.interactive_mode", fallback: "交互模式"), systemImage: "terminal")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            Divider()
-            LocalProcessNSView(username: username, onExit: onExit)
-        }
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.2)))
-    }
-}
-
-// MARK: - NSViewRepresentable for LocalProcessTerminalView
-
-/// 通用交互终端：以指定用户身份运行 openclaw 子命令
-/// subcommandArgs 为空时启动 openclaw 交互 TUI（原有行为）
-struct LocalProcessNSView: NSViewRepresentable {
-    let username: String
-    /// openclaw 后追加的子命令参数，如 ["channels","add","--channel","telegram","--token","xxx"]
     var subcommandArgs: [String] = []
-    /// 可选：覆盖执行命令（默认执行 openclaw）
     var executable: String? = nil
     var executableArgs: [String] = []
     var environmentOverrides: [String: String] = [:]
@@ -429,14 +381,13 @@ struct LocalProcessNSView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> LocalProcessTerminalView {
-        let tv = OutputObservingLocalProcessTerminalView(frame: .zero)
-        tv.processDelegate = context.coordinator
-        // Keep text selection stable while output is streaming.
-        tv.allowMouseReporting = false
-        tv.nativeForegroundColor = NSColor.labelColor
-        tv.nativeBackgroundColor = NSColor.textBackgroundColor
-        tv.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        tv.onOutputBytes = { bytes in
+        let terminal = OutputObservingLocalProcessTerminalView(frame: .zero)
+        terminal.processDelegate = context.coordinator
+        terminal.allowMouseReporting = false
+        terminal.nativeForegroundColor = NSColor.labelColor
+        terminal.nativeBackgroundColor = NSColor.textBackgroundColor
+        terminal.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        terminal.onOutputBytes = { bytes in
             let chunk = String(decoding: Array(bytes), as: UTF8.self)
             guard !chunk.isEmpty else { return }
             context.coordinator.handleOutputChunk(chunk)
@@ -456,44 +407,44 @@ struct LocalProcessNSView: NSViewRepresentable {
         let commandArgs = executable != nil ? executableArgs : subcommandArgs
         let homePath = "/Users/\(username)"
 
-        // 所有交互命令都强制以虾用户身份执行，避免落到当前 GUI 登录用户。
         let runtimeExecutable = "/usr/bin/sudo"
-        var runtimeArgs = ["-n", "-u", username, "-H",
-                           "/usr/bin/env",
-                           "HOME=\(homePath)",
-                           "PATH=\(pathEnv)",
-                           "NPM_CONFIG_PREFIX=\(npmGlobalDir)",
-                           "npm_config_prefix=\(npmGlobalDir)",
-                           "TERM=xterm-256color"]
+        var runtimeArgs = [
+            "-n", "-u", username, "-H",
+            "/usr/bin/env",
+            "HOME=\(homePath)",
+            "PATH=\(pathEnv)",
+            "NPM_CONFIG_PREFIX=\(npmGlobalDir)",
+            "npm_config_prefix=\(npmGlobalDir)",
+            "TERM=xterm-256color"
+        ]
         for (key, value) in environmentOverrides where key != "PATH" {
             runtimeArgs.append("\(key)=\(value)")
         }
         runtimeArgs.append(command)
         runtimeArgs.append(contentsOf: commandArgs)
 
-        tv.startProcess(
+        terminal.startProcess(
             executable: runtimeExecutable,
             args: runtimeArgs,
             environment: nil
         )
-        control?.attach(tv)
-        return tv
+        control?.attach(terminal)
+        return terminal
     }
 
     func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: LocalProcessTerminalView, coordinator: LocalProcessCoordinator) {
+        nsView.terminate()
+    }
 }
 
-// MARK: - 命令终端面板（执行单条 openclaw 子命令，显示输出）
-
-/// 运行指定 openclaw 子命令并展示输出，支持交互式提示响应
-/// 每次 id 变化会重新创建，实现L10n.k("views.terminal_log_view.text_d4eec25c", fallback: "重跑命令")效果
 struct CommandTerminalPanel: View {
     let username: String
     let subcommandArgs: [String]
     var minHeight: CGFloat = 160
     var onExit: ((Int32?) -> Void)? = nil
 
-    /// 展示的命令行摘要（用于标题栏）
     private var commandSummary: String {
         "openclaw " + subcommandArgs.joined(separator: " ")
     }
@@ -521,7 +472,6 @@ struct CommandTerminalPanel: View {
     }
 }
 
-/// 运行任意用户态命令并提供交互式终端（实时输出 + 可输入）
 struct UserCommandTerminalPanel: View {
     let username: String
     let executable: String
@@ -570,324 +520,6 @@ struct UserCommandTerminalPanel: View {
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.2)))
     }
 }
-
-/// Helper 侧 PTY 会话终端（XPC 轮询输出 + 输入转发）
-struct HelperMaintenanceTerminalPanel: View {
-    let username: String
-    let command: [String]
-    @Environment(HelperClient.self) private var helperClient
-    var minHeight: CGFloat = 220
-    var onOutput: ((String) -> Void)? = nil
-    var control: LocalTerminalControl? = nil
-    var onExit: ((Int32?) -> Void)? = nil
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "terminal")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text(command.joined(separator: " "))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                Label(L10n.k("auto.terminal_log_view.helper_session", fallback: "Helper 会话"), systemImage: "bolt.horizontal.circle")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            Divider()
-            HelperMaintenanceTerminalNSView(
-                helperClient: helperClient,
-                username: username,
-                command: command,
-                onOutput: onOutput,
-                control: control,
-                onExit: onExit
-            )
-            .padding(8)
-            .frame(minHeight: minHeight)
-        }
-        .background(Color(nsColor: .textBackgroundColor))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.2)))
-    }
-}
-
-private struct HelperMaintenanceTerminalNSView: NSViewRepresentable {
-    let helperClient: HelperClient
-    let username: String
-    let command: [String]
-    var onOutput: ((String) -> Void)? = nil
-    var control: LocalTerminalControl? = nil
-    var onExit: ((Int32?) -> Void)? = nil
-
-    func makeCoordinator() -> HelperMaintenanceTerminalCoordinator {
-        HelperMaintenanceTerminalCoordinator(
-            helperClient: helperClient,
-            username: username,
-            command: command,
-            onOutput: onOutput,
-            control: control,
-            onExit: onExit
-        )
-    }
-
-    func makeNSView(context: Context) -> TerminalView {
-        let tv = TerminalView(frame: .zero)
-        tv.terminalDelegate = context.coordinator
-        // Keep text selection stable while output is streaming.
-        tv.allowMouseReporting = false
-        tv.nativeForegroundColor = NSColor.labelColor
-        tv.nativeBackgroundColor = NSColor.textBackgroundColor
-        tv.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        context.coordinator.start(with: tv)
-        // 窗口打开后自动聚焦到终端，用户可直接输入。
-        DispatchQueue.main.async {
-            tv.window?.makeFirstResponder(tv)
-        }
-        return tv
-    }
-
-    func updateNSView(_ nsView: TerminalView, context: Context) {}
-}
-
-final class HelperMaintenanceTerminalCoordinator: NSObject, TerminalViewDelegate {
-    private let helperClient: HelperClient
-    private let username: String
-    private let command: [String]
-    private let onOutput: ((String) -> Void)?
-    private let control: LocalTerminalControl?
-    private let onExit: ((Int32?) -> Void)?
-    private weak var terminalView: TerminalView?
-    private var sessionID: String?
-    private var offset: Int64 = 0
-    private var timer: Timer?
-    private var polling = false
-    private var exitNotified = false
-    private var isCleaningUp = false
-    private var lastResizeSent: (cols: Int, rows: Int)?
-    private var pendingResize: (cols: Int, rows: Int)?
-    private var openedOAuthURLs: Set<String> = []
-
-    init(
-        helperClient: HelperClient,
-        username: String,
-        command: [String],
-        onOutput: ((String) -> Void)?,
-        control: LocalTerminalControl?,
-        onExit: ((Int32?) -> Void)?
-    ) {
-        self.helperClient = helperClient
-        self.username = username
-        self.command = command
-        self.onOutput = onOutput
-        self.control = control
-        self.onExit = onExit
-    }
-
-    deinit {
-        timer?.invalidate()
-        cleanupSession()
-    }
-
-    func start(with terminalView: TerminalView) {
-        self.terminalView = terminalView
-        Task { [weak self] in
-            await self?.startSession()
-        }
-    }
-
-    private func startPollingTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
-            self?.pollIfNeeded()
-        }
-    }
-
-    private func startSession() async {
-        let startResult = await helperClient.startMaintenanceTerminalSession(
-            username: username,
-            command: command
-        )
-        // 首次打开窗口时可能恰逢 XPC 连接未就绪：自动重试一次，减少“点重跑才成功”。
-        let finalResult: (Bool, String, String?)
-        if !startResult.0, startResult.2 == L10n.k("services.helper_client.disconnected", fallback: "未连接") {
-            helperClient.connect()
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            finalResult = await helperClient.startMaintenanceTerminalSession(
-                username: username,
-                command: command
-            )
-        } else {
-            finalResult = startResult
-        }
-
-        guard finalResult.0 else {
-            let msg = L10n.f(
-                "views.terminal_log_view.command_start_failed",
-                fallback: "命令启动失败：%@\r\n",
-                finalResult.2 ?? "unknown error"
-            )
-            await MainActor.run {
-                self.feedToTerminal(msg)
-                self.onOutput?(msg)
-            }
-            notifyExitOnce(code: -1)
-            return
-        }
-        await MainActor.run {
-            self.sessionID = finalResult.1
-            self.offset = 0
-            self.isCleaningUp = false
-            let initialResize = self.pendingResize ?? self.lastResizeSent
-            if let initialResize {
-                self.pendingResize = nil
-                self.sendResize(cols: initialResize.cols, rows: initialResize.rows)
-            }
-            self.control?.attachHandlers(sendRaw: { [weak self] data in
-                self?.sendInput(data)
-            }, terminate: { [weak self] in
-                self?.cleanupSession()
-            })
-            self.startPollingTimer()
-        }
-    }
-
-    private func pollIfNeeded() {
-        guard !polling, let sessionID else { return }
-        polling = true
-        Task { [weak self] in
-            guard let self else { return }
-            let snapshot = await helperClient.pollMaintenanceTerminalSession(
-                sessionID: sessionID,
-                fromOffset: self.offset
-            )
-            await MainActor.run {
-                self.handlePollResult(snapshot)
-            }
-        }
-    }
-
-    private func handlePollResult(_ snapshot: (Bool, String, Int64, Bool, Int32, String?)) {
-        polling = false
-        let (ok, chunk, nextOffset, exited, exitCode, err) = snapshot
-        if !ok {
-            if let err, !err.isEmpty {
-                feedToTerminal(L10n.f("views.terminal_log_view.r_n", fallback: "会话错误：%@\r\n", String(describing: err)))
-            }
-            notifyExitOnce(code: -1)
-            timer?.invalidate()
-            return
-        }
-        offset = nextOffset
-        if !chunk.isEmpty {
-            feedToTerminal(chunk)
-            onOutput?(chunk)
-            autoOpenOAuthIfNeeded(chunk)
-        }
-        if exited {
-            timer?.invalidate()
-            notifyExitOnce(code: exitCode)
-            cleanupSession()
-        }
-    }
-
-    private func feedToTerminal(_ text: String) {
-        guard let terminalView else { return }
-        let bytes = ArraySlice(Array(text.utf8))
-        terminalView.feed(byteArray: bytes)
-    }
-
-    private func sendInput(_ data: Data) {
-        guard let sessionID else { return }
-        Task {
-            let (ok, err) = await helperClient.sendMaintenanceTerminalSessionInput(
-                sessionID: sessionID,
-                input: data
-            )
-            if !ok, let err {
-                await MainActor.run { [weak self] in
-                    self?.feedToTerminal(L10n.f("views.terminal_log_view.r_n_r_n", fallback: "\r\n输入失败：%@\r\n", String(describing: err)))
-                }
-            }
-        }
-    }
-
-    private func sendResize(cols: Int, rows: Int) {
-        guard cols > 0, rows > 0 else { return }
-        guard let sessionID else {
-            pendingResize = (cols, rows)
-            return
-        }
-        Task { [helperClient, sessionID] in
-            _ = await helperClient.resizeMaintenanceTerminalSession(
-                sessionID: sessionID,
-                cols: cols,
-                rows: rows
-            )
-        }
-    }
-
-    private func cleanupSession() {
-        timer?.invalidate()
-        timer = nil
-        guard !isCleaningUp else { return }
-        guard let sessionID else { return }
-        isCleaningUp = true
-        self.sessionID = nil
-        let client = helperClient
-        Task { [sessionID] in
-            _ = await client.terminateMaintenanceTerminalSession(sessionID: sessionID)
-        }
-    }
-
-    private func notifyExitOnce(code: Int32?) {
-        guard !exitNotified else { return }
-        exitNotified = true
-        onExit?(code)
-    }
-
-    // MARK: TerminalViewDelegate
-
-    func send(source: TerminalView, data: ArraySlice<UInt8>) {
-        sendInput(Data(data))
-    }
-
-    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
-        guard newCols > 0, newRows > 0 else { return }
-        if let lastResizeSent, lastResizeSent.cols == newCols, lastResizeSent.rows == newRows {
-            return
-        }
-        lastResizeSent = (newCols, newRows)
-        sendResize(cols: newCols, rows: newRows)
-    }
-    func setTerminalTitle(source: TerminalView, title: String) {}
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
-    func scrolled(source: TerminalView, position: Double) {}
-    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
-        guard let url = URL(string: link) else { return }
-        openExternalURL(url)
-    }
-    func bell(source: TerminalView) {}
-    func clipboardCopy(source: TerminalView, content: Data) {
-        writeToPasteboard(content)
-    }
-    func iTermContent(source: TerminalView, content: ArraySlice<UInt8>) {}
-    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
-
-    private func autoOpenOAuthIfNeeded(_ chunk: String) {
-        guard let url = firstOAuthAuthorizeURL(in: chunk) else { return }
-        let raw = url.absoluteString
-        guard !raw.isEmpty, !openedOAuthURLs.contains(raw) else { return }
-        openedOAuthURLs.insert(raw)
-        openExternalURL(url)
-    }
-}
-
-// MARK: - LocalProcessTerminalViewDelegate
 
 final class LocalProcessCoordinator: NSObject, LocalProcessTerminalViewDelegate {
     var onExit: ((Int32?) -> Void)?

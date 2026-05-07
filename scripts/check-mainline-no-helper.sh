@@ -23,7 +23,6 @@ if [ -n "$matches" ]; then
   printf '%s\n' "$matches"
   echo ""
   echo "允许保留的位置："
-  echo "  - EZRWorkerApp/LegacyCompatibility/"
   echo "  - EZRWorkerHelper/"
   echo "  - Shared/HelperProtocol.swift"
   echo ""

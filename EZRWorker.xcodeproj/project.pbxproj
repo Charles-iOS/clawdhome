@@ -22,13 +22,12 @@
 		07CDB28DAA3A3893933F11DC /* AuthSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 360302D93CA3B23E3A2CB64F /* AuthSessionStore.swift */; };
 		0909713A853FB00B7F52D189 /* GlobalModelStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C4D900EFBBA3ED016FBDB6 /* GlobalModelStore.swift */; };
 		09492CD1540C899849D68C7D /* FileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E14DAA0C45656B3F5025800 /* FileModels.swift */; };
-		0BE10D748690A86E7C0321DB /* 智能体 Workspace 重设计方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 8E214EC3AAE2BEAB5A0ADCEE /* 智能体 Workspace 重设计方案.md */; };
+		0C3AB4EB1F2081B8E68E56DB /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1323A413280A3C6D2759CDDB /* ProcessOutputCollector.swift */; };
 		0C760590A7A397DA41FF1439 /* CreateAgentWizardState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B21F8D7DC48B1E02561B0A /* CreateAgentWizardState.swift */; };
 		0F554E029FADC2201D3A009C /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 8BE83D74A68F3C82CAF10410 /* SwiftTerm */; };
 		10AE50E5DB04C49A4F324CD3 /* ProfileCLIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BB39D38BC5A4670D1250FA5 /* ProfileCLIService.swift */; };
 		118E251360FF57BF45D6C60D /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */; };
 		11EB305CF95D84636C123F47 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B13FCA2751D431C930179D6C /* AppSettingsView.swift */; };
-		120CFDD066430D4BB3073672 /* WizardConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6ACF9694496708E55DBBD4 /* WizardConnection.swift */; };
 		127C94F2DAF841B1B5B1C5D1 /* ChannelType.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB3825E5480565691A7697A9 /* ChannelType.swift */; };
 		1390971AD1A4055171C84A14 /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A80BFC11DD1E70AB01DC72 /* UserInitPresentationRouting.swift */; };
 		13A532108EB6EDB8F29DF459 /* EZRWorkerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A4315E9D76AF6CFFBFA6D7 /* EZRWorkerApp.swift */; };
@@ -37,55 +36,40 @@
 		163FE69F2DEF39F0CD1E1A87 /* UserManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6E8B8C0512F7843AB6D169 /* UserManager.swift */; };
 		16765726777CE61AA46DCFFC /* FileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E14DAA0C45656B3F5025800 /* FileModels.swift */; };
 		181EB79773E6ACC06EC32E05 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245C733CB708D2CC4657D10B /* DashboardModels.swift */; };
-		19F095F7F36465E9A09E8424 /* LLMManagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */; };
 		1AAE22BB1A45A87CD72D472C /* Stable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 03F20F22E1D3B0500B2B2F36 /* Stable.xcstrings */; };
 		1B263219094E1E3BDA9C6963 /* CreateProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F4555D06326E7D96A34A8B /* CreateProfileSheet.swift */; };
+		1B27E9B3C6A0A8F01B002DB0 /* OpenClawInstanceDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C08E302E1AB365F5FB24305 /* OpenClawInstanceDiscoveryService.swift */; };
 		1B618D0AF3E7A7A4F91CFBA0 /* TelegramChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DB4B622DA108773F0D7066 /* TelegramChannelConfigSheet.swift */; };
 		1BC5C36E35CFAC54DA9CEE4C /* CloneClawModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4142B9D2C5922D549BDECEEE /* CloneClawModels.swift */; };
 		1BCBDB8DDD65FFC4880D7952 /* ShellRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22F30959ACB0A8B663F27B7 /* ShellRunner.swift */; };
 		207C0361D57EB90D7669011E /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80A3BEC38B3B563C4EC9BD67 /* SupervisorProtocol.swift */; };
-		20BF2D873265F7C3F616DBE3 /* SessionsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC54AFFEE5A61479E85B8FD5 /* SessionsTabView.swift */; };
 		21221230DDC21B2BA9013FE9 /* WizardStep3SkillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4304E5FD0143F963EA133FB5 /* WizardStep3SkillsView.swift */; };
-		21B00C5BA00FD215E477FF55 /* PersonaDefView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 417E93162156AB9DE54C4FD2 /* PersonaDefView.swift */; };
 		24C638A05FA75C8B46998279 /* CloneClawModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4142B9D2C5922D549BDECEEE /* CloneClawModels.swift */; };
 		2692E95F0C8FEA80FC10F6F0 /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26D1903B7805374325974FB /* AppUpdateState.swift */; };
-		26DAA7DF391D264FB9937272 /* 定时任务页改版与创建弹窗重做.md in Resources */ = {isa = PBXBuildFile; fileRef = 5EAD831B5BA12C9BD42EB676 /* 定时任务页改版与创建弹窗重做.md */; };
-		27C0182E29FA19A0D7BF5371 /* UserDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77874CF35690017EC8B0B413 /* UserDetailView.swift */; };
-		289A8B42CC2C2F172225E645 /* EZRWorker 目录重组方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 2C21588F9BBD7644322A54B5 /* EZRWorker 目录重组方案.md */; };
 		29845C83518858090487FEE8 /* AgentStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 406C2F51B5F75C855100D43B /* AgentStyle.swift */; };
+		298786DAB12F9E2EDF477CD8 /* SupervisorController+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19791E7F1C81617CDB5DB870 /* SupervisorController+Config.swift */; };
 		2AAA7D765398D0134FAF83F7 /* ProfileTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30E9A622A85E6C84D696F8A /* ProfileTerminalView.swift */; };
-		2CA596360957A695BF7DF730 /* AwakeningWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17D5DEA24C5BED726C91F8A6 /* AwakeningWizardView.swift */; };
-		2DB5B6E4610B3DC09C243192 /* 模型配置自动同步 + 智能体独立选模型.md in Resources */ = {isa = PBXBuildFile; fileRef = 4C2310FF1CAB90CD0860B18A /* 模型配置自动同步 + 智能体独立选模型.md */; };
 		2E18243A182E96F4E0B1D06E /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */; };
-		321D6BC8014D0C62DBB26E13 /*  新建智能体向导.md in Resources */ = {isa = PBXBuildFile; fileRef = 0CF361BFC426343684599751 /*  新建智能体向导.md */; };
 		32815D2B1515CA0ABF6BF100 /* UserFileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DCA2E1614EAF1055C981CB /* UserFileManager.swift */; };
 		32BD5F9B185593C1ACADADC8 /* FileInputAcceptFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD2EECD3EF061A3AC53013F /* FileInputAcceptFilter.swift */; };
-		338F59C98B8DEA5FDA1719B8 /* SecurityAuditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B925DB4A92F9517B40E8CA /* SecurityAuditView.swift */; };
-		3493323E6F3708780B0A7C33 /* UserListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0D5D801BA09117BEA8A1B0 /* UserListView.swift */; };
 		3539069790A462361311644B /* GeneratedVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C3F56BC6006738C1679B9E8 /* GeneratedVersion.swift */; };
-		35A832ACD832D032CF07569E /* ProviderKeySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93E086F51C967E1AB9C7AF00 /* ProviderKeySheet.swift */; };
 		36F44D0BF41189BA7B8E2C76 /* AgentWorkspaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4EA89089DC5B4B2F541DB1 /* AgentWorkspaceManager.swift */; };
 		38E90F6DE391EAA7C315D1DB /* AgentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5F0DF12C62DB7033A7C088 /* AgentStore.swift */; };
 		397B6E22B4612FE1E649D950 /* DashboardCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E44CB1B06DF5471BD13925 /* DashboardCollector.swift */; };
-		3B40B71FFDDA40A51185A876 /* VoiceLibraryTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341A536C67D8695DE5B73B98 /* VoiceLibraryTab.swift */; };
 		3B6FBF3AC3F4EA77E5F61E3C /* WizardAgentPreviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD92271EC9701A999944A64C /* WizardAgentPreviewCard.swift */; };
-		3C91B8EBF1B75612E1C2D339 /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09FF22980362E75630A57068 /* BackupView.swift */; };
 		3D0E68D7D5370C195467EE92 /* GatewayService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F79FFD77FEFBB9374FF9388 /* GatewayService.swift */; };
 		3DC268CC24604EA975DF47B5 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */; };
-		3EF9C2994290EF09C3D8F55B /* Gateway 自重启交接修复技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 6FA3C9DABF937ABD459C670E /* Gateway 自重启交接修复技术方案.md */; };
 		400D2CEDFF2AC76714154770 /* ConfigWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12D93EDCF3E599D6FCB43F5 /* ConfigWriter.swift */; };
 		404053F6AA2474CB754B1BD8 /* GatewayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC3D0DE440728AE3F88B8070 /* GatewayManager.swift */; };
 		4251623040D1848B350C8861 /* CreateAgentWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5EE4419BA91C11D57D8784 /* CreateAgentWizardView.swift */; };
 		4390223FCA3A2AF3C4EA3307 /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52048ED8CE2A7913214CE038 /* AppNotifications.swift */; };
 		439DD82A4C0006D209077CB1 /* CronTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C5CE8670F3E13D445A191FA /* CronTaskView.swift */; };
-		4535FC36DEC55D72AB02D54A /* UserFilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB5400D6FA58C9EA502EFAB /* UserFilesView.swift */; };
 		469F180DF12F7D1A2D4861AF /* ModelConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0E410382FDDA3CBBF35E9C /* ModelConfigView.swift */; };
-		4702B5FDA5634C1E54657EC9 /* AILabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776D9DF1069AC323CFCA85F1 /* AILabView.swift */; };
 		47D2E8C47D07C2D04F294BB3 /* CreateAgentSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D59A3A3629639C10A1BE95D0 /* CreateAgentSheet.swift */; };
 		47FD3CDA0B277A2A5AB35C32 /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9559D9976F2E0E230CA5478D /* OpenClawRuntime.swift */; };
 		49A50CD89BBBCD488C8C142C /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */; };
+		4A8C78D9E88E520EE6BDA6A0 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = FD0A37975AC4E8D949737435 /* logo.png */; };
 		4A96853CA492C4AC0CCF916C /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2A45DB033D24C4E9A0801C /* NetworkModels.swift */; };
-		4ABF10190F7035785CD68071 /* EZRWorker 架构重设计：单实例智能体配置管理面板.md in Resources */ = {isa = PBXBuildFile; fileRef = 6F3E305DD9F6C20E0AE4720C /* EZRWorker 架构重设计：单实例智能体配置管理面板.md */; };
 		4D5CA1C1C84D069318A58E63 /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DA15B9B8920B917D89DE4DC /* Charts.framework */; };
 		4DA959D639591D4C29870646 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */; };
 		4DB3ABF4D896DA3DB2F04F98 /* ModelsStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E7ECFB0052218EC40E1AE8 /* ModelsStatus.swift */; };
@@ -94,44 +78,37 @@
 		546EC8249B3774DA048428B9 /* ProcessModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */; };
 		54EBE37A6A6F0D7FCD37BA67 /* NStatCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E92F6D4426AFE2396117F0F /* NStatCollector.swift */; };
 		57DE6A88D02779A43098531F /* FileInputAcceptFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD2EECD3EF061A3AC53013F /* FileInputAcceptFilter.swift */; };
+		5A205FDC9B16463C39677807 /* PersonaFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D7E8DD3D279F34DAAA0CB26 /* PersonaFile.swift */; };
 		5B108A44CED757B2CE41E351 /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80A3BEC38B3B563C4EC9BD67 /* SupervisorProtocol.swift */; };
 		5DB0DBB02E4A53227FC1AE28 /* AgentEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88E0243FE311E2077C971990 /* AgentEditorView.swift */; };
-		5F06C354A9A387A43EAE2745 /* ApplyCredentialSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AC4F423C8FA26EF670B12A9 /* ApplyCredentialSheet.swift */; };
 		630C8C8AF449E602F93C2A08 /* WizardStep1IdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E4B104E2D7E8111CFE056F2 /* WizardStep1IdentityView.swift */; };
-		6378AE98717EA50411B2DC1E /* NetworkPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBA351B14BFF320A46582D4 /* NetworkPolicyView.swift */; };
-		6387E2FBE5AD949813F5F050 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 993999E87900A0DF0027382D /* ContentView.swift */; };
-		64052477277EA2E469E08732 /* HealthCheckSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C94EAFAA80E56106D57A56 /* HealthCheckSheet.swift */; };
+		63C2CE1DD2927E89748CB993 /* SupervisorController+AutoStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAB65B69F1D7AF47049A493F /* SupervisorController+AutoStart.swift */; };
 		6408256C201F686320392202 /* GatewayCronStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0B3D07289A447AB0573591 /* GatewayCronStore.swift */; };
-		66404CB724247583F6E84608 /* ModelDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E78B5A13EC9C7018814E07F /* ModelDetailView.swift */; };
 		6763C3238B4B555B4B34EA46 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06416A4736695C43257B59E4 /* SidebarView.swift */; };
 		68EACC33DF17AD36D7F2F793 /* ChannelPairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50154BBC1CADA61EBF44496C /* ChannelPairingSheet.swift */; };
 		68EE85703B992648D9E539A6 /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE712347C5C362A5E831665 /* LocalAIModels.swift */; };
 		6A367E95F522DAB6374FE07F /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */; };
-		6A87112DE79A7D41B65C1DC0 /* EZRWorker 新主线完成 Helper 脱钩技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = E0A844D5A8276D6A390D3975 /* EZRWorker 新主线完成 Helper 脱钩技术方案.md */; };
 		6B8F82410DA79BD3E837A1D2 /* AgentGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA53EA2C51FB6902AAE33E20 /* AgentGridView.swift */; };
 		6C22895570A68ABF0CA21BAC /* HomeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF979415FFD6678D2E19439 /* HomeDashboardView.swift */; };
 		6C7A891C6A8975D0AAC1F2D6 /* CloneClawModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4142B9D2C5922D549BDECEEE /* CloneClawModels.swift */; };
 		6CE3C7B857A7715402BD8127 /* AgentToolCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA62D32A18F683AA3757BB46 /* AgentToolCategory.swift */; };
-		6D31A1C548A82EA83644F6AF /* ModelPrioritySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FB7DFCF60EBC9352AB6D1B /* ModelPrioritySheet.swift */; };
 		6EC86ED94CDA4184433A02C9 /* WizardStep0TemplateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCB7B6411C1D8CBD3C0DA46 /* WizardStep0TemplateView.swift */; };
 		6F645F1F9C0A10F312D84C79 /* AgentWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 541837AF1938E6F28B6CB902 /* AgentWorkspaceView.swift */; };
+		6F91FBE889EDE8854F4F11A6 /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D0407C6B71D8C489C445DE /* EZRWorkerSupervisorService.swift */; };
 		6FAA05C6976CB4EC89FFD0A9 /* LocalLLMManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6720DAACD8FA945551B0C814 /* LocalLLMManager.swift */; };
-		717390D30FA30859ED5BA4AE /* RoleMarketView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370C2A259021802A011D0F04 /* RoleMarketView.swift */; };
+		719951381890B2516D611619 /* SessionEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E2A38D1E25BA6C69BF72216 /* SessionEntry.swift */; };
 		725139BB755221E62DA5B75C /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */; };
-		72862724BFC1136B5BBBAC4E /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153F6660DE916E3A5166AE53 /* DashboardView.swift */; };
 		73439DEDEBD676CA95BEC88A /* EZRWorkerBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A47F610C9545ED6022D59E /* EZRWorkerBranding.swift */; };
 		73D69643AE4CE1CAF7014DDC /* GatewayLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9D6EF8FCBBC2EEC576F78B /* GatewayLog.swift */; };
 		73EFB5E23737E05741A50663 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2C01D7719436845AAEE99D /* main.swift */; };
 		77515C9F22226AE6034E60AB /* EZRWorkerBranding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41A47F610C9545ED6022D59E /* EZRWorkerBranding.swift */; };
-		78D60D8934ABE5A054396545 /* EZRWorker 手机号登录门禁方案.md in Resources */ = {isa = PBXBuildFile; fileRef = F4FAF4EA670875D2878F73E2 /* EZRWorker 手机号登录门禁方案.md */; };
+		79F27D175DC3B36E32BD77FC /* TerminalPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4351B56CE089EAAC752DFC44 /* TerminalPanels.swift */; };
 		7ABF47A726CE940AF7F61919 /* VoiceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98F8ADF4F753E82EC62D93F1 /* VoiceProfile.swift */; };
 		7C1062DC63F804DF2790C8C3 /* GatewaySkillsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3CD29580049C3C28EB5D4A7 /* GatewaySkillsStore.swift */; };
 		7C936599962716FA0BDA463A /* GatewaySkillModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AD7BA6A94E1C97733FD849 /* GatewaySkillModels.swift */; };
 		7CA499D25686BAE861398456 /* FormatUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 974F5BA074B049A1D2F1ED1D /* FormatUtils.swift */; };
-		7D6118614DE086172F4CF1AE /* Agent 渠道绑定功能完善方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 16E8F1E22DAFB3800E0879C2 /* Agent 渠道绑定功能完善方案.md */; };
 		7D62AC57B7D1237CE771CB1D /* ProviderKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */; };
 		7DE39E0A59531ADBEB772CEA /* ChannelBotConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F862365EBE5A03ADE4D918 /* ChannelBotConfigSheet.swift */; };
-		7DFC3511C5F89573B385154F /* AddUserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 131B2DAEA7A5596D65C89538 /* AddUserSheet.swift */; };
 		7EE282831690CC759BC1ABAE /* GatewayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B8C75A78263C4C9B8C6E4B /* GatewayClient.swift */; };
 		7F01095C41E7284CAF0119E5 /* ProviderKeyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B57166787F28D6CA0DC966 /* ProviderKeyConfig.swift */; };
 		8093AFA6118892180BBEB830 /* UserDirectoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1EDBB82362FBD65CA0EB745 /* UserDirectoryService.swift */; };
@@ -140,48 +117,27 @@
 		8239CDB3AC1AFE7C7F476A23 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A58E344AB8D39F8E09BCE42 /* ProcessManager.swift */; };
 		82EB45092DE1110669843D4F /* PortAllocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53929C9886023FF85F7BA88E /* PortAllocator.swift */; };
 		8568E919775BDBB53CB34CD8 /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE712347C5C362A5E831665 /* LocalAIModels.swift */; };
+		86894FB1907A3DB12B31E762 /* SupervisorRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2477EFB6C4FF5DA7555F61BC /* SupervisorRecord.swift */; };
 		8A82AAD5A37B10804CCFD1BC /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */; };
 		8A9A02E51FAE5173C148F785 /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9559D9976F2E0E230CA5478D /* OpenClawRuntime.swift */; };
 		8AFC15B60AAD09A13D6592FD /* AppLockStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBA743FBE660021E4FE192B /* AppLockStore.swift */; };
 		8C14AB69E49D99582269E7C6 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1321A176A8D41B547825528A /* LoginView.swift */; };
 		8CCB22FBB79EBD9B5C450EAF /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680ECFFDD674F840DB3D093B /* AppLanguage.swift */; };
-		9110C73EEED52E2FB6985B06 /* LocalAITab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674530854AC920AD9217B135 /* LocalAITab.swift */; };
 		92581700FC79177BB11D3AFB /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52048ED8CE2A7913214CE038 /* AppNotifications.swift */; };
-		934515128FE1467B16F18D28 /* Channels.md in Resources */ = {isa = PBXBuildFile; fileRef = B9853CF9A21268FFCDF17798 /* Channels.md */; };
-		937DCC2331CE3F9863B5E6AC /* EZRWorker 多 Profile 配置链路收口技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = AAC7F7477F2A22A41F7B5E4F /* EZRWorker 多 Profile 配置链路收口技术方案.md */; };
 		93826E30A52898111BC88F3B /* UpdateCheckPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2CE856C50D2EFD17B00A5C6 /* UpdateCheckPolicy.swift */; };
 		93FBD4BC2C2CA9486D24D6FA /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 41729DA0971439D7C20400D0 /* AppIcon.icns */; };
-		94B81D6503B4DBC62A9C70B8 /* ManagedUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A870A9FD938BFBC287C3581D /* ManagedUser.swift */; };
-		9639E50ADC8F3BE487374FCF /* TerminalLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03D9FCB011E383FAE8396BC /* TerminalLogView.swift */; };
+		96906793FC8549D27A33C765 /* ExistingOpenClawImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13A036E3C7594AEBABBF1CBA /* ExistingOpenClawImportView.swift */; };
 		96F7E835490F0F78F634D509 /* ProviderKeyRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463E4F777658E9239C41FF5E /* ProviderKeyRow.swift */; };
-		984FBC42CD3FDDA4C6CA5715 /* UserInitWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF53C649A8E7CD94ACDBEF3 /* UserInitWizardView.swift */; };
 		99D697C2D9984FBDF6625E0A /* LocalAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE712347C5C362A5E831665 /* LocalAIModels.swift */; };
-		9E3F93B8034DD4D5372C64F0 /* DaemonSetupBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF8CE1B569404029D6A72AD4 /* DaemonSetupBanner.swift */; };
-		9EE462B3B76B88C76A84D9FB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B991519B0396C677ECA0CE /* SettingsView.swift */; };
 		A04C6C26B74915B70FB7D1A3 /* AppUpdateBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BED324F1ED7BF01A2E94129 /* AppUpdateBanner.swift */; };
 		A06C573A01685AA58F33F665 /* UpgradeConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F3149513BC01F516421443 /* UpgradeConfirmSheet.swift */; };
 		A0AA6566850DB453946BCC66 /* Agent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2E1E96E5AA29609CE56A717 /* Agent.swift */; };
-		A1C000000000000000000001 /* SupervisorRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000001 /* SupervisorRecord.swift */; };
-		A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000002 /* SupervisorController+Profiles.swift */; };
-		A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000003 /* SupervisorController+AutoStart.swift */; };
-		A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */; };
-		A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000005 /* SupervisorController+Readiness.swift */; };
-		A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000006 /* SupervisorController+Config.swift */; };
-		A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */; };
-		A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */; };
-		A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F000000000000000000009 /* ProcessOutputCollector.swift */; };
-		A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */; };
-		A2C000000000000000000001 /* ExistingOpenClawImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F000000000000000000001 /* ExistingOpenClawImportView.swift */; };
-		A2C000000000000000000002 /* OpenClawInstanceDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */; };
-		A2C000000000000000000003 /* LaunchAgentHandoffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F000000000000000000003 /* LaunchAgentHandoffService.swift */; };
 		A546B9CB6D7439ECB0AC6197 /* InstallManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A166CCCC9E924E212D44E7 /* InstallManager.swift */; };
 		AB3B802AE7680B5CB4EFB2B0 /* UserAdoptionFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */; };
-		AB4DEC6B28295032A4EAE80C /* Agent Creation CLI Fallback.md in Resources */ = {isa = PBXBuildFile; fileRef = 7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */; };
+		ABDA61F11E0C0F4623920018 /* SupervisorController+GatewayProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80B98C7552D43B71CD15B1A2 /* SupervisorController+GatewayProcess.swift */; };
+		AC80CD514A99CD116C322DA1 /* SupervisorController+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CFD416E3CC697308811404 /* SupervisorController+Lifecycle.swift */; };
 		ACAB18484DB65AD95A8F8220 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8882ACE6E5A6DC465DCA7BB3 /* GatewayProfiles.swift */; };
 		B059514600834292CB43165C /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 403CB48EA9A20CF985208776 /* AuthModels.swift */; };
-		B0E55779E8344D3B14B2D790 /* 飞书渠道配置弹窗改版方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 094E133C596E16E8D2538B5D /* 飞书渠道配置弹窗改版方案.md */; };
-		B2F31069FA5381C0E0983039 /* ClawPoolView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62647684D4B8CA197E7CA9E2 /* ClawPoolView.swift */; };
-		B420F13632AE057202D9DE57 /* AppLockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2458E0408D92958E211D87A6 /* AppLockScreen.swift */; };
 		B4FA57E59BFD8991D3F5534F /* WizardStep4UserInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76879C02F2548FC5B6641740 /* WizardStep4UserInfoView.swift */; };
 		B79DC9D9B8D7067AFE0D51B8 /* GatewayCronModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FD8336226F6CD693C12B80 /* GatewayCronModels.swift */; };
 		B7ED7126F6DB9590527CA039 /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245C733CB708D2CC4657D10B /* DashboardModels.swift */; };
@@ -189,58 +145,44 @@
 		B8A08AC074AE22B33746BAAC /* AgentSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BFAB29D20A77B385926B74B /* AgentSessionsView.swift */; };
 		BA6373F00341B8E6F2B1EEA4 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D0B7A4C6E52DA59C04D7A051 /* SystemConfiguration.framework */; };
 		BB429A5AFB2CCE2B094810D0 /* AppRootGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C525F7E05443D608CFE0D1DB /* AppRootGateView.swift */; };
-		BC9735902209A7FAC2C583F3 /* CloneClawSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F7FBC057B034CCE22D55B3 /* CloneClawSheet.swift */; };
-		BCC8FA0D08A302D2729ED3BD /* ManagedUserDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */; };
 		BCFA8E44981939FC278A9E4C /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C9300D00E62DEBBD1135DA /* UpdateChecker.swift */; };
 		BD6B6CBA8EA673AF0EC086F0 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35AD2C49D4474A7A30A332D8 /* MainView.swift */; };
-		BF9CDFAF95C38E04D26A38A4 /* MemoryTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE2B727C22955A7E3AA3BD9 /* MemoryTabView.swift */; };
-		C00CAFCD3C66F0D63D9DD61B /* openclaw 和 node 打包在 app bundle 内.md in Resources */ = {isa = PBXBuildFile; fileRef = AA8B17A7D12ADE10C7644BF0 /* openclaw 和 node 打包在 app bundle 内.md */; };
 		C0E6D98E9E8FFE2368039DEF /* AuthAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1CDF86B604C553735889E /* AuthAPIClient.swift */; };
 		C1AA02AC96431B45EB62B251 /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8882ACE6E5A6DC465DCA7BB3 /* GatewayProfiles.swift */; };
 		C1AE4A8B21F0FACDBB808FE0 /* AppUpdateHeartbeatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1725E9AC8CA4D4EACB472BE /* AppUpdateHeartbeatService.swift */; };
 		C1CFDCF7A205C6CD0D8EDB6C /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */; };
 		C39053280650A2AFB5922A83 /* PresetAgents.json in Resources */ = {isa = PBXBuildFile; fileRef = 66725C3E4DA03B905774BBEA /* PresetAgents.json */; };
-		C45CB20C6B38CED63294C46C /* ManagedUserDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */; };
 		C633190537B0B9A54D84A6D8 /* PersonaGitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90D57D3B7F32AEB510440F35 /* PersonaGitManager.swift */; };
 		C6669AD2046D7FFEC4D2D3FD /* HealthCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4DB2255DD0BABA2748481C /* HealthCheck.swift */; };
+		C66EC6B8E2B700B5F6502405 /* LaunchAgentHandoffService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 066D976F7CAB22CD53E04EA3 /* LaunchAgentHandoffService.swift */; };
 		C6B1C8632A97F10CC1D57E19 /* GlobalSecretsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22A6BDE79B358E22BEE2B74 /* GlobalSecretsStore.swift */; };
 		C6F9F878ED201AA8907F70EB /* AppNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52048ED8CE2A7913214CE038 /* AppNotifications.swift */; };
-		C7EAC06D75275652371CE22B /* DaemonInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED01AE9D607DE65B50A4B5B /* DaemonInstaller.swift */; };
-		C821DFEDD4BE3E522C3161D5 /* GatewayProviderKeySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B79CACAC04B14B96902EBBD5 /* GatewayProviderKeySheet.swift */; };
 		CB7421D5C0A7E7BC0303FE04 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B3B624688C78F5F968C4BED /* main.swift */; };
 		CB89D694775ADAEAA601C6DD /* NodeDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6C93EE8F38EF2D49365E7F9 /* NodeDownloader.swift */; };
 		CBB88E295D12277156252949 /* AppUpdateState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C26D1903B7805374325974FB /* AppUpdateState.swift */; };
 		CC35A6BD4D1E1AF3E5F3B66B /* FeishuChannelOnboardingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0995FC8A604C624817297FBA /* FeishuChannelOnboardingSheet.swift */; };
-		CC987765581A063F9156B4DA /* TTSManagerTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BCD6661514B0ACBAA2AAC6F /* TTSManagerTab.swift */; };
 		CF80779371BC6ECB7985F733 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30FB396DBACF647230E1ADA /* DeviceIdentity.swift */; };
-		D163785E565D7579B28423A1 /* ShrimpPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D558D0067AAEA5DD626C8F29 /* ShrimpPool.swift */; };
-		D1A1BCCDAE12A37328108D09 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 8E0E48AAED35F1EA12180AA7 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */; };
 		D1DC17C7A4F1FB04DB4A3647 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */; };
 		D31E6F2FFEEAC36466B7635C /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A80BFC11DD1E70AB01DC72 /* UserInitPresentationRouting.swift */; };
 		D3A2F6603044FD367F4D781C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 65DFDC9A5D564622349F186D /* Assets.xcassets */; };
 		D51F43B92088801DBCBDC2AE /* CronAddSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6DF2DA86BC84D8B486B3BE0 /* CronAddSheet.swift */; };
 		D63E050779DF1D8D5FDEFC24 /* SupervisorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C4248D2AA44226F4452987 /* SupervisorClient.swift */; };
+		D6A96844A9F0AAF2FD9E2EC0 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7B35275773CD4D7FE80E9F /* SupervisorController+Readiness.swift */; };
 		D768D451B0BD8DCC76D8EE3A /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2A45DB033D24C4E9A0801C /* NetworkModels.swift */; };
 		D8A9BF7D0233A506381B1B46 /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */; };
 		D93C026DD10956CFEDB6D913 /* AddProviderModelSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D4EB2C3C8B59CC871802B4 /* AddProviderModelSheet.swift */; };
+		DD8741AF41F4E95D05F95153 /* SupervisorController+Profiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966BBDE49011F98EA188BA2C /* SupervisorController+Profiles.swift */; };
 		E059EE5AF3DEF2527E3CC32D /* AppBootstrapCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D318B755822D946359CA70DD /* AppBootstrapCoordinator.swift */; };
-		E0E6EDDDA077860B1AADF882 /* ConfigEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 758D305253780E4DDF037E33 /* ConfigEditorSheet.swift */; };
 		E253192E6D8662B63A7E0D0B /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE5365116B6E72E2B01D3176 /* AppLogger.swift */; };
-		E341234CCE9EE02B48CAA9EB /* BackupManagerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D848C1B5EF0CDD59CE126E /* BackupManagerSheet.swift */; };
 		E3597E1F9A7BCAD7B7F78680 /* SkillListItemRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00A4F741A8F1B6FF4AD3937C /* SkillListItemRow.swift */; };
-		E3ED6FE7DACB8C513FE1FC03 /* EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md in Resources */ = {isa = PBXBuildFile; fileRef = 3000C33F7E7DF7225961D3A7 /* EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md */; };
-		E552B3C9233DFA4C51758BF7 /* AppSecondaryWindows.swift in Sources */ = {isa = PBXBuildFile; fileRef = 970567CFB47DAF35EEB2FAC3 /* AppSecondaryWindows.swift */; };
-		E5BDFBA94DDAF1CD62500B61 /* GatewayHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA9091BA2CBFE300AD0C7EC9 /* GatewayHub.swift */; };
 		E6898D8DC33A8A4B348F4E7F /* GatewayProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8882ACE6E5A6DC465DCA7BB3 /* GatewayProfiles.swift */; };
 		E6B71EC87DD08A1B125F3C68 /* FeishuChannelConfigSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DC4D47EB53A6A87CDB202 /* FeishuChannelConfigSheet.swift */; };
 		E6C5884207EE3AF2ABF635EE /* WizardStep2ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7A4E0528C23D1E5B01416BA /* WizardStep2ToolsView.swift */; };
 		E6EFF6179F97299E40189858 /* CronJobDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62E8D72AD6B3304552BE0770 /* CronJobDetailView.swift */; };
 		E7976265D330A5AAF3652560 /* OpenClawProviderKeySync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F9BE1B58385F1831D981E3 /* OpenClawProviderKeySync.swift */; };
-		E7AE6B8A8F1D981AFB86B997 /* ModelManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A688B4C885CF7D37CB17D07D /* ModelManagerView.swift */; };
 		E86F287DDA71CE8B3485951A /* SupervisorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80A3BEC38B3B563C4EC9BD67 /* SupervisorProtocol.swift */; };
 		E993C7C0175EEA12800FF53F /* FileInputAcceptFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD2EECD3EF061A3AC53013F /* FileInputAcceptFilter.swift */; };
 		EC4BBEC047C5B36422354C55 /* ChannelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 929E77B2F563A1B186A2FF19 /* ChannelView.swift */; };
-		ECAAFEE55157650D9AE5E834 /* LogViewerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CFFD4ED2CE44E73F29CB643 /* LogViewerSheet.swift */; };
 		ECB23A8369CE55EFD00333DD /* DashboardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245C733CB708D2CC4657D10B /* DashboardModels.swift */; };
 		ED3146B46405DD11F7BC28E7 /* OpenDirectory.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E179BEE0F9C2AEB933ACFB0 /* OpenDirectory.framework */; };
 		ED52ACCC396AF98C9EEC13DF /* ModelPingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB8CCD5F5E790E50CFD9928 /* ModelPingService.swift */; };
@@ -248,17 +190,16 @@
 		EE8DA45D41196B88A5E1EE8F /* UserDetailWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */; };
 		EEEF1352391ED8FA8FF52602 /* UserPasswordStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A245488B0EA1984454B05131 /* UserPasswordStore.swift */; };
 		F2C107DBF7853685484E5AED /* PageHeroHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */; };
-		F422A1771A3FC1A6D33995AD /* ManagedUserDisplayName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */; };
 		F62EA38AE8AEBBEA741B9581 /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A80BFC11DD1E70AB01DC72 /* UserInitPresentationRouting.swift */; };
 		F7B2439907A521F18192A0B6 /* OpenClawRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9559D9976F2E0E230CA5478D /* OpenClawRuntime.swift */; };
 		F839938649A3A777C34DB7F3 /* ProfileMigrationChoiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F52960A35FCDC71FC976B7 /* ProfileMigrationChoiceView.swift */; };
 		F8580E41A659F66834C0A483 /* AgentCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54AC8681A32D884DCD5FDF50 /* AgentCategory.swift */; };
 		F8F5A2CF662CE6CD75F35BF9 /* CloneClawManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F5C8E43657D5E808CADC5A /* CloneClawManager.swift */; };
-		F8FB34C7C13C0B35A1769FBC /* HelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27BAD0C67098FFB94B3764A /* HelperClient.swift */; };
 		FB3EEBEE043EEB96C3F5E3EF /* AgentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80281DFEE56C056853BE27AB /* AgentStatus.swift */; };
 		FB6B5C3040412338C2881927 /* GatewayHealthProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */; };
 		FB8DEFD72F3427C9D19503C6 /* ConnectionCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1A5B98FE93356C6C1CB95E /* ConnectionCollector.swift */; };
 		FC626655F40647C56A05190D /* GatewayProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B79D854325E23896C00535 /* GatewayProcessManager.swift */; };
+		FCA8D5F78F76E3A7C8595758 /* SupervisorController+OutputParsing.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5067273AAFB9ED3F6BE967 /* SupervisorController+OutputParsing.swift */; };
 		FF1A54861FA09928D8CAEA81 /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2A45DB033D24C4E9A0801C /* NetworkModels.swift */; };
 /* End PBXBuildFile section */
 
@@ -283,192 +224,138 @@
 		04F1CDF86B604C553735889E /* AuthAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthAPIClient.swift; sourceTree = "<group>"; };
 		056DC4D47EB53A6A87CDB202 /* FeishuChannelConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelConfigSheet.swift; sourceTree = "<group>"; };
 		06416A4736695C43257B59E4 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
-		094E133C596E16E8D2538B5D /* 飞书渠道配置弹窗改版方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "飞书渠道配置弹窗改版方案.md"; sourceTree = "<group>"; };
+		066D976F7CAB22CD53E04EA3 /* LaunchAgentHandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAgentHandoffService.swift; sourceTree = "<group>"; };
 		0995FC8A604C624817297FBA /* FeishuChannelOnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelOnboardingSheet.swift; sourceTree = "<group>"; };
-		09FF22980362E75630A57068 /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
 		0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHeroHeader.swift; sourceTree = "<group>"; };
 		0BFAB29D20A77B385926B74B /* AgentSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionsView.swift; sourceTree = "<group>"; };
-		0CF361BFC426343684599751 /*  新建智能体向导.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = " 新建智能体向导.md"; sourceTree = "<group>"; };
 		0E14DAA0C45656B3F5025800 /* FileModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileModels.swift; sourceTree = "<group>"; };
+		0E2A38D1E25BA6C69BF72216 /* SessionEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEntry.swift; sourceTree = "<group>"; };
 		0EC51539D8F616DB28326C48 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
 		12725005464A7DC9DC5B2260 /* AgentBinding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBinding.swift; sourceTree = "<group>"; };
-		131B2DAEA7A5596D65C89538 /* AddUserSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddUserSheet.swift; sourceTree = "<group>"; };
 		1321A176A8D41B547825528A /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		153F6660DE916E3A5166AE53 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
-		15D848C1B5EF0CDD59CE126E /* BackupManagerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupManagerSheet.swift; sourceTree = "<group>"; };
-		16E8F1E22DAFB3800E0879C2 /* Agent 渠道绑定功能完善方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Agent 渠道绑定功能完善方案.md"; sourceTree = "<group>"; };
-		17D5DEA24C5BED726C91F8A6 /* AwakeningWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AwakeningWizardView.swift; sourceTree = "<group>"; };
+		1323A413280A3C6D2759CDDB /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
+		13A036E3C7594AEBABBF1CBA /* ExistingOpenClawImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExistingOpenClawImportView.swift; sourceTree = "<group>"; };
 		17EBE5B457012294EFE0E076 /* ModelPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPickerSheet.swift; sourceTree = "<group>"; };
 		18E44CB1B06DF5471BD13925 /* DashboardCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardCollector.swift; sourceTree = "<group>"; };
+		19791E7F1C81617CDB5DB870 /* SupervisorController+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Config.swift"; sourceTree = "<group>"; };
 		1A359DCD24F13AEBDA5F7AB5 /* EZRWorkerHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorkerHelper.entitlements; sourceTree = "<group>"; };
 		1A5F0DF12C62DB7033A7C088 /* AgentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStore.swift; sourceTree = "<group>"; };
 		1AB8CCD5F5E790E50CFD9928 /* ModelPingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPingService.swift; sourceTree = "<group>"; };
-		1B6ACF9694496708E55DBBD4 /* WizardConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardConnection.swift; sourceTree = "<group>"; };
-		1BCD6661514B0ACBAA2AAC6F /* TTSManagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTSManagerTab.swift; sourceTree = "<group>"; };
 		1CCB7B6411C1D8CBD3C0DA46 /* WizardStep0TemplateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep0TemplateView.swift; sourceTree = "<group>"; };
 		1F79FFD77FEFBB9374FF9388 /* GatewayService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayService.swift; sourceTree = "<group>"; };
 		1FF979415FFD6678D2E19439 /* HomeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDashboardView.swift; sourceTree = "<group>"; };
-		2458E0408D92958E211D87A6 /* AppLockScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockScreen.swift; sourceTree = "<group>"; };
 		245C733CB708D2CC4657D10B /* DashboardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModels.swift; sourceTree = "<group>"; };
-		25C94EAFAA80E56106D57A56 /* HealthCheckSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthCheckSheet.swift; sourceTree = "<group>"; };
-		27B991519B0396C677ECA0CE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2477EFB6C4FF5DA7555F61BC /* SupervisorRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorRecord.swift; sourceTree = "<group>"; };
 		28FD4C0C6FCC281BADB3F231 /* UserAdoptionFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAdoptionFlow.swift; sourceTree = "<group>"; };
-		2AC4F423C8FA26EF670B12A9 /* ApplyCredentialSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyCredentialSheet.swift; sourceTree = "<group>"; };
-		2C21588F9BBD7644322A54B5 /* EZRWorker 目录重组方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 目录重组方案.md"; sourceTree = "<group>"; };
 		2C5CE8670F3E13D445A191FA /* CronTaskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronTaskView.swift; sourceTree = "<group>"; };
-		2CFFD4ED2CE44E73F29CB643 /* LogViewerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerSheet.swift; sourceTree = "<group>"; };
-		2D0D5D801BA09117BEA8A1B0 /* UserListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserListView.swift; sourceTree = "<group>"; };
-		3000C33F7E7DF7225961D3A7 /* EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md"; sourceTree = "<group>"; };
-		341A536C67D8695DE5B73B98 /* VoiceLibraryTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceLibraryTab.swift; sourceTree = "<group>"; };
 		35AD2C49D4474A7A30A332D8 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		360302D93CA3B23E3A2CB64F /* AuthSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionStore.swift; sourceTree = "<group>"; };
-		370C2A259021802A011D0F04 /* RoleMarketView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleMarketView.swift; sourceTree = "<group>"; };
 		39F5C8E43657D5E808CADC5A /* CloneClawManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneClawManager.swift; sourceTree = "<group>"; };
 		3A58E344AB8D39F8E09BCE42 /* ProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessManager.swift; sourceTree = "<group>"; };
-		3E78B5A13EC9C7018814E07F /* ModelDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDetailView.swift; sourceTree = "<group>"; };
-		3ED01AE9D607DE65B50A4B5B /* DaemonInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonInstaller.swift; sourceTree = "<group>"; };
+		3A7B35275773CD4D7FE80E9F /* SupervisorController+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Readiness.swift"; sourceTree = "<group>"; };
 		3EE262DF3180027C8F168EB9 /* roles.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = roles.html; sourceTree = "<group>"; };
 		403CB48EA9A20CF985208776 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
 		406C2F51B5F75C855100D43B /* AgentStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStyle.swift; sourceTree = "<group>"; };
 		4142B9D2C5922D549BDECEEE /* CloneClawModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneClawModels.swift; sourceTree = "<group>"; };
 		41729DA0971439D7C20400D0 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
-		417E93162156AB9DE54C4FD2 /* PersonaDefView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaDefView.swift; sourceTree = "<group>"; };
 		41A47F610C9545ED6022D59E /* EZRWorkerBranding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerBranding.swift; sourceTree = "<group>"; };
 		41DE6ED7978F554ADA31DFF2 /* SkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsView.swift; sourceTree = "<group>"; };
 		4304E5FD0143F963EA133FB5 /* WizardStep3SkillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep3SkillsView.swift; sourceTree = "<group>"; };
+		4351B56CE089EAAC752DFC44 /* TerminalPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPanels.swift; sourceTree = "<group>"; };
 		45DB4B622DA108773F0D7066 /* TelegramChannelConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramChannelConfigSheet.swift; sourceTree = "<group>"; };
 		463E4F777658E9239C41FF5E /* ProviderKeyRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeyRow.swift; sourceTree = "<group>"; };
 		48F9BE1B58385F1831D981E3 /* OpenClawProviderKeySync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawProviderKeySync.swift; sourceTree = "<group>"; };
 		4A2C01D7719436845AAEE99D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		4C2310FF1CAB90CD0860B18A /* 模型配置自动同步 + 智能体独立选模型.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "模型配置自动同步 + 智能体独立选模型.md"; sourceTree = "<group>"; };
 		4E179BEE0F9C2AEB933ACFB0 /* OpenDirectory.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = OpenDirectory.framework; sourceTree = "<group>"; };
 		50154BBC1CADA61EBF44496C /* ChannelPairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPairingSheet.swift; sourceTree = "<group>"; };
 		52048ED8CE2A7913214CE038 /* AppNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNotifications.swift; sourceTree = "<group>"; };
 		53929C9886023FF85F7BA88E /* PortAllocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortAllocator.swift; sourceTree = "<group>"; };
 		541837AF1938E6F28B6CB902 /* AgentWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentWorkspaceView.swift; sourceTree = "<group>"; };
 		54AC8681A32D884DCD5FDF50 /* AgentCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCategory.swift; sourceTree = "<group>"; };
+		57CFD416E3CC697308811404 /* SupervisorController+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Lifecycle.swift"; sourceTree = "<group>"; };
+		58D0407C6B71D8C489C445DE /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
 		593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeychainStore.swift; sourceTree = "<group>"; };
 		5B0B3D07289A447AB0573591 /* GatewayCronStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronStore.swift; sourceTree = "<group>"; };
 		5BED324F1ED7BF01A2E94129 /* AppUpdateBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateBanner.swift; sourceTree = "<group>"; };
 		5DA15B9B8920B917D89DE4DC /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		5E2A45DB033D24C4E9A0801C /* NetworkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkModels.swift; sourceTree = "<group>"; };
-		5EAD831B5BA12C9BD42EB676 /* 定时任务页改版与创建弹窗重做.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "定时任务页改版与创建弹窗重做.md"; sourceTree = "<group>"; };
-		62647684D4B8CA197E7CA9E2 /* ClawPoolView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClawPoolView.swift; sourceTree = "<group>"; };
 		62A167FAD1A010E91F3E4606 /* AgentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentCardView.swift; sourceTree = "<group>"; };
 		62E8D72AD6B3304552BE0770 /* CronJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronJobDetailView.swift; sourceTree = "<group>"; };
 		63E7ECFB0052218EC40E1AE8 /* ModelsStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsStatus.swift; sourceTree = "<group>"; };
 		65DFDC9A5D564622349F186D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		66725C3E4DA03B905774BBEA /* PresetAgents.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = PresetAgents.json; sourceTree = "<group>"; };
 		6720DAACD8FA945551B0C814 /* LocalLLMManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMManager.swift; sourceTree = "<group>"; };
-		674530854AC920AD9217B135 /* LocalAITab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAITab.swift; sourceTree = "<group>"; };
 		680ECFFDD674F840DB3D093B /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		6BB39D38BC5A4670D1250FA5 /* ProfileCLIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileCLIService.swift; sourceTree = "<group>"; };
-		6BF53C649A8E7CD94ACDBEF3 /* UserInitWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserInitWizardView.swift; sourceTree = "<group>"; };
-		6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedUserDisplayName.swift; sourceTree = "<group>"; };
-		6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMManagerTab.swift; sourceTree = "<group>"; };
-		6F3E305DD9F6C20E0AE4720C /* EZRWorker 架构重设计：单实例智能体配置管理面板.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 架构重设计：单实例智能体配置管理面板.md"; sourceTree = "<group>"; };
-		6FA3C9DABF937ABD459C670E /* Gateway 自重启交接修复技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Gateway 自重启交接修复技术方案.md"; sourceTree = "<group>"; };
 		737B53A6520DDF241C124184 /* EnvironmentChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentChecker.swift; sourceTree = "<group>"; };
-		74A2E865F4893F817C7BF536 /* EZRWorkerSupervisor */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
-		758D305253780E4DDF037E33 /* ConfigEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigEditorSheet.swift; sourceTree = "<group>"; };
+		74A2E865F4893F817C7BF536 /* EZRWorkerSupervisor */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerSupervisor; sourceTree = BUILT_PRODUCTS_DIR; };
 		76879C02F2548FC5B6641740 /* WizardStep4UserInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep4UserInfoView.swift; sourceTree = "<group>"; };
 		77475F12BBE60B5F9541BB33 /* GatewayHealthProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayHealthProbe.swift; sourceTree = "<group>"; };
-		776D9DF1069AC323CFCA85F1 /* AILabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AILabView.swift; sourceTree = "<group>"; };
-		77874CF35690017EC8B0B413 /* UserDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailView.swift; sourceTree = "<group>"; };
 		79D4EB2C3C8B59CC871802B4 /* AddProviderModelSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddProviderModelSheet.swift; sourceTree = "<group>"; };
 		79F52960A35FCDC71FC976B7 /* ProfileMigrationChoiceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileMigrationChoiceView.swift; sourceTree = "<group>"; };
 		7AD2EECD3EF061A3AC53013F /* FileInputAcceptFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInputAcceptFilter.swift; sourceTree = "<group>"; };
 		7B3B624688C78F5F968C4BED /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Agent Creation CLI Fallback.md"; sourceTree = "<group>"; };
 		80281DFEE56C056853BE27AB /* AgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatus.swift; sourceTree = "<group>"; };
 		80A3BEC38B3B563C4EC9BD67 /* SupervisorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorProtocol.swift; sourceTree = "<group>"; };
+		80B98C7552D43B71CD15B1A2 /* SupervisorController+GatewayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+GatewayProcess.swift"; sourceTree = "<group>"; };
 		84B21F8D7DC48B1E02561B0A /* CreateAgentWizardState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAgentWizardState.swift; sourceTree = "<group>"; };
 		8882ACE6E5A6DC465DCA7BB3 /* GatewayProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProfiles.swift; sourceTree = "<group>"; };
 		88E0243FE311E2077C971990 /* AgentEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEditorView.swift; sourceTree = "<group>"; };
 		89F3149513BC01F516421443 /* UpgradeConfirmSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpgradeConfirmSheet.swift; sourceTree = "<group>"; };
-		8E0E48AAED35F1EA12180AA7 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md"; sourceTree = "<group>"; };
-		8E214EC3AAE2BEAB5A0ADCEE /* 智能体 Workspace 重设计方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "智能体 Workspace 重设计方案.md"; sourceTree = "<group>"; };
+		8D7E8DD3D279F34DAAA0CB26 /* PersonaFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaFile.swift; sourceTree = "<group>"; };
 		8E4B104E2D7E8111CFE056F2 /* WizardStep1IdentityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep1IdentityView.swift; sourceTree = "<group>"; };
 		8E4EA89089DC5B4B2F541DB1 /* AgentWorkspaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentWorkspaceManager.swift; sourceTree = "<group>"; };
 		8E92F6D4426AFE2396117F0F /* NStatCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NStatCollector.swift; sourceTree = "<group>"; };
 		90D57D3B7F32AEB510440F35 /* PersonaGitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaGitManager.swift; sourceTree = "<group>"; };
 		929E77B2F563A1B186A2FF19 /* ChannelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelView.swift; sourceTree = "<group>"; };
-		93E086F51C967E1AB9C7AF00 /* ProviderKeySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderKeySheet.swift; sourceTree = "<group>"; };
 		9559D9976F2E0E230CA5478D /* OpenClawRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawRuntime.swift; sourceTree = "<group>"; };
-		970567CFB47DAF35EEB2FAC3 /* AppSecondaryWindows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSecondaryWindows.swift; sourceTree = "<group>"; };
+		966BBDE49011F98EA188BA2C /* SupervisorController+Profiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Profiles.swift"; sourceTree = "<group>"; };
 		974F5BA074B049A1D2F1ED1D /* FormatUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatUtils.swift; sourceTree = "<group>"; };
 		98F8ADF4F753E82EC62D93F1 /* VoiceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceProfile.swift; sourceTree = "<group>"; };
-		993999E87900A0DF0027382D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9A1A5B98FE93356C6C1CB95E /* ConnectionCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionCollector.swift; sourceTree = "<group>"; };
+		9C08E302E1AB365F5FB24305 /* OpenClawInstanceDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawInstanceDiscoveryService.swift; sourceTree = "<group>"; };
 		9C3F56BC6006738C1679B9E8 /* GeneratedVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedVersion.swift; sourceTree = "<group>"; };
 		9DDCCE3581AF68B6A18F0829 /* GatewayProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProfileStore.swift; sourceTree = "<group>"; };
-		9DE2B727C22955A7E3AA3BD9 /* MemoryTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryTabView.swift; sourceTree = "<group>"; };
 		9F6E8B8C0512F7843AB6D169 /* UserManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserManager.swift; sourceTree = "<group>"; };
-		A1F000000000000000000001 /* SupervisorRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorRecord.swift; sourceTree = "<group>"; };
-		A1F000000000000000000002 /* SupervisorController+Profiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Profiles.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000003 /* SupervisorController+AutoStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+AutoStart.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Lifecycle.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000005 /* SupervisorController+Readiness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Readiness.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000006 /* SupervisorController+Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Config.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+GatewayProcess.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
-		A1F000000000000000000009 /* ProcessOutputCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessOutputCollector.swift; sourceTree = "<group>"; };
-		A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerSupervisorService.swift; sourceTree = "<group>"; };
-		A2F000000000000000000001 /* ExistingOpenClawImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExistingOpenClawImportView.swift; sourceTree = "<group>"; };
-		A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenClawInstanceDiscoveryService.swift; sourceTree = "<group>"; };
-		A2F000000000000000000003 /* LaunchAgentHandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAgentHandoffService.swift; sourceTree = "<group>"; };
 		A245488B0EA1984454B05131 /* UserPasswordStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPasswordStore.swift; sourceTree = "<group>"; };
 		A4250EB561AA0155DE283768 /* EZRWorker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorker.entitlements; sourceTree = "<group>"; };
-		A4250EB561AA0155DE283769 /* EZRWorkerDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorkerDebug.entitlements; sourceTree = "<group>"; };
 		A481B031B88F8B0BCD5F509E /* UserDetailWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailWindowLayout.swift; sourceTree = "<group>"; };
-		A688B4C885CF7D37CB17D07D /* ModelManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerView.swift; sourceTree = "<group>"; };
 		A6C93EE8F38EF2D49365E7F9 /* NodeDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeDownloader.swift; sourceTree = "<group>"; };
 		A7A4E0528C23D1E5B01416BA /* WizardStep2ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardStep2ToolsView.swift; sourceTree = "<group>"; };
-		A870A9FD938BFBC287C3581D /* ManagedUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedUser.swift; sourceTree = "<group>"; };
-		AA8B17A7D12ADE10C7644BF0 /* openclaw 和 node 打包在 app bundle 内.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "openclaw 和 node 打包在 app bundle 内.md"; sourceTree = "<group>"; };
-		AAC7F7477F2A22A41F7B5E4F /* EZRWorker 多 Profile 配置链路收口技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 多 Profile 配置链路收口技术方案.md"; sourceTree = "<group>"; };
 		AE5EE4419BA91C11D57D8784 /* CreateAgentWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAgentWizardView.swift; sourceTree = "<group>"; };
-		B03D9FCB011E383FAE8396BC /* TerminalLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalLogView.swift; sourceTree = "<group>"; };
-		B0FB7DFCF60EBC9352AB6D1B /* ModelPrioritySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPrioritySheet.swift; sourceTree = "<group>"; };
 		B13FCA2751D431C930179D6C /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
 		B22A6BDE79B358E22BEE2B74 /* GlobalSecretsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSecretsStore.swift; sourceTree = "<group>"; };
 		B2DCA2E1614EAF1055C981CB /* UserFileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFileManager.swift; sourceTree = "<group>"; };
 		B30FB396DBACF647230E1ADA /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		B3F862365EBE5A03ADE4D918 /* ChannelBotConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelBotConfigSheet.swift; sourceTree = "<group>"; };
-		B79CACAC04B14B96902EBBD5 /* GatewayProviderKeySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProviderKeySheet.swift; sourceTree = "<group>"; };
 		B85025EF4A2B11716E07A5E2 /* AgentBindingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentBindingsView.swift; sourceTree = "<group>"; };
 		B956AEF42E1524A3EC205AD7 /* AccountKeychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountKeychain.swift; sourceTree = "<group>"; };
-		B9853CF9A21268FFCDF17798 /* Channels.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Channels.md; sourceTree = "<group>"; };
 		B9C4248D2AA44226F4452987 /* SupervisorClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorClient.swift; sourceTree = "<group>"; };
 		B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperProtocol.swift; sourceTree = "<group>"; };
 		BA53EA2C51FB6902AAE33E20 /* AgentGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentGridView.swift; sourceTree = "<group>"; };
-		BBBA351B14BFF320A46582D4 /* NetworkPolicyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPolicyView.swift; sourceTree = "<group>"; };
 		C0C4D900EFBBA3ED016FBDB6 /* GlobalModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalModelStore.swift; sourceTree = "<group>"; };
 		C26D1903B7805374325974FB /* AppUpdateState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateState.swift; sourceTree = "<group>"; };
 		C3CD29580049C3C28EB5D4A7 /* GatewaySkillsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewaySkillsStore.swift; sourceTree = "<group>"; };
-		C4B925DB4A92F9517B40E8CA /* SecurityAuditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityAuditView.swift; sourceTree = "<group>"; };
 		C525F7E05443D608CFE0D1DB /* AppRootGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootGateView.swift; sourceTree = "<group>"; };
 		C5B79D854325E23896C00535 /* GatewayProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayProcessManager.swift; sourceTree = "<group>"; };
 		C5B8C75A78263C4C9B8C6E4B /* GatewayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayClient.swift; sourceTree = "<group>"; };
 		C6DF2DA86BC84D8B486B3BE0 /* CronAddSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronAddSheet.swift; sourceTree = "<group>"; };
-		C7F7FBC057B034CCE22D55B3 /* CloneClawSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloneClawSheet.swift; sourceTree = "<group>"; };
 		CA62D32A18F683AA3757BB46 /* AgentToolCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentToolCategory.swift; sourceTree = "<group>"; };
-		CA9091BA2CBFE300AD0C7EC9 /* GatewayHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayHub.swift; sourceTree = "<group>"; };
-		CF8CE1B569404029D6A72AD4 /* DaemonSetupBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonSetupBanner.swift; sourceTree = "<group>"; };
+		CAB65B69F1D7AF47049A493F /* SupervisorController+AutoStart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+AutoStart.swift"; sourceTree = "<group>"; };
+		CC5067273AAFB9ED3F6BE967 /* SupervisorController+OutputParsing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+OutputParsing.swift"; sourceTree = "<group>"; };
 		CF9D6EF8FCBBC2EEC576F78B /* GatewayLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayLog.swift; sourceTree = "<group>"; };
 		D0B7A4C6E52DA59C04D7A051 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SystemConfiguration.framework; sourceTree = "<group>"; };
 		D12D93EDCF3E599D6FCB43F5 /* ConfigWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigWriter.swift; sourceTree = "<group>"; };
 		D2E1E96E5AA29609CE56A717 /* Agent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Agent.swift; sourceTree = "<group>"; };
 		D30E9A622A85E6C84D696F8A /* ProfileTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTerminalView.swift; sourceTree = "<group>"; };
 		D318B755822D946359CA70DD /* AppBootstrapCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapCoordinator.swift; sourceTree = "<group>"; };
-		D558D0067AAEA5DD626C8F29 /* ShrimpPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShrimpPool.swift; sourceTree = "<group>"; };
 		D59A3A3629639C10A1BE95D0 /* CreateAgentSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateAgentSheet.swift; sourceTree = "<group>"; };
 		D7C9300D00E62DEBBD1135DA /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		D972888B5B38961C2FC70BE5 /* onboard.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = onboard.html; sourceTree = "<group>"; };
 		DD92271EC9701A999944A64C /* WizardAgentPreviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WizardAgentPreviewCard.swift; sourceTree = "<group>"; };
 		DE0E410382FDDA3CBBF35E9C /* ModelConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelConfigView.swift; sourceTree = "<group>"; };
 		E087A7548C1534ED739E04B6 /* ChannelBindSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelBindSheet.swift; sourceTree = "<group>"; };
-		E0A844D5A8276D6A390D3975 /* EZRWorker 新主线完成 Helper 脱钩技术方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 新主线完成 Helper 脱钩技术方案.md"; sourceTree = "<group>"; };
+		E1CF75A88E4E50021E547F61 /* EZRWorkerDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EZRWorkerDebug.entitlements; sourceTree = "<group>"; };
 		E22F30959ACB0A8B663F27B7 /* ShellRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellRunner.swift; sourceTree = "<group>"; };
 		E2A4315E9D76AF6CFFBFA6D7 /* EZRWorkerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EZRWorkerApp.swift; sourceTree = "<group>"; };
 		E2CE856C50D2EFD17B00A5C6 /* UpdateCheckPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckPolicy.swift; sourceTree = "<group>"; };
@@ -476,20 +363,17 @@
 		E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupervisorController.swift; sourceTree = "<group>"; };
 		E7FD8336226F6CD693C12B80 /* GatewayCronModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayCronModels.swift; sourceTree = "<group>"; };
 		EA4DB2255DD0BABA2748481C /* HealthCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthCheck.swift; sourceTree = "<group>"; };
-		EA587CAEEC9E0880E72A31EA /* EZRWorkerHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = EZRWorkerHelper; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA587CAEEC9E0880E72A31EA /* EZRWorkerHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = EZRWorkerHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		EAE712347C5C362A5E831665 /* LocalAIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalAIModels.swift; sourceTree = "<group>"; };
 		EB3825E5480565691A7697A9 /* ChannelType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelType.swift; sourceTree = "<group>"; };
 		EC3D0DE440728AE3F88B8070 /* GatewayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayManager.swift; sourceTree = "<group>"; };
-		EC54AFFEE5A61479E85B8FD5 /* SessionsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsTabView.swift; sourceTree = "<group>"; };
 		EE5365116B6E72E2B01D3176 /* AppLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogger.swift; sourceTree = "<group>"; };
 		EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessModels.swift; sourceTree = "<group>"; };
-		EFB5400D6FA58C9EA502EFAB /* UserFilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserFilesView.swift; sourceTree = "<group>"; };
 		EFBA743FBE660021E4FE192B /* AppLockStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLockStore.swift; sourceTree = "<group>"; };
 		F1725E9AC8CA4D4EACB472BE /* AppUpdateHeartbeatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateHeartbeatService.swift; sourceTree = "<group>"; };
 		F1EDBB82362FBD65CA0EB745 /* UserDirectoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDirectoryService.swift; sourceTree = "<group>"; };
-		F27BAD0C67098FFB94B3764A /* HelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperClient.swift; sourceTree = "<group>"; };
-		F4FAF4EA670875D2878F73E2 /* EZRWorker 手机号登录门禁方案.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "EZRWorker 手机号登录门禁方案.md"; sourceTree = "<group>"; };
 		F9C0D6748D3BD47FE9AD0BAE /* EZRWorker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EZRWorker.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FD0A37975AC4E8D949737435 /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -542,14 +426,6 @@
 			path = EZRWorkerHelper;
 			sourceTree = "<group>";
 		};
-		12DE6D204E9464667F68DB91 /* App */ = {
-			isa = PBXGroup;
-			children = (
-				970567CFB47DAF35EEB2FAC3 /* AppSecondaryWindows.swift */,
-			);
-			path = App;
-			sourceTree = "<group>";
-		};
 		1FBA9AC118B12A95C5F9490C /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -565,9 +441,9 @@
 				5B0B3D07289A447AB0573591 /* GatewayCronStore.swift */,
 				9DDCCE3581AF68B6A18F0829 /* GatewayProfileStore.swift */,
 				C3CD29580049C3C28EB5D4A7 /* GatewaySkillsStore.swift */,
-				A2F000000000000000000003 /* LaunchAgentHandoffService.swift */,
+				066D976F7CAB22CD53E04EA3 /* LaunchAgentHandoffService.swift */,
 				1AB8CCD5F5E790E50CFD9928 /* ModelPingService.swift */,
-				A2F000000000000000000002 /* OpenClawInstanceDiscoveryService.swift */,
+				9C08E302E1AB365F5FB24305 /* OpenClawInstanceDiscoveryService.swift */,
 				48F9BE1B58385F1831D981E3 /* OpenClawProviderKeySync.swift */,
 				6BB39D38BC5A4670D1250FA5 /* ProfileCLIService.swift */,
 				593E8302B8E5D180E168E00D /* ProviderKeychainStore.swift */,
@@ -613,37 +489,6 @@
 			path = ChannelOnboarding;
 			sourceTree = "<group>";
 		};
-		495B49C332F3095FF9E53A4F /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				2AC4F423C8FA26EF670B12A9 /* ApplyCredentialSheet.swift */,
-				09FF22980362E75630A57068 /* BackupView.swift */,
-				C7F7FBC057B034CCE22D55B3 /* CloneClawSheet.swift */,
-				758D305253780E4DDF037E33 /* ConfigEditorSheet.swift */,
-				993999E87900A0DF0027382D /* ContentView.swift */,
-				CF8CE1B569404029D6A72AD4 /* DaemonSetupBanner.swift */,
-				153F6660DE916E3A5166AE53 /* DashboardView.swift */,
-				B79CACAC04B14B96902EBBD5 /* GatewayProviderKeySheet.swift */,
-				25C94EAFAA80E56106D57A56 /* HealthCheckSheet.swift */,
-				2CFFD4ED2CE44E73F29CB643 /* LogViewerSheet.swift */,
-				9DE2B727C22955A7E3AA3BD9 /* MemoryTabView.swift */,
-				B0FB7DFCF60EBC9352AB6D1B /* ModelPrioritySheet.swift */,
-				BBBA351B14BFF320A46582D4 /* NetworkPolicyView.swift */,
-				417E93162156AB9DE54C4FD2 /* PersonaDefView.swift */,
-				370C2A259021802A011D0F04 /* RoleMarketView.swift */,
-				C4B925DB4A92F9517B40E8CA /* SecurityAuditView.swift */,
-				EC54AFFEE5A61479E85B8FD5 /* SessionsTabView.swift */,
-				27B991519B0396C677ECA0CE /* SettingsView.swift */,
-				B03D9FCB011E383FAE8396BC /* TerminalLogView.swift */,
-				77874CF35690017EC8B0B413 /* UserDetailView.swift */,
-				EFB5400D6FA58C9EA502EFAB /* UserFilesView.swift */,
-				6BF53C649A8E7CD94ACDBEF3 /* UserInitWizardView.swift */,
-				2D0D5D801BA09117BEA8A1B0 /* UserListView.swift */,
-				9338F9B0999FBFE539F20DA7 /* ModelManager */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		4E5BE6477E47E892E45053AD /* Shared */ = {
 			isa = PBXGroup;
 			children = (
@@ -659,7 +504,6 @@
 				EA4DB2255DD0BABA2748481C /* HealthCheck.swift */,
 				B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */,
 				EAE712347C5C362A5E831665 /* LocalAIModels.swift */,
-				6CBE7A3CFAB95A1EBF36AE6C /* ManagedUserDisplayName.swift */,
 				5E2A45DB033D24C4E9A0801C /* NetworkModels.swift */,
 				9559D9976F2E0E230CA5478D /* OpenClawRuntime.swift */,
 				EE7AA866C4221EF6F9D47026 /* ProcessModels.swift */,
@@ -718,18 +562,18 @@
 		6BA10E939790D0068E3689E9 /* EZRWorkerSupervisor */ = {
 			isa = PBXGroup;
 			children = (
+				58D0407C6B71D8C489C445DE /* EZRWorkerSupervisorService.swift */,
 				7B3B624688C78F5F968C4BED /* main.swift */,
+				1323A413280A3C6D2759CDDB /* ProcessOutputCollector.swift */,
 				E3CF9DF3200DDC4BF2F63FE7 /* SupervisorController.swift */,
-				A1F000000000000000000001 /* SupervisorRecord.swift */,
-				A1F000000000000000000002 /* SupervisorController+Profiles.swift */,
-				A1F000000000000000000003 /* SupervisorController+AutoStart.swift */,
-				A1F000000000000000000004 /* SupervisorController+Lifecycle.swift */,
-				A1F000000000000000000005 /* SupervisorController+Readiness.swift */,
-				A1F000000000000000000006 /* SupervisorController+Config.swift */,
-				A1F000000000000000000007 /* SupervisorController+GatewayProcess.swift */,
-				A1F000000000000000000008 /* SupervisorController+OutputParsing.swift */,
-				A1F000000000000000000009 /* ProcessOutputCollector.swift */,
-				A1F00000000000000000000A /* EZRWorkerSupervisorService.swift */,
+				CAB65B69F1D7AF47049A493F /* SupervisorController+AutoStart.swift */,
+				19791E7F1C81617CDB5DB870 /* SupervisorController+Config.swift */,
+				80B98C7552D43B71CD15B1A2 /* SupervisorController+GatewayProcess.swift */,
+				57CFD416E3CC697308811404 /* SupervisorController+Lifecycle.swift */,
+				CC5067273AAFB9ED3F6BE967 /* SupervisorController+OutputParsing.swift */,
+				966BBDE49011F98EA188BA2C /* SupervisorController+Profiles.swift */,
+				3A7B35275773CD4D7FE80E9F /* SupervisorController+Readiness.swift */,
+				2477EFB6C4FF5DA7555F61BC /* SupervisorRecord.swift */,
 			);
 			path = EZRWorkerSupervisor;
 			sourceTree = "<group>";
@@ -752,15 +596,6 @@
 			path = Localization;
 			sourceTree = "<group>";
 		};
-		9338F9B0999FBFE539F20DA7 /* ModelManager */ = {
-			isa = PBXGroup;
-			children = (
-				674530854AC920AD9217B135 /* LocalAITab.swift */,
-				A688B4C885CF7D37CB17D07D /* ModelManagerView.swift */,
-			);
-			path = ModelManager;
-			sourceTree = "<group>";
-		};
 		9B04B4EA7437AD00449F316E /* EZRWorker */ = {
 			isa = PBXGroup;
 			children = (
@@ -774,14 +609,6 @@
 			path = EZRWorker;
 			sourceTree = "<group>";
 		};
-		9CFA9607E4569D6AE6F67E4B /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				A870A9FD938BFBC287C3581D /* ManagedUser.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
 		A212301F5EA3AE407EDDB0A8 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -789,29 +616,6 @@
 				02F4555D06326E7D96A34A8B /* CreateProfileSheet.swift */,
 			);
 			path = Settings;
-			sourceTree = "<group>";
-		};
-		A87AD192ACBB0C60B6C195B7 /* plans */ = {
-			isa = PBXGroup;
-			children = (
-				0CF361BFC426343684599751 /*  新建智能体向导.md */,
-				5EAD831B5BA12C9BD42EB676 /* 定时任务页改版与创建弹窗重做.md */,
-				094E133C596E16E8D2538B5D /* 飞书渠道配置弹窗改版方案.md */,
-				4C2310FF1CAB90CD0860B18A /* 模型配置自动同步 + 智能体独立选模型.md */,
-				8E214EC3AAE2BEAB5A0ADCEE /* 智能体 Workspace 重设计方案.md */,
-				16E8F1E22DAFB3800E0879C2 /* Agent 渠道绑定功能完善方案.md */,
-				7F3211329AF096A13C8D10D0 /* Agent Creation CLI Fallback.md */,
-				8E0E48AAED35F1EA12180AA7 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md */,
-				AAC7F7477F2A22A41F7B5E4F /* EZRWorker 多 Profile 配置链路收口技术方案.md */,
-				6F3E305DD9F6C20E0AE4720C /* EZRWorker 架构重设计：单实例智能体配置管理面板.md */,
-				2C21588F9BBD7644322A54B5 /* EZRWorker 目录重组方案.md */,
-				F4FAF4EA670875D2878F73E2 /* EZRWorker 手机号登录门禁方案.md */,
-				E0A844D5A8276D6A390D3975 /* EZRWorker 新主线完成 Helper 脱钩技术方案.md */,
-				3000C33F7E7DF7225961D3A7 /* EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md */,
-				6FA3C9DABF937ABD459C670E /* Gateway 自重启交接修复技术方案.md */,
-				AA8B17A7D12ADE10C7644BF0 /* openclaw 和 node 打包在 app bundle 内.md */,
-			);
-			path = plans;
 			sourceTree = "<group>";
 		};
 		AD028C1DC7F986F43880F531 /* Frameworks */ = {
@@ -822,18 +626,6 @@
 				D0B7A4C6E52DA59C04D7A051 /* SystemConfiguration.framework */,
 			);
 			name = Frameworks;
-			sourceTree = "<group>";
-		};
-		B6BB72A64A8B8651F483FD01 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				3ED01AE9D607DE65B50A4B5B /* DaemonInstaller.swift */,
-				CA9091BA2CBFE300AD0C7EC9 /* GatewayHub.swift */,
-				F27BAD0C67098FFB94B3764A /* HelperClient.swift */,
-				D558D0067AAEA5DD626C8F29 /* ShrimpPool.swift */,
-				1B6ACF9694496708E55DBBD4 /* WizardConnection.swift */,
-			);
-			path = Services;
 			sourceTree = "<group>";
 		};
 		BE26EFBD8E1A7991E7319A9E /* Sidebar */ = {
@@ -862,7 +654,9 @@
 				C0C4D900EFBBA3ED016FBDB6 /* GlobalModelStore.swift */,
 				B22A6BDE79B358E22BEE2B74 /* GlobalSecretsStore.swift */,
 				63E7ECFB0052218EC40E1AE8 /* ModelsStatus.swift */,
+				8D7E8DD3D279F34DAAA0CB26 /* PersonaFile.swift */,
 				00B57166787F28D6CA0DC966 /* ProviderKeyConfig.swift */,
+				0E2A38D1E25BA6C69BF72216 /* SessionEntry.swift */,
 				98F8ADF4F753E82EC62D93F1 /* VoiceProfile.swift */,
 			);
 			path = Models;
@@ -872,11 +666,6 @@
 			isa = PBXGroup;
 			children = (
 				79D4EB2C3C8B59CC871802B4 /* AddProviderModelSheet.swift */,
-				6EFAE515C66040F8053EEA83 /* LLMManagerTab.swift */,
-				3E78B5A13EC9C7018814E07F /* ModelDetailView.swift */,
-				93E086F51C967E1AB9C7AF00 /* ProviderKeySheet.swift */,
-				1BCD6661514B0ACBAA2AAC6F /* TTSManagerTab.swift */,
-				341A536C67D8695DE5B73B98 /* VoiceLibraryTab.swift */,
 			);
 			path = ModelManager;
 			sourceTree = "<group>";
@@ -884,13 +673,7 @@
 		CE7B64D5C76F78E51ACC7DFE /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				131B2DAEA7A5596D65C89538 /* AddUserSheet.swift */,
-				776D9DF1069AC323CFCA85F1 /* AILabView.swift */,
-				2458E0408D92958E211D87A6 /* AppLockScreen.swift */,
 				5BED324F1ED7BF01A2E94129 /* AppUpdateBanner.swift */,
-				17D5DEA24C5BED726C91F8A6 /* AwakeningWizardView.swift */,
-				15D848C1B5EF0CDD59CE126E /* BackupManagerSheet.swift */,
-				62647684D4B8CA197E7CA9E2 /* ClawPoolView.swift */,
 				CC94021EFAC848EEE00483AD /* ModelManager */,
 			);
 			path = Views;
@@ -923,7 +706,6 @@
 				E087A7548C1534ED739E04B6 /* ChannelBindSheet.swift */,
 				B3F862365EBE5A03ADE4D918 /* ChannelBotConfigSheet.swift */,
 				50154BBC1CADA61EBF44496C /* ChannelPairingSheet.swift */,
-				B9853CF9A21268FFCDF17798 /* Channels.md */,
 				929E77B2F563A1B186A2FF19 /* ChannelView.swift */,
 				C6DF2DA86BC84D8B486B3BE0 /* CronAddSheet.swift */,
 				62E8D72AD6B3304552BE0770 /* CronJobDetailView.swift */,
@@ -936,6 +718,14 @@
 				45DB4B622DA108773F0D7066 /* TelegramChannelConfigSheet.swift */,
 			);
 			path = Capabilities;
+			sourceTree = "<group>";
+		};
+		EB077C01DFD8FB9DE0D33439 /* Terminal */ = {
+			isa = PBXGroup;
+			children = (
+				4351B56CE089EAAC752DFC44 /* TerminalPanels.swift */,
+			);
+			path = Terminal;
 			sourceTree = "<group>";
 		};
 		EE60E36E0AFE82FC5398D683 /* CreateAgentWizard */ = {
@@ -963,22 +753,11 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		FBD19A401F8AE615DED00A06 /* LegacyCompatibility */ = {
-			isa = PBXGroup;
-			children = (
-				12DE6D204E9464667F68DB91 /* App */,
-				9CFA9607E4569D6AE6F67E4B /* Models */,
-				B6BB72A64A8B8651F483FD01 /* Services */,
-				495B49C332F3095FF9E53A4F /* Views */,
-			);
-			path = LegacyCompatibility;
-			sourceTree = "<group>";
-		};
 		FD1B76ED6F1360593B66A5FE /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				13A036E3C7594AEBABBF1CBA /* ExistingOpenClawImportView.swift */,
 				17EBE5B457012294EFE0E076 /* ModelPickerSheet.swift */,
-				A2F000000000000000000001 /* ExistingOpenClawImportView.swift */,
 				0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */,
 				79F52960A35FCDC71FC976B7 /* ProfileMigrationChoiceView.swift */,
 				D30E9A622A85E6C84D696F8A /* ProfileTerminalView.swift */,
@@ -988,6 +767,7 @@
 				E7241783C549B97EF1C474E1 /* Capabilities */,
 				493A3B01E3566EAF19E9C907 /* ChannelOnboarding */,
 				A212301F5EA3AE407EDDB0A8 /* Settings */,
+				EB077C01DFD8FB9DE0D33439 /* Terminal */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -998,13 +778,12 @@
 				41729DA0971439D7C20400D0 /* AppIcon.icns */,
 				65DFDC9A5D564622349F186D /* Assets.xcassets */,
 				A4250EB561AA0155DE283768 /* EZRWorker.entitlements */,
-				A4250EB561AA0155DE283769 /* EZRWorkerDebug.entitlements */,
+				E1CF75A88E4E50021E547F61 /* EZRWorkerDebug.entitlements */,
 				024A24C4A426107D68445692 /* Info.plist */,
+				FD0A37975AC4E8D949737435 /* logo.png */,
 				03F20F22E1D3B0500B2B2F36 /* Stable.xcstrings */,
 				9B04B4EA7437AD00449F316E /* EZRWorker */,
-				FBD19A401F8AE615DED00A06 /* LegacyCompatibility */,
 				7E628D04FB0571A2545B9C7C /* Localization */,
-				A87AD192ACBB0C60B6C195B7 /* plans */,
 				CE7B64D5C76F78E51ACC7DFE /* Views */,
 			);
 			path = EZRWorkerApp;
@@ -1083,12 +862,15 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7228B160710A74C119780ADB = {
+						DevelopmentTeam = 9P6LY282WU;
 						ProvisioningStyle = Automatic;
 					};
 					E359B56798BC64BC260339AD = {
+						DevelopmentTeam = 9P6LY282WU;
 						ProvisioningStyle = Automatic;
 					};
 					EFB0E2F70653FCB2A446D643 = {
+						DevelopmentTeam = 9P6LY282WU;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -1123,29 +905,13 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				321D6BC8014D0C62DBB26E13 /*  新建智能体向导.md in Resources */,
-				AB4DEC6B28295032A4EAE80C /* Agent Creation CLI Fallback.md in Resources */,
-				7D6118614DE086172F4CF1AE /* Agent 渠道绑定功能完善方案.md in Resources */,
 				93FBD4BC2C2CA9486D24D6FA /* AppIcon.icns in Resources */,
 				D3A2F6603044FD367F4D781C /* Assets.xcassets in Resources */,
-				934515128FE1467B16F18D28 /* Channels.md in Resources */,
-				E3ED6FE7DACB8C513FE1FC03 /* EZRWorker App 内嵌 OpenClaw 终端优先技术方案.md in Resources */,
-				D1A1BCCDAE12A37328108D09 /* EZRWorker 多 OpenClaw Gateway + Global Supervisor 技术方案.md in Resources */,
-				937DCC2331CE3F9863B5E6AC /* EZRWorker 多 Profile 配置链路收口技术方案.md in Resources */,
-				78D60D8934ABE5A054396545 /* EZRWorker 手机号登录门禁方案.md in Resources */,
-				6A87112DE79A7D41B65C1DC0 /* EZRWorker 新主线完成 Helper 脱钩技术方案.md in Resources */,
-				4ABF10190F7035785CD68071 /* EZRWorker 架构重设计：单实例智能体配置管理面板.md in Resources */,
-				289A8B42CC2C2F172225E645 /* EZRWorker 目录重组方案.md in Resources */,
-				3EF9C2994290EF09C3D8F55B /* Gateway 自重启交接修复技术方案.md in Resources */,
 				C39053280650A2AFB5922A83 /* PresetAgents.json in Resources */,
 				1AAE22BB1A45A87CD72D472C /* Stable.xcstrings in Resources */,
+				4A8C78D9E88E520EE6BDA6A0 /* logo.png in Resources */,
 				00D784CD2B12BDFA80548F70 /* onboard.html in Resources */,
-				C00CAFCD3C66F0D63D9DD61B /* openclaw 和 node 打包在 app bundle 内.md in Resources */,
 				0361DD9FA5B5876333CAFE8B /* roles.html in Resources */,
-				26DAA7DF391D264FB9937272 /* 定时任务页改版与创建弹窗重做.md in Resources */,
-				0BE10D748690A86E7C0321DB /* 智能体 Workspace 重设计方案.md in Resources */,
-				2DB5B6E4610B3DC09C243192 /* 模型配置自动同步 + 智能体独立选模型.md in Resources */,
-				B0E55779E8344D3B14B2D790 /* 飞书渠道配置弹窗改版方案.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1217,10 +983,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4702B5FDA5634C1E54657EC9 /* AILabView.swift in Sources */,
 				B85227CB3B44B10A0B8F472F /* AccountKeychain.swift in Sources */,
 				D93C026DD10956CFEDB6D913 /* AddProviderModelSheet.swift in Sources */,
-				7DFC3511C5F89573B385154F /* AddUserSheet.swift in Sources */,
 				A0AA6566850DB453946BCC66 /* Agent.swift in Sources */,
 				01449EE0E627BACAC6F253B1 /* AgentBinding.swift in Sources */,
 				038DB1AF3ADFFECD581A2261 /* AgentBindingsView.swift in Sources */,
@@ -1237,32 +1001,22 @@
 				6F645F1F9C0A10F312D84C79 /* AgentWorkspaceView.swift in Sources */,
 				E059EE5AF3DEF2527E3CC32D /* AppBootstrapCoordinator.swift in Sources */,
 				8CCB22FBB79EBD9B5C450EAF /* AppLanguage.swift in Sources */,
-				B420F13632AE057202D9DE57 /* AppLockScreen.swift in Sources */,
 				8AFC15B60AAD09A13D6592FD /* AppLockStore.swift in Sources */,
 				E253192E6D8662B63A7E0D0B /* AppLogger.swift in Sources */,
 				4390223FCA3A2AF3C4EA3307 /* AppNotifications.swift in Sources */,
 				BB429A5AFB2CCE2B094810D0 /* AppRootGateView.swift in Sources */,
-				E552B3C9233DFA4C51758BF7 /* AppSecondaryWindows.swift in Sources */,
 				11EB305CF95D84636C123F47 /* AppSettingsView.swift in Sources */,
 				A04C6C26B74915B70FB7D1A3 /* AppUpdateBanner.swift in Sources */,
 				2692E95F0C8FEA80FC10F6F0 /* AppUpdateState.swift in Sources */,
-				5F06C354A9A387A43EAE2745 /* ApplyCredentialSheet.swift in Sources */,
 				C0E6D98E9E8FFE2368039DEF /* AuthAPIClient.swift in Sources */,
 				B059514600834292CB43165C /* AuthModels.swift in Sources */,
 				07CDB28DAA3A3893933F11DC /* AuthSessionStore.swift in Sources */,
-				2CA596360957A695BF7DF730 /* AwakeningWizardView.swift in Sources */,
-				E341234CCE9EE02B48CAA9EB /* BackupManagerSheet.swift in Sources */,
-				3C91B8EBF1B75612E1C2D339 /* BackupView.swift in Sources */,
 				EE08386CB00390E39127AC25 /* ChannelBindSheet.swift in Sources */,
 				7DE39E0A59531ADBEB772CEA /* ChannelBotConfigSheet.swift in Sources */,
 				68EACC33DF17AD36D7F2F793 /* ChannelPairingSheet.swift in Sources */,
 				127C94F2DAF841B1B5B1C5D1 /* ChannelType.swift in Sources */,
 				EC4BBEC047C5B36422354C55 /* ChannelView.swift in Sources */,
-				B2F31069FA5381C0E0983039 /* ClawPoolView.swift in Sources */,
 				1BC5C36E35CFAC54DA9CEE4C /* CloneClawModels.swift in Sources */,
-				BC9735902209A7FAC2C583F3 /* CloneClawSheet.swift in Sources */,
-				E0E6EDDDA077860B1AADF882 /* ConfigEditorSheet.swift in Sources */,
-				6387E2FBE5AD949813F5F050 /* ContentView.swift in Sources */,
 				47D2E8C47D07C2D04F294BB3 /* CreateAgentSheet.swift in Sources */,
 				0C760590A7A397DA41FF1439 /* CreateAgentWizardState.swift in Sources */,
 				4251623040D1848B350C8861 /* CreateAgentWizardView.swift in Sources */,
@@ -1270,15 +1024,12 @@
 				D51F43B92088801DBCBDC2AE /* CronAddSheet.swift in Sources */,
 				E6EFF6179F97299E40189858 /* CronJobDetailView.swift in Sources */,
 				439DD82A4C0006D209077CB1 /* CronTaskView.swift in Sources */,
-				C7EAC06D75275652371CE22B /* DaemonInstaller.swift in Sources */,
-				9E3F93B8034DD4D5372C64F0 /* DaemonSetupBanner.swift in Sources */,
 				ECB23A8369CE55EFD00333DD /* DashboardModels.swift in Sources */,
-				72862724BFC1136B5BBBAC4E /* DashboardView.swift in Sources */,
 				CF80779371BC6ECB7985F733 /* DeviceIdentity.swift in Sources */,
 				13A532108EB6EDB8F29DF459 /* EZRWorkerApp.swift in Sources */,
 				73439DEDEBD676CA95BEC88A /* EZRWorkerBranding.swift in Sources */,
 				53609128E116AEC60E9DB5BD /* EnvironmentChecker.swift in Sources */,
-				A2C000000000000000000001 /* ExistingOpenClawImportView.swift in Sources */,
+				96906793FC8549D27A33C765 /* ExistingOpenClawImportView.swift in Sources */,
 				E6B71EC87DD08A1B125F3C68 /* FeishuChannelConfigSheet.swift in Sources */,
 				CC35A6BD4D1E1AF3E5F3B66B /* FeishuChannelOnboardingSheet.swift in Sources */,
 				57DE6A88D02779A43098531F /* FileInputAcceptFilter.swift in Sources */,
@@ -1288,46 +1039,32 @@
 				B79DC9D9B8D7067AFE0D51B8 /* GatewayCronModels.swift in Sources */,
 				6408256C201F686320392202 /* GatewayCronStore.swift in Sources */,
 				6A367E95F522DAB6374FE07F /* GatewayHealthProbe.swift in Sources */,
-				E5BDFBA94DDAF1CD62500B61 /* GatewayHub.swift in Sources */,
 				FC626655F40647C56A05190D /* GatewayProcessManager.swift in Sources */,
 				073B8C7D7C16732C44390493 /* GatewayProfileStore.swift in Sources */,
 				ACAB18484DB65AD95A8F8220 /* GatewayProfiles.swift in Sources */,
-				C821DFEDD4BE3E522C3161D5 /* GatewayProviderKeySheet.swift in Sources */,
 				3D0E68D7D5370C195467EE92 /* GatewayService.swift in Sources */,
 				7C936599962716FA0BDA463A /* GatewaySkillModels.swift in Sources */,
 				7C1062DC63F804DF2790C8C3 /* GatewaySkillsStore.swift in Sources */,
 				0909713A853FB00B7F52D189 /* GlobalModelStore.swift in Sources */,
 				C6B1C8632A97F10CC1D57E19 /* GlobalSecretsStore.swift in Sources */,
 				03F6A77372BF577F5CAD0958 /* HealthCheck.swift in Sources */,
-				64052477277EA2E469E08732 /* HealthCheckSheet.swift in Sources */,
-				F8FB34C7C13C0B35A1769FBC /* HelperClient.swift in Sources */,
 				C1CFDCF7A205C6CD0D8EDB6C /* HelperProtocol.swift in Sources */,
 				6C22895570A68ABF0CA21BAC /* HomeDashboardView.swift in Sources */,
 				066731B4E61F419E71F75D62 /* L10n.swift in Sources */,
-				A2C000000000000000000003 /* LaunchAgentHandoffService.swift in Sources */,
-				19F095F7F36465E9A09E8424 /* LLMManagerTab.swift in Sources */,
+				C66EC6B8E2B700B5F6502405 /* LaunchAgentHandoffService.swift in Sources */,
 				8568E919775BDBB53CB34CD8 /* LocalAIModels.swift in Sources */,
-				9110C73EEED52E2FB6985B06 /* LocalAITab.swift in Sources */,
-				ECAAFEE55157650D9AE5E834 /* LogViewerSheet.swift in Sources */,
 				8C14AB69E49D99582269E7C6 /* LoginView.swift in Sources */,
 				BD6B6CBA8EA673AF0EC086F0 /* MainView.swift in Sources */,
-				94B81D6503B4DBC62A9C70B8 /* ManagedUser.swift in Sources */,
-				BCC8FA0D08A302D2729ED3BD /* ManagedUserDisplayName.swift in Sources */,
-				BF9CDFAF95C38E04D26A38A4 /* MemoryTabView.swift in Sources */,
 				469F180DF12F7D1A2D4861AF /* ModelConfigView.swift in Sources */,
-				66404CB724247583F6E84608 /* ModelDetailView.swift in Sources */,
-				E7AE6B8A8F1D981AFB86B997 /* ModelManagerView.swift in Sources */,
 				14FA84A360B5643A3053C7E8 /* ModelPickerSheet.swift in Sources */,
 				ED52ACCC396AF98C9EEC13DF /* ModelPingService.swift in Sources */,
-				6D31A1C548A82EA83644F6AF /* ModelPrioritySheet.swift in Sources */,
 				4DB3ABF4D896DA3DB2F04F98 /* ModelsStatus.swift in Sources */,
 				D768D451B0BD8DCC76D8EE3A /* NetworkModels.swift in Sources */,
-				6378AE98717EA50411B2DC1E /* NetworkPolicyView.swift in Sources */,
-				A2C000000000000000000002 /* OpenClawInstanceDiscoveryService.swift in Sources */,
+				1B27E9B3C6A0A8F01B002DB0 /* OpenClawInstanceDiscoveryService.swift in Sources */,
 				E7976265D330A5AAF3652560 /* OpenClawProviderKeySync.swift in Sources */,
 				47FD3CDA0B277A2A5AB35C32 /* OpenClawRuntime.swift in Sources */,
 				F2C107DBF7853685484E5AED /* PageHeroHeader.swift in Sources */,
-				21B00C5BA00FD215E477FF55 /* PersonaDefView.swift in Sources */,
+				5A205FDC9B16463C39677807 /* PersonaFile.swift in Sources */,
 				82EB45092DE1110669843D4F /* PortAllocator.swift in Sources */,
 				4DA959D639591D4C29870646 /* ProcessModels.swift in Sources */,
 				10AE50E5DB04C49A4F324CD3 /* ProfileCLIService.swift in Sources */,
@@ -1335,37 +1072,25 @@
 				2AAA7D765398D0134FAF83F7 /* ProfileTerminalView.swift in Sources */,
 				7F01095C41E7284CAF0119E5 /* ProviderKeyConfig.swift in Sources */,
 				96F7E835490F0F78F634D509 /* ProviderKeyRow.swift in Sources */,
-				35A832ACD832D032CF07569E /* ProviderKeySheet.swift in Sources */,
 				7D62AC57B7D1237CE771CB1D /* ProviderKeychainStore.swift in Sources */,
-				717390D30FA30859ED5BA4AE /* RoleMarketView.swift in Sources */,
-				338F59C98B8DEA5FDA1719B8 /* SecurityAuditView.swift in Sources */,
-				20BF2D873265F7C3F616DBE3 /* SessionsTabView.swift in Sources */,
-				9EE462B3B76B88C76A84D9FB /* SettingsView.swift in Sources */,
-				D163785E565D7579B28423A1 /* ShrimpPool.swift in Sources */,
+				719951381890B2516D611619 /* SessionEntry.swift in Sources */,
 				6763C3238B4B555B4B34EA46 /* SidebarView.swift in Sources */,
 				E3597E1F9A7BCAD7B7F78680 /* SkillListItemRow.swift in Sources */,
 				158170DF3130A8B40C979C4C /* SkillsView.swift in Sources */,
 				D63E050779DF1D8D5FDEFC24 /* SupervisorClient.swift in Sources */,
 				207C0361D57EB90D7669011E /* SupervisorProtocol.swift in Sources */,
-				CC987765581A063F9156B4DA /* TTSManagerTab.swift in Sources */,
 				1B618D0AF3E7A7A4F91CFBA0 /* TelegramChannelConfigSheet.swift in Sources */,
-				9639E50ADC8F3BE487374FCF /* TerminalLogView.swift in Sources */,
+				79F27D175DC3B36E32BD77FC /* TerminalPanels.swift in Sources */,
 				93826E30A52898111BC88F3B /* UpdateCheckPolicy.swift in Sources */,
 				BCFA8E44981939FC278A9E4C /* UpdateChecker.swift in Sources */,
 				A06C573A01685AA58F33F665 /* UpgradeConfirmSheet.swift in Sources */,
 				2E18243A182E96F4E0B1D06E /* UserAdoptionFlow.swift in Sources */,
-				27C0182E29FA19A0D7BF5371 /* UserDetailView.swift in Sources */,
 				EE8DA45D41196B88A5E1EE8F /* UserDetailWindowLayout.swift in Sources */,
 				8093AFA6118892180BBEB830 /* UserDirectoryService.swift in Sources */,
-				4535FC36DEC55D72AB02D54A /* UserFilesView.swift in Sources */,
 				1390971AD1A4055171C84A14 /* UserInitPresentationRouting.swift in Sources */,
-				984FBC42CD3FDDA4C6CA5715 /* UserInitWizardView.swift in Sources */,
-				3493323E6F3708780B0A7C33 /* UserListView.swift in Sources */,
 				EEEF1352391ED8FA8FF52602 /* UserPasswordStore.swift in Sources */,
-				3B40B71FFDDA40A51185A876 /* VoiceLibraryTab.swift in Sources */,
 				7ABF47A726CE940AF7F61919 /* VoiceProfile.swift in Sources */,
 				3B6FBF3AC3F4EA77E5F61E3C /* WizardAgentPreviewCard.swift in Sources */,
-				120CFDD066430D4BB3073672 /* WizardConnection.swift in Sources */,
 				6EC86ED94CDA4184433A02C9 /* WizardStep0TemplateView.swift in Sources */,
 				630C8C8AF449E602F93C2A08 /* WizardStep1IdentityView.swift in Sources */,
 				E6C5884207EE3AF2ABF635EE /* WizardStep2ToolsView.swift in Sources */,
@@ -1400,7 +1125,6 @@
 				A546B9CB6D7439ECB0AC6197 /* InstallManager.swift in Sources */,
 				99D697C2D9984FBDF6625E0A /* LocalAIModels.swift in Sources */,
 				6FAA05C6976CB4EC89FFD0A9 /* LocalLLMManager.swift in Sources */,
-				C45CB20C6B38CED63294C46C /* ManagedUserDisplayName.swift in Sources */,
 				54EBE37A6A6F0D7FCD37BA67 /* NStatCollector.swift in Sources */,
 				FF1A54861FA09928D8CAEA81 /* NetworkModels.swift in Sources */,
 				CB89D694775ADAEAA601C6DD /* NodeDownloader.swift in Sources */,
@@ -1428,6 +1152,7 @@
 				6C7A891C6A8975D0AAC1F2D6 /* CloneClawModels.swift in Sources */,
 				181EB79773E6ACC06EC32E05 /* DashboardModels.swift in Sources */,
 				77515C9F22226AE6034E60AB /* EZRWorkerBranding.swift in Sources */,
+				6F91FBE889EDE8854F4F11A6 /* EZRWorkerSupervisorService.swift in Sources */,
 				32BD5F9B185593C1ACADADC8 /* FileInputAcceptFilter.swift in Sources */,
 				16765726777CE61AA46DCFFC /* FileModels.swift in Sources */,
 				118E251360FF57BF45D6C60D /* GatewayHealthProbe.swift in Sources */,
@@ -1435,22 +1160,20 @@
 				010963F0E83703B0AFE5E03B /* HealthCheck.swift in Sources */,
 				8A82AAD5A37B10804CCFD1BC /* HelperProtocol.swift in Sources */,
 				68EE85703B992648D9E539A6 /* LocalAIModels.swift in Sources */,
-				F422A1771A3FC1A6D33995AD /* ManagedUserDisplayName.swift in Sources */,
 				4A96853CA492C4AC0CCF916C /* NetworkModels.swift in Sources */,
 				F7B2439907A521F18192A0B6 /* OpenClawRuntime.swift in Sources */,
 				546EC8249B3774DA048428B9 /* ProcessModels.swift in Sources */,
+				0C3AB4EB1F2081B8E68E56DB /* ProcessOutputCollector.swift in Sources */,
+				63C2CE1DD2927E89748CB993 /* SupervisorController+AutoStart.swift in Sources */,
+				298786DAB12F9E2EDF477CD8 /* SupervisorController+Config.swift in Sources */,
+				ABDA61F11E0C0F4623920018 /* SupervisorController+GatewayProcess.swift in Sources */,
+				AC80CD514A99CD116C322DA1 /* SupervisorController+Lifecycle.swift in Sources */,
+				FCA8D5F78F76E3A7C8595758 /* SupervisorController+OutputParsing.swift in Sources */,
+				DD8741AF41F4E95D05F95153 /* SupervisorController+Profiles.swift in Sources */,
+				D6A96844A9F0AAF2FD9E2EC0 /* SupervisorController+Readiness.swift in Sources */,
 				816163E208A30C242C77413F /* SupervisorController.swift in Sources */,
-				A1C000000000000000000001 /* SupervisorRecord.swift in Sources */,
-				A1C000000000000000000002 /* SupervisorController+Profiles.swift in Sources */,
-				A1C000000000000000000003 /* SupervisorController+AutoStart.swift in Sources */,
-				A1C000000000000000000004 /* SupervisorController+Lifecycle.swift in Sources */,
-				A1C000000000000000000005 /* SupervisorController+Readiness.swift in Sources */,
-				A1C000000000000000000006 /* SupervisorController+Config.swift in Sources */,
-				A1C000000000000000000007 /* SupervisorController+GatewayProcess.swift in Sources */,
-				A1C000000000000000000008 /* SupervisorController+OutputParsing.swift in Sources */,
-				A1C000000000000000000009 /* ProcessOutputCollector.swift in Sources */,
-				A1C00000000000000000000A /* EZRWorkerSupervisorService.swift in Sources */,
 				E86F287DDA71CE8B3485951A /* SupervisorProtocol.swift in Sources */,
+				86894FB1907A3DB12B31E762 /* SupervisorRecord.swift in Sources */,
 				AB3B802AE7680B5CB4EFB2B0 /* UserAdoptionFlow.swift in Sources */,
 				725139BB755221E62DA5B75C /* UserDetailWindowLayout.swift in Sources */,
 				D31E6F2FFEEAC36466B7635C /* UserInitPresentationRouting.swift in Sources */,
@@ -1472,9 +1195,9 @@
 		19E448245FB55E30B44EF57D /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APP_DISPLAY_NAME = EZRWorker;
 				APP_UPDATE_MANIFEST_URL = "https://imp-assets.ezrpro.com/ezrworker/updates/latest.json";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorker.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -1606,9 +1329,9 @@
 		AD2E0B06E909F76EC53C39A2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APP_DISPLAY_NAME = "EZRWorker Dev";
 				APP_UPDATE_MANIFEST_URL = "https://imp-assets.ezrpro.com/ezrworker/updates/latest.json";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = EZRWorkerApp/EZRWorkerDebug.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;

@@ -63,7 +63,7 @@ enum MemoryFileLocator {
     }
 }
 
-/// Build candidate transcript paths relative to /Users/<username>/ for HelperClient.readFile.
+/// Build candidate transcript paths relative to /Users/<username>/ for transcript readers.
 func resolveSessionTranscriptRelativePaths(
     sessionFile: String?,
     sessionId: String?,

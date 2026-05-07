@@ -30,7 +30,6 @@ struct EZRWorkerApp: App {
     @State private var updater: UpdateChecker
     @State private var modelStore: GlobalModelStore
     @State private var lockStore: AppLockStore
-    @State private var maintenanceWindowRegistry: MaintenanceWindowRegistry
     @State private var authStore: AuthSessionStore
     @State private var profileStore: GatewayProfileStore
     @State private var supervisorClient: SupervisorClient
@@ -50,7 +49,6 @@ struct EZRWorkerApp: App {
         let updater = UpdateChecker()
         let modelStore = GlobalModelStore()
         let lockStore = AppLockStore()
-        let maintenanceWindowRegistry = MaintenanceWindowRegistry()
         let authStore = AuthSessionStore(apiClient: BackendAuthClient())
         let profileStore = GatewayProfileStore()
         let supervisorClient = SupervisorClient()
@@ -75,7 +73,6 @@ struct EZRWorkerApp: App {
         _updater = State(initialValue: updater)
         _modelStore = State(initialValue: modelStore)
         _lockStore = State(initialValue: lockStore)
-        _maintenanceWindowRegistry = State(initialValue: maintenanceWindowRegistry)
         _authStore = State(initialValue: authStore)
         _profileStore = State(initialValue: profileStore)
         _supervisorClient = State(initialValue: supervisorClient)
@@ -101,7 +98,6 @@ struct EZRWorkerApp: App {
                 .environment(updater)
                 .environment(modelStore)
                 .environment(lockStore)
-                .environment(maintenanceWindowRegistry)
                 .task {
                     appDelegate.onWillTerminate = {
                         bootstrapCoordinator.prepareForAppTermination()

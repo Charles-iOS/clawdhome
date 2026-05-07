@@ -7,22 +7,22 @@
 EZRWorker 现在的主要目标，是作为一个面向 macOS 的本地控制平面，管理当前用户正在运行的 OpenClaw gateway 实例，并围绕这个 gateway 创建、配置和维护多个 agent。它不是单一进程应用，而是由下面三部分共同组成：
 
 - `EZRWorker` target：SwiftUI 管理应用，`project.yml` 里定义的产品名是 `EZRWorker`
-- `EZRWorkerHelper` target：以 root 权限运行的特权 Helper / LaunchDaemon
-- `Shared`：App 与 Helper 共用的 XPC 协议、数据模型和状态对象
+- `EZRWorkerSupervisor` target：当前用户态的全局 Supervisor，负责多 profile gateway runtime 托管
+- `EZRWorkerHelper` target：保留的 root 系统能力 target，用于仍需特权操作的兼容场景
+- `Shared`：App、Supervisor 与 Helper 共用的 XPC 协议、数据模型和状态对象
 
 运行时可以把它理解成：
 
 ```text
 操作员
   -> EZRWorker.app / EZRWorker（SwiftUI）
-      -> HelperClient（NSXPC）
-          -> EZRWorkerHelper（root LaunchDaemon）
-              -> Gateway 管理 / 文件与进程操作 / 必要的系统级能力
-                  -> 当前用户下运行的 OpenClaw gateway
-                      -> 该 gateway 下的多个 agent
+      -> SupervisorClient（NSXPC）
+          -> EZRWorkerSupervisor（LaunchAgent）
+              -> 多个 OpenClaw gateway profile runtime
+                  -> 当前选中 gateway 下的多个 agent
 ```
 
-当前主入口已经切到 `EZRWorkerApp/EZRWorker/` 这套以单 gateway、多 agent 为中心的新结构，但 `EZRWorkerApp/Views/` 里仍保留了一部分早期多用户管理时期的页面和辅助窗口，所以这个仓库目前属于“新主框架 + 存量旧模块并存”的状态。
+当前主入口已经切到 `EZRWorkerApp/EZRWorker/` 这套以单 gateway、多 agent 为中心的新结构，早期多用户管理时期的旧窗口和 Helper 兼容 UI 已经清理；`EZRWorkerApp/Views/` 现在只保留仍被主线复用的少量共享组件。
 
 ## 2. 启动链路
 
@@ -31,7 +31,7 @@ EZRWorker 现在的主要目标，是作为一个面向 macOS 的本地控制平
 1. `EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`
 2. 环境检查与 Gateway 启动：`EnvironmentChecker`、`GatewayProcessManager`
 3. Gateway 连接：`GatewayService`
-4. Helper 连接：`HelperClient`
+4. Supervisor/Profile 连接：`SupervisorClient`、`GatewayProfileStore`
 5. 智能体数据加载：`AgentStore`
 
 这条链路基本决定了 App 启动后如何连上 gateway、如何连上 helper，以及界面里的 agent、技能、渠道等数据从哪里来。
@@ -88,9 +88,9 @@ docs/
     - [`../EZRWorkerApp/EZRWorker/Models/AgentBinding.swift`](../EZRWorkerApp/EZRWorker/Models/AgentBinding.swift)
     - [`../EZRWorkerApp/EZRWorker/Models/ChannelType.swift`](../EZRWorkerApp/EZRWorker/Models/ChannelType.swift)
 - `EZRWorker/Services/`
-  - 新架构的应用服务层，负责 Gateway、XPC、工作区、更新、环境检查、Provider Key 等
+  - 新架构的应用服务层，负责 Gateway、Supervisor、工作区、更新、环境检查、Provider Key 等
   - 重点文件：
-    - [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift)
+    - [`../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift`](../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift)
     - [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift)
     - [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayProcessManager.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayProcessManager.swift)
     - [`../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift`](../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift)
@@ -104,13 +104,12 @@ docs/
 - `EZRWorker/Resources/`
   - 新架构相关内置资源，例如预置智能体模板与 onboard/roles HTML
 - `Views/`
-  - 历史阶段留下的旧功能页与辅助窗口，部分仍被详情窗口、初始化向导、备份、克隆等流程复用
-  - 这部分不是当前主导航壳层，且不少能力带有早期多用户管理背景，阅读时要和现有产品定位区分开
+  - 主线仍复用的少量共享视图，当前主要是更新横幅与 Provider 编辑弹窗
+  - 新页面优先放在 `EZRWorker/Views/` 对应业务目录；不要在这里恢复旧多用户窗口
   - 重点文件：
-    - [`../EZRWorkerApp/Views/UserDetailView.swift`](../EZRWorkerApp/Views/UserDetailView.swift)
-    - [`../EZRWorkerApp/Views/UserInitWizardView.swift`](../EZRWorkerApp/Views/UserInitWizardView.swift)
-    - [`../EZRWorkerApp/Views/CloneClawSheet.swift`](../EZRWorkerApp/Views/CloneClawSheet.swift)
-    - [`../EZRWorkerApp/Views/ModelManager/ModelManagerView.swift`](../EZRWorkerApp/Views/ModelManager/ModelManagerView.swift)
+    - [`../EZRWorkerApp/Views/AppUpdateBanner.swift`](../EZRWorkerApp/Views/AppUpdateBanner.swift)
+    - [`../EZRWorkerApp/Views/ModelManager/AddProviderModelSheet.swift`](../EZRWorkerApp/Views/ModelManager/AddProviderModelSheet.swift)
+    - [`../EZRWorkerApp/EZRWorker/Views/Terminal/TerminalPanels.swift`](../EZRWorkerApp/EZRWorker/Views/Terminal/TerminalPanels.swift)
 - `Localization/`
   - 语言切换与本地化访问封装
   - 重点文件：
@@ -187,11 +186,11 @@ docs/
 | [`../project.yml`](../project.yml) | 定义两个 target、依赖、脚本和打包方式 |
 | [`../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`](../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift) | App 真正启动入口，负责 bootstrap |
 | [`../EZRWorkerApp/EZRWorker/App/MainView.swift`](../EZRWorkerApp/EZRWorker/App/MainView.swift) | 当前主界面壳层 |
-| [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift) | App 侧 XPC 客户端封装 |
+| [`../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift`](../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift) | App 侧 Supervisor XPC 客户端封装 |
 | [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift) | App 侧 Gateway 连接与配置访问 |
 | [`../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift`](../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift) | agent 列表、绑定和工作区状态的主数据源 |
-| [`../Shared/HelperProtocol.swift`](../Shared/HelperProtocol.swift) | App/Helper 协议边界 |
-| [`../EZRWorkerHelper/main.swift`](../EZRWorkerHelper/main.swift) | Helper 主入口与 XPC 服务实现 |
+| [`../Shared/SupervisorProtocol.swift`](../Shared/SupervisorProtocol.swift) | App/Supervisor 协议边界 |
+| [`../EZRWorkerSupervisor/main.swift`](../EZRWorkerSupervisor/main.swift) | Supervisor 主入口与 XPC 服务实现 |
 | [`../EZRWorkerHelper/Operations/UserManager.swift`](../EZRWorkerHelper/Operations/UserManager.swift) | macOS 用户生命周期管理 |
 | [`../EZRWorkerHelper/Operations/GatewayManager.swift`](../EZRWorkerHelper/Operations/GatewayManager.swift) | gateway 生命周期管理与启动收敛逻辑 |
 
@@ -199,7 +198,7 @@ docs/
 
 这套代码目前可以按“4 层”理解：
 
-1. 界面层：`EZRWorkerApp/EZRWorker/Views` 和部分 `EZRWorkerApp/Views`
+1. 界面层：`EZRWorkerApp/EZRWorker/Views` 和少量 `EZRWorkerApp/Views` 共享组件
 2. 应用服务层：`EZRWorkerApp/EZRWorker/Services`
 3. 协议与共享模型层：`Shared`
 4. 系统操作层：`EZRWorkerHelper/Operations`
@@ -207,8 +206,8 @@ docs/
 其中最容易混淆的一点是：
 
 - 当前主窗口导航在 `EZRWorker/App/MainView.swift`
-- 但用户详情、初始化向导、克隆等窗口仍会复用 `EZRWorkerApp/Views/` 下的旧页面
-- 所以 `EZRWorkerApp/Views/` 不能简单视为废弃目录，但也不能把它当成当前产品主模型的唯一依据
+- `EZRWorkerApp/Views/` 已不再承载旧多用户窗口，只保留主线仍复用的共享组件
+- 终端/日志组件已经收口到 `EZRWorkerApp/EZRWorker/Views/Terminal/`
 
 再直白一点说：
 
@@ -256,10 +255,10 @@ make clean
 1. [`../README.zh.md`](../README.zh.md)
 2. [`../project.yml`](../project.yml)
 3. [`../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift`](../EZRWorkerApp/EZRWorker/App/EZRWorkerApp.swift)
-4. [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift)
-5. [`../Shared/HelperProtocol.swift`](../Shared/HelperProtocol.swift)
-6. [`../EZRWorkerHelper/main.swift`](../EZRWorkerHelper/main.swift)
-7. `AgentStore` / `GatewayService` / `GatewayManager` 这三条主线
+4. [`../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift`](../EZRWorkerApp/EZRWorker/Services/SupervisorClient.swift)
+5. [`../Shared/SupervisorProtocol.swift`](../Shared/SupervisorProtocol.swift)
+6. [`../EZRWorkerSupervisor/main.swift`](../EZRWorkerSupervisor/main.swift)
+7. `AgentStore` / `GatewayService` / `GatewayProcessManager` 这三条主线
 
 ## 7. 相关说明文档索引
 

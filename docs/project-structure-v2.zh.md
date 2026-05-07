@@ -27,10 +27,10 @@
 - 产品名、bundle id、Mach service、App Support 目录、Helper/Supervisor plist 也都统一到了 `EZRWorker`
 - 主应用源码根目录已经切到 `EZRWorkerApp/`
 
-仍然处在“过渡态”的，主要不是运行时品牌，而是目录组织方式：
+仍然处在“过渡态”的，主要不是运行时品牌，而是少量共享视图还保留在历史目录里：
 
 - 主应用主线代码仍放在 `EZRWorkerApp/EZRWorker/`
-- 历史窗口和兼容 UI 仍放在 `EZRWorkerApp/Views/`
+- `EZRWorkerApp/Views/` 只保留主线仍复用的共享组件，例如更新横幅和 Provider 编辑弹窗
 
 另外要特别区分两类“迁移”：
 
@@ -80,8 +80,6 @@
                   -> OpenClaw Gateway: test
           -> GatewayService (仅连接当前选中的 profile)
           -> AgentStore / AgentWorkspaceManager / Channel / Skills / Settings
-      -> HelperClient (仅旧兼容能力)
-          -> EZRWorkerHelper
 ```
 
 这里最关键的边界是：
@@ -151,7 +149,6 @@ EZRWorkerApp/
   Assets.xcassets/
   Stable.xcstrings
   Info.plist
-  plans/
 
 EZRWorkerHelper/
   main.swift
@@ -171,7 +168,7 @@ docs/
 这份树有两个容易误读的点：
 
 - `EZRWorkerApp/EZRWorker/` 不是“又一层 App”；它是当前主应用主线代码实际所在位置。
-- `EZRWorkerApp/Views/` 不是当前主应用壳层的总入口；它主要是历史多用户时期遗留的窗口、sheet 和工具页。
+- `EZRWorkerApp/Views/` 不是当前主应用壳层的总入口；它只保留少量跨主线复用的视图组件。
 
 ## 5. 目录逐段说明
 
@@ -242,9 +239,7 @@ docs/
   `GlobalModelStore.swift`、
   `GlobalSecretsStore.swift`
 - 兼容/遗留桥接组：
-  [`../EZRWorkerApp/EZRWorker/Services/HelperClient.swift`](../EZRWorkerApp/EZRWorker/Services/HelperClient.swift)、
-  [`../EZRWorkerApp/EZRWorker/Services/GatewayHub.swift`](../EZRWorkerApp/EZRWorker/Services/GatewayHub.swift)、
-  [`../EZRWorkerApp/EZRWorker/Services/ShrimpPool.swift`](../EZRWorkerApp/EZRWorker/Services/ShrimpPool.swift)
+  旧多用户窗口依赖的 `HelperClient` / `GatewayHub` / `ShrimpPool` 已经删除；当前主线只保留旧 `.openclaw` profile 导入与 Helper target 本身。
 
 这里有一个现在已经发生的重要变化：
 
@@ -290,16 +285,10 @@ docs/
 
 这是最容易让新同学误判的目录。
 
-它并不是当前产品主壳层的页面目录，而是历史多用户时期留下的一批窗口、sheet 和工具页面。它们现在仍可能被详情窗口、初始化流程、克隆流程、系统能力页或旧交互路径复用，但不应再作为 v2 主线产品模型的唯一依据。
+它并不是当前产品主壳层的页面目录。早期多用户窗口和 Helper 兼容 UI 已经删除，这里只保留主线仍复用的少量共享组件：
 
-这块目录大致可以分成几类：
-
-- 系统级/多用户管理页：
-  `UserListView.swift`、`UserDetailView.swift`、`AddUserSheet.swift`、`SecurityAuditView.swift`
-- 历史工具页：
-  `BackupView.swift`、`LogViewerSheet.swift`、`NetworkPolicyView.swift`、`RoleMarketView.swift`
-- 旧模型配置页：
-  `Views/ModelManager/*`
+- `AppUpdateBanner.swift`
+- `Views/ModelManager/AddProviderModelSheet.swift`
 
 所以，理解它时要把握住两个判断：
 
@@ -316,10 +305,6 @@ docs/
   中英文 UI 字符串总表
 - `Info.plist`
   App 基础信息与版本入口
-
-### `EZRWorkerApp/plans/`
-
-这里不是运行时代码，但对理解为什么会出现 `profile/supervisor/legacy migration` 这些模块非常重要。目录重组、品牌统一、兼容层收缩，基本都能在这里找到设计背景。
 
 ### `EZRWorkerSupervisor/`
 
@@ -386,7 +371,6 @@ docs/
   - `AppNotifications.swift`
   - `UserInitPresentationRouting.swift`
   - `HealthCheck.swift`
-  - `ManagedUserDisplayName.swift`
   - `UserDetailWindowLayout.swift`
 
 这里还有一个现在很值得记住的点：
@@ -474,23 +458,20 @@ docs/
 
 - `EZRWorkerHelper/*`
 - `Shared/HelperProtocol.swift`
-- `EZRWorkerApp/Views/*`
-- `EZRWorkerApp/EZRWorker/Services/HelperClient.swift`
-- `EZRWorkerApp/EZRWorker/Services/GatewayHub.swift`
-- `EZRWorkerApp/EZRWorker/Services/ShrimpPool.swift`
+- `EZRWorkerApp/Views/*` 中仍被主线复用的共享组件
 - `Resources/ai.ezrworker.mac.helper.plist`
 
 对阅读和改造工作来说，这意味着：
 
 - 做新 profile/runtime/supervisor 相关需求时，优先在主线目录里找答案
-- 只有涉及旧多用户窗口、系统级安装操作或兼容逻辑时，再深入 Helper 和旧 Views
+- 只有涉及系统级安装操作或兼容逻辑时，再深入 Helper；旧多用户窗口已经不再保留
 
 ## 7. 现在最容易混淆的几个事实
 
 为了避免继续被过渡态结构带偏，建议先把下面几件事记住：
 
 1. `EZRWorkerApp/EZRWorker/` 才是当前主应用主线代码区。
-2. `EZRWorkerApp/Views/` 不是主壳层，而是历史窗口/工具页集合。
+2. `EZRWorkerApp/Views/` 不是主壳层，只保留少量共享组件。
 3. 品牌迁移逻辑已经删除，不要再去找 `BrandMigrationManager`。
 4. 旧单实例 `.openclaw` 导入仍然保留，所以看到 `legacyReuse` 并不代表还有品牌兼容逻辑。
 5. 外部 URL 仍然可能是 `clawdhome.app`，这不表示本地运行时身份还是旧品牌；它只是发布基础设施还没改名。
@@ -525,11 +506,10 @@ docs/
 5. 再看 [`../EZRWorkerSupervisor/SupervisorController.swift`](../EZRWorkerSupervisor/SupervisorController.swift)，理解 profile runtime 真正如何被托管
 6. 最后回到 [`../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift`](../EZRWorkerApp/EZRWorker/Services/Gateway/GatewayService.swift)、[`../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift`](../EZRWorkerApp/EZRWorker/Services/Stores/AgentStore.swift)、[`../EZRWorkerApp/EZRWorker/Services/AgentWorkspaceManager.swift`](../EZRWorkerApp/EZRWorker/Services/AgentWorkspaceManager.swift)，理解当前选中 profile 的业务上下文
 
-只有当你确实需要处理这些问题时，再继续深入：
+只有当你确实需要处理 root 侧系统能力时，再继续深入：
 
-- 旧多用户窗口和历史交互流程
 - root Helper 的系统级实现
-- 老的 `GatewayHub` / `ShrimpPool` 兼容模型
+- `Shared/HelperProtocol.swift` 中仍保留的 Helper 协议模型
 
 ## 10. 一句话总结
 
@@ -542,4 +522,4 @@ EZRWorkerHelper 负责旧兼容和系统级能力
 Shared 负责把三者之间的协议、模型和运行时路径统一起来
 ```
 
-只要先抓住这条主线，再回头看 `EZRWorkerApp/EZRWorker/`、`EZRWorkerApp/Views/` 和 `.openclaw` 相关兼容点，就不会太容易被当前过渡态结构带偏。
+只要先抓住这条主线，再回头看 `EZRWorkerApp/EZRWorker/`、少量共享 `EZRWorkerApp/Views/` 组件和 `.openclaw` 相关兼容点，就不会太容易被当前过渡态结构带偏。
