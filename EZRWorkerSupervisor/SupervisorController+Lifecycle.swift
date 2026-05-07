@@ -199,30 +199,15 @@ extension EZRWorkerSupervisorController {
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
         let startupLogURL = prepareGatewayOutputLog(for: record.resolution)
         let startupOutput = ProcessOutputCollector(logURL: startupLogURL)
-        let outputPipe: Pipe?
-        let outputHandle: FileHandle?
-        if let startupLogURL,
-           let handle = try? FileHandle(forWritingTo: startupLogURL) {
-            outputHandle = handle
-            outputPipe = nil
-            process.standardOutput = handle
-            process.standardError = handle
-        } else {
-            let pipe = Pipe()
-            outputPipe = pipe
-            outputHandle = nil
-            startupOutput.attach(to: pipe)
-            process.standardOutput = pipe
-            process.standardError = pipe
-        }
+        let outputPipe = Pipe()
+        startupOutput.attach(to: outputPipe, teeTo: startupLogURL)
+        process.standardOutput = outputPipe
+        process.standardError = outputPipe
 
         let controller = self
         let recordID = profileID
         process.terminationHandler = { terminated in
-            if let outputPipe {
-                startupOutput.finishReading(from: outputPipe)
-            }
-            try? outputHandle?.close()
+            startupOutput.finishReading(from: outputPipe)
             let terminatedPID = terminated.processIdentifier
             Task {
                 await controller.handleProcessTermination(
@@ -247,7 +232,7 @@ extension EZRWorkerSupervisorController {
             record.lastError = nil
             record.lastLifecycleMessage = "Gateway 进程已启动，正在等待本地服务响应"
         } catch {
-            try? outputHandle?.close()
+            startupOutput.close()
             record.markFailed(error.localizedDescription)
             record.ownership = .none
             return (false, error.localizedDescription)

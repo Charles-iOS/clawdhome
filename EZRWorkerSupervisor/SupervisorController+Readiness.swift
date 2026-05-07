@@ -694,9 +694,41 @@ extension EZRWorkerSupervisorController {
             record.healthState = .unresponsive
             let seconds = Int(duration.rounded(.down))
             record.lastLifecycleMessage = "Gateway 进程运行中，但健康检查已连续 \(seconds) 秒无响应"
+            scheduleManagedUnresponsiveRestartIfNeeded(record)
         } else {
             record.healthState = pendingHealthState
             record.lastLifecycleMessage = pendingMessage
+        }
+    }
+
+    private func scheduleManagedUnresponsiveRestartIfNeeded(_ record: SupervisorRecord) {
+        guard record.profile.sourceKind == .managed,
+              record.profile.managementMode == .managedByEZRWorker,
+              record.userStoppedAt == nil,
+              inFlightStartTasks[record.profile.id] == nil
+        else {
+            return
+        }
+
+        let confirmedManagedGateway =
+            record.ownership == .supervised
+            || (record.ownership == .adopted && record.adoptionKind == .managedAdopted)
+        guard confirmedManagedGateway else { return }
+
+        guard recordRestartHandoff(for: record.profile.id) else {
+            record.markFailed(Self.gatewayRestartHandoffLimitMessage)
+            record.ownership = .none
+            return
+        }
+
+        let profileID = record.profile.id
+        record.readyState = .starting
+        record.healthState = .launching
+        record.lastError = nil
+        record.lastLifecycleMessage = "Gateway 健康检查持续无响应，Supervisor 正在自动重启"
+
+        Task { [profileID] in
+            _ = await self.restartProfile(profileID: profileID)
         }
     }
 

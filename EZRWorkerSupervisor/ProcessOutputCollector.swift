@@ -27,8 +27,13 @@ final class ProcessOutputCollector {
 
     func finishReading(from pipe: Pipe) {
         pipe.fileHandleForReading.readabilityHandler = nil
+        try? pipe.fileHandleForWriting.close()
         let remaining = pipe.fileHandleForReading.readDataToEndOfFile()
         append(remaining)
+        closeLogFile()
+    }
+
+    func close() {
         closeLogFile()
     }
 
