@@ -114,6 +114,7 @@ extension EZRWorkerSupervisorController {
         guard let profile = profiles[profileID] else {
             return (false, "未找到 profile: \(profileID.uuidString)")
         }
+        logLifecycle("startProfile begin profile=\(profile.slug) id=\(profileID.uuidString)")
         let record = recordForProfile(profile)
         record.clearManualStopMarker()
         setPersistentDesiredState(
@@ -128,6 +129,7 @@ extension EZRWorkerSupervisorController {
         }
         record.lastLifecycleMessage = "正在检查是否已有可复用 Gateway"
         if let existingGatewayResult = await adoptExistingHealthyGatewayIfAvailable(for: record) {
+            logLifecycle("startProfile adopted-existing profile=\(profile.slug) ok=\(existingGatewayResult.0)")
             return existingGatewayResult
         }
 
@@ -222,6 +224,9 @@ extension EZRWorkerSupervisorController {
         do {
             record.lastLifecycleMessage = "正在启动 Gateway 进程"
             try process.run()
+            logLifecycle(
+                "startProfile launched profile=\(profile.slug) pid=\(process.processIdentifier) port=\(record.resolution.resolvedPort)"
+            )
             record.process = process
             record.pid = process.processIdentifier
             record.isRunning = true
@@ -336,6 +341,11 @@ extension EZRWorkerSupervisorController {
         record.pid = nil
         record.isRunning = false
         record.ownership = .none
+        // 重启或停止后清掉就绪时间戳；下一轮启动重新走 fresh-launch 宽限期，
+        // 避免 unresponsive 阈值在新进程刚拉起就被触发。
+        record.lastReadyAt = nil
+        record.unhealthySince = nil
+        record.lastHealthyProbeAt = nil
         if markUserStopped {
             record.markManuallyStopped()
             setPersistentDesiredState(
@@ -389,10 +399,34 @@ extension EZRWorkerSupervisorController {
     }
 
     func restartProfile(profileID: UUID) async -> (Bool, String?) {
+        if let existing = inFlightRestartTasks[profileID] {
+            logLifecycle("restartProfile coalesced existing-task id=\(profileID.uuidString)")
+            return await existing.value
+        }
+
+        let task = Task { [self] in
+            await performRestartProfile(profileID: profileID)
+        }
+        inFlightRestartTasks[profileID] = task
+
+        let result = await task.value
+        inFlightRestartTasks.removeValue(forKey: profileID)
+        return result
+    }
+
+    private func performRestartProfile(profileID: UUID) async -> (Bool, String?) {
+        if let profile = profiles[profileID] {
+            logLifecycle("restartProfile requested profile=\(profile.slug) id=\(profileID.uuidString)")
+        } else {
+            logLifecycle("restartProfile requested missing-profile id=\(profileID.uuidString)")
+        }
         guard let record = records[profileID] else {
             return await startProfile(profileID: profileID)
         }
         let stopResult = await stopRecord(record, markUserStopped: false)
+        logLifecycle(
+            "restartProfile stopResult profile=\(record.profile.slug) ok=\(stopResult.0) msg=\(stopResult.1 ?? "nil")"
+        )
         guard stopResult.0 else { return stopResult }
         return await startProfile(profileID: profileID)
     }

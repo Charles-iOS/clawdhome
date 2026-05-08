@@ -1,10 +1,19 @@
 import Foundation
+import OSLog
 
 actor EZRWorkerSupervisorController {
+    nonisolated static let lifecycleLogger = Logger(
+        subsystem: "ai.ezrworker.mac.supervisor",
+        category: "lifecycle"
+    )
     static let gatewayStartupProbeAttempts = 120
     static let gatewayStartupProbeIntervalNanoseconds: UInt64 = 1_000_000_000
-    static let gatewayUnresponsiveThreshold: TimeInterval = 30
-    static let gatewayFreshLaunchGracePeriod: TimeInterval = 90
+    static let gatewayUnresponsiveThreshold: TimeInterval = 60
+    static let gatewayFreshLaunchGracePeriod: TimeInterval = 120
+    static let gatewayReadyResponseTimeoutDuringStartup: TimeInterval = 30
+    static let pseudoLiveAutoRestartCooldown: TimeInterval = 120
+    static let pseudoLiveSampleCaptureCooldown: TimeInterval = 180
+    static let postRestartSettleWindow: TimeInterval = 90
     static let gatewayRestartHandoffWindow: TimeInterval = 60
     static let maxGatewayRestartHandoffsInWindow = 3
     static let gatewayRestartHandoffLimitMessage =
@@ -21,7 +30,10 @@ actor EZRWorkerSupervisorController {
     var profileOrder: [UUID] = []
     var records: [UUID: SupervisorRecord] = [:]
     var inFlightStartTasks: [UUID: Task<(Bool, String?), Never>] = [:]
+    var inFlightRestartTasks: [UUID: Task<(Bool, String?), Never>] = [:]
     var restartHandoffTimestamps: [UUID: [Date]] = [:]
+    var pseudoLiveRecoveryTimestamps: [UUID: Date] = [:]
+    var pseudoLiveSampleCaptureTimestamps: [UUID: Date] = [:]
     var runtimeState = SupervisorRuntimeStateDocument()
     var isReconcilingAutoStart = false
     var needsAutoStartReconcile = false
@@ -130,6 +142,10 @@ actor EZRWorkerSupervisorController {
             return SupervisorRuntimeStateDocument()
         }
         return document
+    }
+
+    func logLifecycle(_ message: String) {
+        Self.lifecycleLogger.notice("\(message, privacy: .public)")
     }
 }
 

@@ -39,7 +39,9 @@ extension EZRWorkerSupervisorController {
             }
         }
 
-        return lines.reversed().first(where: { !Self.isBenignStartupProgressLine($0) })
+        // 没有匹配到明确的错误指示就返回 nil，由上层自行决定超时/未就绪文案；
+        // 避免把 startup trace、plugin 加载日志等正常行误当成失败原因。
+        return nil
     }
 
     func startupOutputIndicatesGatewayReady(_ output: String?) -> Bool {
@@ -60,9 +62,17 @@ extension EZRWorkerSupervisorController {
     }
 
     static func isSupervisorRestartHandoffMessage(_ text: String) -> Bool {
-        text.localizedCaseInsensitiveContains("restart mode:")
-            && text.localizedCaseInsensitiveContains("full process restart")
-            && text.localizedCaseInsensitiveContains("supervisor restart")
+        let normalized = text.lowercased()
+        guard normalized.contains("restart mode:") else { return false }
+
+        let fullSupervisorRestart =
+            normalized.contains("full process restart")
+            && normalized.contains("supervisor restart")
+        let inProcessNoRespawnRestart =
+            normalized.contains("in-process restart")
+            && normalized.contains("openclaw_no_respawn")
+
+        return fullSupervisorRestart || inProcessNoRespawnRestart
     }
 
     static func isBenignStartupProgressLine(_ text: String) -> Bool {
@@ -73,6 +83,12 @@ extension EZRWorkerSupervisorController {
             || normalized.contains("[gateway] starting")
             || isGatewayReadyLine(normalized)
             || normalized.contains("[gateway] log file:")
+            || normalized.contains("[gateway] startup trace")
+            || normalized.contains("[gateway] startup phase")
+            || normalized.contains("[plugins]")
+            || normalized.contains("[plugin]")
+            || normalized.contains("[browser/")
+            || normalized.contains("[ws]")
             || normalized.contains("[canvas] host mounted")
             || normalized.contains("[health-monitor] started")
             || normalized.contains("[heartbeat] started")
@@ -81,6 +97,10 @@ extension EZRWorkerSupervisorController {
             || normalized.hasPrefix("sessions ok:")
             || normalized.hasPrefix("wrote ")
             || normalized.hasPrefix("config overwrite:")
+            || normalized.hasPrefix("listening on ")
+            || normalized.hasPrefix("info ")
+            || normalized.hasPrefix("warn ")
+            || normalized.hasPrefix("debug ")
     }
 
     static func isGatewayReadyLine(_ text: String) -> Bool {
