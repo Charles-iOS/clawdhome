@@ -165,6 +165,7 @@
 		D1DC17C7A4F1FB04DB4A3647 /* HelperProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9EE5DE7D583D2F71833A534 /* HelperProtocol.swift */; };
 		D31E6F2FFEEAC36466B7635C /* UserInitPresentationRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A80BFC11DD1E70AB01DC72 /* UserInitPresentationRouting.swift */; };
 		D3A2F6603044FD367F4D781C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 65DFDC9A5D564622349F186D /* Assets.xcassets */; };
+		D4A99AB34F15075CB25FD12F /* SupervisorController+Recovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0731A89A9D9490C98B670A76 /* SupervisorController+Recovery.swift */; };
 		D51F43B92088801DBCBDC2AE /* CronAddSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6DF2DA86BC84D8B486B3BE0 /* CronAddSheet.swift */; };
 		D63E050779DF1D8D5FDEFC24 /* SupervisorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9C4248D2AA44226F4452987 /* SupervisorClient.swift */; };
 		D6A96844A9F0AAF2FD9E2EC0 /* SupervisorController+Readiness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A7B35275773CD4D7FE80E9F /* SupervisorController+Readiness.swift */; };
@@ -225,6 +226,7 @@
 		056DC4D47EB53A6A87CDB202 /* FeishuChannelConfigSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelConfigSheet.swift; sourceTree = "<group>"; };
 		06416A4736695C43257B59E4 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		066D976F7CAB22CD53E04EA3 /* LaunchAgentHandoffService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAgentHandoffService.swift; sourceTree = "<group>"; };
+		0731A89A9D9490C98B670A76 /* SupervisorController+Recovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SupervisorController+Recovery.swift"; sourceTree = "<group>"; };
 		0995FC8A604C624817297FBA /* FeishuChannelOnboardingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeishuChannelOnboardingSheet.swift; sourceTree = "<group>"; };
 		0B16F71BB5A6376932F4DDCA /* PageHeroHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageHeroHeader.swift; sourceTree = "<group>"; };
 		0BFAB29D20A77B385926B74B /* AgentSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionsView.swift; sourceTree = "<group>"; };
@@ -573,6 +575,7 @@
 				CC5067273AAFB9ED3F6BE967 /* SupervisorController+OutputParsing.swift */,
 				966BBDE49011F98EA188BA2C /* SupervisorController+Profiles.swift */,
 				3A7B35275773CD4D7FE80E9F /* SupervisorController+Readiness.swift */,
+				0731A89A9D9490C98B670A76 /* SupervisorController+Recovery.swift */,
 				2477EFB6C4FF5DA7555F61BC /* SupervisorRecord.swift */,
 			);
 			path = EZRWorkerSupervisor;
@@ -1171,6 +1174,7 @@
 				FCA8D5F78F76E3A7C8595758 /* SupervisorController+OutputParsing.swift in Sources */,
 				DD8741AF41F4E95D05F95153 /* SupervisorController+Profiles.swift in Sources */,
 				D6A96844A9F0AAF2FD9E2EC0 /* SupervisorController+Readiness.swift in Sources */,
+				D4A99AB34F15075CB25FD12F /* SupervisorController+Recovery.swift in Sources */,
 				816163E208A30C242C77413F /* SupervisorController.swift in Sources */,
 				E86F287DDA71CE8B3485951A /* SupervisorProtocol.swift in Sources */,
 				86894FB1907A3DB12B31E762 /* SupervisorRecord.swift in Sources */,

@@ -165,6 +165,7 @@ extension EZRWorkerSupervisorController {
         record.ownership = ownsProcess ? .supervised : .adopted
         record.adoptionKind = adoptionKind(for: record, ownership: record.ownership)
         if probe.ready {
+            clearRestartHandoffHistory(for: record.profile.id)
             record.markHealthy(now: now)
         } else {
             applyUnhealthyRunningSnapshot(
@@ -233,6 +234,7 @@ extension EZRWorkerSupervisorController {
         record.ownership = .adopted
         record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
         if probe.ready {
+            clearRestartHandoffHistory(for: record.profile.id)
             record.markHealthy(now: now)
             record.lastLifecycleMessage = record.profile.managementMode == .observeOnly
                 ? "外部 Gateway 已接入（仅观察）"
@@ -268,6 +270,7 @@ extension EZRWorkerSupervisorController {
                 record.portListeningPID = pid
                 record.httpResponding = currentProbe.alive
                 record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
+                clearRestartHandoffHistory(for: record.profile.id)
                 record.markHealthy()
                 return (true, nil)
             }
@@ -313,27 +316,73 @@ extension EZRWorkerSupervisorController {
                 return (false, "Gateway 启动已取消")
             }
 
-            if ownership == .supervised,
-               record.process == nil {
-                let message =
-                    record.lastError
-                    ?? extractStartupFailureMessage(from: startupOutput?.output)
-                    ?? "Gateway 异常退出"
-                record.markFailed(message)
-                record.ownership = .none
-                return (false, message)
-            }
+            if ownership == .supervised {
+                let listeningPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+                let listeningBelongsToRecord = listeningPID.map {
+                    listeningGatewayProcessBelongsToRecord(
+                        pid: $0,
+                        record: record,
+                        expectedRootPID: pid
+                    )
+                } ?? false
 
-            if ownership == .supervised,
-               let process = record.process,
-               !process.isRunning {
-                let message =
-                    record.lastError
-                    ?? extractStartupFailureMessage(from: startupOutput?.output)
-                    ?? "Gateway 异常退出"
-                record.markFailed(message)
-                record.ownership = .none
-                return (false, message)
+                if record.process == nil || (record.process?.isRunning == false) {
+                    if listeningBelongsToRecord {
+                        logLifecycle(
+                            "waitForGatewayReady launcher-exit adopt profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) pid=\(listeningPID ?? -1)"
+                        )
+                        let now = Date()
+                        record.isRunning = true
+                        record.pid = listeningPID ?? pid
+                        record.portListeningPID = listeningPID
+                        record.httpResponding = false
+                        record.ownership = .adopted
+                        record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
+                        applyUnhealthyRunningSnapshot(
+                            record,
+                            pid: listeningPID ?? pid,
+                            ownership: .adopted,
+                            pendingHealthState: .portListening,
+                            reason: "gateway launcher exited while readiness probe is still running",
+                            pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在接管并继续等待健康检查",
+                            now: now
+                        )
+                    } else {
+                        let elapsed = Date().timeIntervalSince(startupStartedAt)
+                        if elapsed < Self.gatewayFreshLaunchGracePeriod {
+                            let now = Date()
+                            record.isRunning = true
+                            record.pid = pid
+                            record.portListeningPID = listeningPID
+                            record.httpResponding = false
+                            record.ownership = .adopted
+                            record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
+                            applyUnhealthyRunningSnapshot(
+                                record,
+                                pid: pid,
+                                ownership: .adopted,
+                                pendingHealthState: .launching,
+                                reason: "gateway launcher exited before listener is ready",
+                                pendingMessage: "Gateway 启动链路切换中，正在等待监听端口就绪",
+                                now: now
+                            )
+                            logLifecycle(
+                                "waitForGatewayReady launcher-exit defer-fail profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) elapsed=\(Int(elapsed.rounded(.down)))s"
+                            )
+                        } else {
+                            let message =
+                                record.lastError
+                                ?? extractStartupFailureMessage(from: startupOutput?.output)
+                                ?? "Gateway 异常退出"
+                            logLifecycle(
+                                "waitForGatewayReady launcher-exit fail profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) message=\(message)"
+                            )
+                            record.markFailed(message)
+                            record.ownership = .none
+                            return (false, message)
+                        }
+                    }
+                }
             }
 
             if ownership == .supervised,
@@ -342,6 +391,9 @@ extension EZRWorkerSupervisorController {
                 let message =
                     extractStartupFailureMessage(from: capturedOutput)
                     ?? "Gateway 启动失败"
+                logLifecycle(
+                    "waitForGatewayReady terminal-output-fail profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) message=\(message)"
+                )
                 _ = await stopRecord(record)
                 record.markFailed(message)
                 record.ownership = .none
@@ -374,6 +426,7 @@ extension EZRWorkerSupervisorController {
                 record.portListeningPID = currentPID
                 record.httpResponding = true
                 record.adoptionKind = adoptionKind(for: record, ownership: ownership)
+                clearRestartHandoffHistory(for: record.profile.id)
                 record.markHealthy()
                 return (true, nil)
             }
@@ -410,6 +463,7 @@ extension EZRWorkerSupervisorController {
                 record.portListeningPID = currentPID
                 record.httpResponding = probe.alive
                 record.adoptionKind = adoptionKind(for: record, ownership: ownership)
+                clearRestartHandoffHistory(for: record.profile.id)
                 record.markHealthy(now: probeAt)
                 return (true, nil)
             }
@@ -418,6 +472,20 @@ extension EZRWorkerSupervisorController {
                 Int(Date().timeIntervalSince(startupStartedAt).rounded(.down))
             )
             if probe.alive {
+                if ownership == .supervised,
+                   TimeInterval(elapsedSeconds) >= Self.gatewayReadyResponseTimeoutDuringStartup {
+                    let capturedOutput = startupOutput?.output
+                    _ = await stopRecord(record, markUserStopped: false)
+                    let message =
+                        extractStartupFailureMessage(from: capturedOutput)
+                        ?? "Gateway 已监听端口，但健康检查在 \(elapsedSeconds) 秒内无响应"
+                    logLifecycle(
+                        "waitForGatewayReady startup-readyz-timeout profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) elapsed=\(elapsedSeconds)s message=\(message)"
+                    )
+                    record.markFailed(message, now: probeAt)
+                    record.ownership = .none
+                    return (false, message)
+                }
                 applyUnhealthyRunningSnapshot(
                     record,
                     pid: currentPID ?? pid,
@@ -497,6 +565,7 @@ extension EZRWorkerSupervisorController {
             record.portListeningPID = record.pid
             record.httpResponding = finalProbe.alive
             record.adoptionKind = adoptionKind(for: record, ownership: ownership)
+            clearRestartHandoffHistory(for: record.profile.id)
             record.markHealthy(now: finalProbeAt)
             return (true, nil)
         }
@@ -507,6 +576,9 @@ extension EZRWorkerSupervisorController {
             let message =
                 extractStartupFailureMessage(from: capturedOutput)
                 ?? "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
+            logLifecycle(
+                "waitForGatewayReady startup-timeout profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) message=\(message)"
+            )
             record.markFailed(message, now: finalProbeAt)
             return (false, message)
         }
@@ -552,6 +624,7 @@ extension EZRWorkerSupervisorController {
                 record.portListeningPID = pid
                 record.httpResponding = probe.alive
                 record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
+                clearRestartHandoffHistory(for: profileID)
                 record.markHealthy(now: probeAt)
                 return
             case .relaunch:
@@ -562,9 +635,11 @@ extension EZRWorkerSupervisorController {
                 record.healthState = .launching
                 record.lastError = nil
                 record.lastLifecycleMessage = "Gateway 请求重启，正在重新拉起"
-                Task { [profileID] in
-                    _ = await self.startProfile(profileID: profileID)
-                }
+                requestLifecycleRecovery(
+                    profileID: profileID,
+                    reason: .terminationRelaunch,
+                    operation: .start
+                )
                 return
             case .fail(let message):
                 record.markFailed(message, now: probeAt)
@@ -591,9 +666,11 @@ extension EZRWorkerSupervisorController {
                     pendingMessage: "正在接管已有 Gateway 并等待就绪",
                     now: probeAt
                 )
-                Task { [profileID] in
-                    _ = await self.startProfile(profileID: profileID)
-                }
+                requestLifecycleRecovery(
+                    profileID: profileID,
+                    reason: .terminationAdoptStartup,
+                    operation: .start
+                )
             case .relaunch:
                 record.pid = nil
                 record.isRunning = false
@@ -602,9 +679,11 @@ extension EZRWorkerSupervisorController {
                 record.healthState = .launching
                 record.lastError = nil
                 record.lastLifecycleMessage = "Gateway 已退出，正在重新启动"
-                Task { [profileID] in
-                    _ = await self.startProfile(profileID: profileID)
-                }
+                requestLifecycleRecovery(
+                    profileID: profileID,
+                    reason: .terminationRelaunch,
+                    operation: .start
+                )
             case .fail(let message):
                 record.markFailed(message, now: probeAt)
                 record.ownership = .none
@@ -613,27 +692,35 @@ extension EZRWorkerSupervisorController {
         }
 
         if let currentPID = gatewayPIDListening(onPort: record.resolution.resolvedPort),
-           listeningGatewayProcessBelongsToRecord(
-               pid: currentPID,
-               record: record,
-               expectedRootPID: terminatedPID
-           ) {
-            _ = await terminateGatewayProcess(
+           externalGatewayProcessMatches(record: record, pid: currentPID) {
+            // When the managed launcher process exits, the real gateway may still be alive
+            // and soon become healthy. Prefer adoption over aggressive termination.
+            record.process = nil
+            record.pid = currentPID
+            record.isRunning = true
+            record.ownership = .adopted
+            record.portListeningPID = currentPID
+            record.httpResponding = probe.alive
+            record.adoptionKind = adoptionKind(for: record, ownership: .adopted)
+            applyUnhealthyRunningSnapshot(
+                record,
                 pid: currentPID,
-                port: record.resolution.resolvedPort
+                ownership: .adopted,
+                pendingHealthState: .portListening,
+                reason: "gateway launcher exited while gateway process is still listening",
+                pendingMessage: "Gateway 已监听端口 \(record.resolution.resolvedPort)，正在接管并等待健康检查",
+                now: probeAt
             )
-            record.portListeningPID = nil
-            record.httpResponding = false
+            requestLifecycleRecovery(
+                profileID: profileID,
+                reason: .terminationLauncherExited,
+                operation: .start
+            )
+            return
         }
 
         if record.readyState != .stopped,
            isSupervisorRestartHandoff(exitCode: exitCode, output: capturedOutput) {
-            guard recordRestartHandoff(for: profileID) else {
-                record.markFailed(Self.gatewayRestartHandoffLimitMessage)
-                record.ownership = .none
-                return
-            }
-
             record.pid = nil
             record.isRunning = false
             record.ownership = .none
@@ -642,9 +729,11 @@ extension EZRWorkerSupervisorController {
             record.lastError = nil
             record.lastLifecycleMessage = "Gateway 请求重启，正在重新拉起"
 
-            Task { [profileID] in
-                _ = await self.startProfile(profileID: profileID)
-            }
+            requestLifecycleRecovery(
+                profileID: profileID,
+                reason: .terminationHandoff,
+                operation: .start
+            )
             return
         }
 
@@ -668,6 +757,10 @@ extension EZRWorkerSupervisorController {
         }
         restartHandoffTimestamps[profileID] = recent + [now]
         return true
+    }
+
+    func clearRestartHandoffHistory(for profileID: UUID) {
+        restartHandoffTimestamps.removeValue(forKey: profileID)
     }
 
     private func applyUnhealthyRunningSnapshot(
@@ -715,21 +808,16 @@ extension EZRWorkerSupervisorController {
             || (record.ownership == .adopted && record.adoptionKind == .managedAdopted)
         guard confirmedManagedGateway else { return }
 
-        guard recordRestartHandoff(for: record.profile.id) else {
-            record.markFailed(Self.gatewayRestartHandoffLimitMessage)
-            record.ownership = .none
-            return
-        }
-
-        let profileID = record.profile.id
         record.readyState = .starting
         record.healthState = .launching
         record.lastError = nil
         record.lastLifecycleMessage = "Gateway 健康检查持续无响应，Supervisor 正在自动重启"
 
-        Task { [profileID] in
-            _ = await self.restartProfile(profileID: profileID)
-        }
+        requestLifecycleRecovery(
+            profileID: record.profile.id,
+            reason: .unresponsive,
+            operation: .restart
+        )
     }
 
     private func unresponsiveThreshold(for record: SupervisorRecord) -> TimeInterval {
