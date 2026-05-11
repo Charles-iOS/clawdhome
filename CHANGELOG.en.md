@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.4] - 2026-05-11
+
+### Improvements & Fixes
+- Centralized Gateway start, restart, and recovery decisions in the Supervisor so the app no longer triggers parallel lifecycle recovery, reducing restart thrash and flaky health transitions from overlapping fault handlers.
+- Fixed environment handoff on Gateway restarts and improved recovery after abnormal child process exits for better long-running stability.
+- Tightened Supervisor readiness waits and recovery pacing, clarified failure messaging, and made minor home dashboard adjustments.
+- Removed unused legacy Helper/pool code paths so the mainline consistently uses the user-level Supervisor model, simplifying maintenance and future work.
+
+
 ## [1.1.3] - 2026-05-06
 
 ### Improvements & Fixes
