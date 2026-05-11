@@ -6,16 +6,27 @@ actor EZRWorkerSupervisorController {
         subsystem: "ai.ezrworker.mac.supervisor",
         category: "lifecycle"
     )
-    static let gatewayStartupProbeAttempts = 120
+    static let gatewayStartupProbeAttempts = 180
     static let gatewayStartupProbeIntervalNanoseconds: UInt64 = 1_000_000_000
-    static let gatewayUnresponsiveThreshold: TimeInterval = 60
-    static let gatewayFreshLaunchGracePeriod: TimeInterval = 120
+    /// 主循环耗尽后再追加若干次探测，覆盖「刚过阈值即 ready」的边界。
+    static let gatewayStartupFinalGraceProbeExtraAttempts = 8
+    static let gatewayStartupFinalGraceProbeIntervalSeconds: UInt64 = 3
+    nonisolated static var gatewayStartupTimeoutMessageSeconds: Int {
+        gatewayStartupProbeAttempts
+            + Int(gatewayStartupFinalGraceProbeExtraAttempts)
+                * Int(gatewayStartupFinalGraceProbeIntervalSeconds)
+    }
+    // 已 ready 后 /readyz 持续无响应 240s 才视为 unresponsive：
+    // 真实场景下 LLM 长任务 + 插件后置安装 + 大日志 tail 都会让 event loop 阶段性繁忙，
+    // 但只要端口仍 LISTEN 一般不是真死，过短阈值会触发误重启。
+    static let gatewayUnresponsiveThreshold: TimeInterval = 240
+    static let gatewayFreshLaunchGracePeriod: TimeInterval = 240
     static let gatewayReadyResponseTimeoutDuringStartup: TimeInterval = 30
-    static let pseudoLiveAutoRestartCooldown: TimeInterval = 120
+    static let pseudoLiveAutoRestartCooldown: TimeInterval = 600
     static let pseudoLiveSampleCaptureCooldown: TimeInterval = 180
-    static let postRestartSettleWindow: TimeInterval = 90
-    static let gatewayRestartHandoffWindow: TimeInterval = 60
-    static let maxGatewayRestartHandoffsInWindow = 3
+    static let postRestartSettleWindow: TimeInterval = 180
+    static let gatewayRestartHandoffWindow: TimeInterval = 1800
+    static let maxGatewayRestartHandoffsInWindow = 2
     static let gatewayRestartHandoffLimitMessage =
         "Gateway 连续请求 supervisor restart，已停止自动重启以避免循环"
     static let meaningfulLegacyConfigKeys: Set<String> = [

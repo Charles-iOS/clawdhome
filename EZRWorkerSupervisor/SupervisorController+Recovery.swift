@@ -52,6 +52,23 @@ extension EZRWorkerSupervisorController {
                 )
                 return false
             }
+            // 强保护：端口仍在 LISTEN 且当前窗口内已经触发过至少一次 handoff 时，
+            // 倾向于"只抓样本不重启"。真实场景里 /readyz 慢但端口还在监听，
+            // 多半是 LLM 长任务或插件 backfill，重启反而会打断用户操作。
+            let recentHandoffCount = restartHandoffTimestamps[profileID]?
+                .filter { now.timeIntervalSince($0) < Self.gatewayRestartHandoffWindow }
+                .count ?? 0
+            if record.portListeningPID != nil, recentHandoffCount >= 1 {
+                logLifecycle(
+                    "lifecycle recovery skipped reason=\(reason.rawValue) detail=port-still-listening profile=\(slug) port=\(port) recentHandoffs=\(recentHandoffCount)"
+                )
+                pseudoLiveRecoveryTimestamps[profileID] = now
+                Task { [profileID] in
+                    await self.capturePseudoLiveSampleIfNeeded(profileID: profileID)
+                }
+                record.lastLifecycleMessage = "Gateway 健康检查无响应但端口仍在监听，已暂停自动重启并抓取诊断样本"
+                return false
+            }
             guard recordRestartHandoff(for: profileID, now: now) else {
                 logLifecycle(
                     "lifecycle recovery throttled reason=\(reason.rawValue) detail=handoff-limit profile=\(slug) port=\(port)"
@@ -110,11 +127,36 @@ extension EZRWorkerSupervisorController {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let timestamp = formatter.string(from: now)
-        let fileName = "sample-\(record.profile.slug)-\(record.resolution.resolvedPort)-\(pid)-\(timestamp).txt"
+        let baseName = "sample-\(record.profile.slug)-\(record.resolution.resolvedPort)-\(pid)-\(timestamp)"
         let captureDir = EZRWorkerPaths.applicationSupportDirectory
             .appendingPathComponent("diagnostics", isDirectory: true)
             .appendingPathComponent("pseudo-live-samples", isDirectory: true)
-        let outputURL = captureDir.appendingPathComponent(fileName)
+        let outputURL = captureDir.appendingPathComponent("\(baseName).txt")
+        let metaURL = captureDir.appendingPathComponent("\(baseName).meta.json")
+
+        let meta = PseudoLiveSampleMeta(
+            capturedAt: now,
+            profileSlug: record.profile.slug,
+            profileID: record.profile.id.uuidString,
+            sourceKind: record.profile.sourceKind.rawValue,
+            managementMode: record.profile.managementMode.rawValue,
+            port: record.resolution.resolvedPort,
+            pid: Int(pid),
+            ownership: record.ownership.rawValue,
+            adoptionKind: record.adoptionKind.rawValue,
+            healthState: record.healthState.rawValue,
+            readyState: record.readyState.rawValue,
+            isRunning: record.isRunning,
+            httpResponding: record.httpResponding,
+            lastReadyAt: record.lastReadyAt,
+            unhealthySince: record.unhealthySince,
+            lastProbeAt: record.lastProbeAt,
+            lastHealthyProbeAt: record.lastHealthyProbeAt,
+            lastUnhealthyReason: record.lastUnhealthyReason,
+            lastLifecycleMessage: record.lastLifecycleMessage,
+            lastError: record.lastError,
+            sampleFile: outputURL.lastPathComponent
+        )
 
         logLifecycle(
             "pseudo-live sample capture start profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) pid=\(pid) file=\(outputURL.path)"
@@ -128,13 +170,14 @@ extension EZRWorkerSupervisorController {
                     withIntermediateDirectories: true,
                     attributes: [.posixPermissions: 0o700]
                 )
+                Self.writePseudoLiveSampleMeta(meta, to: metaURL)
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/bin/sample")
                 process.arguments = [String(pid), "3", "-file", outputURL.path]
                 try process.run()
                 process.waitUntilExit()
                 await self.logLifecycle(
-                    "pseudo-live sample capture done profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) pid=\(pid) exit=\(process.terminationStatus) file=\(outputURL.path)"
+                    "pseudo-live sample capture done profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) pid=\(pid) exit=\(process.terminationStatus) file=\(outputURL.path) meta=\(metaURL.lastPathComponent)"
                 )
             } catch {
                 await self.logLifecycle(
@@ -143,4 +186,39 @@ extension EZRWorkerSupervisorController {
             }
         }.value
     }
+
+    private static func writePseudoLiveSampleMeta(
+        _ meta: PseudoLiveSampleMeta,
+        to url: URL
+    ) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(meta) else { return }
+        try? data.write(to: url, options: [.atomic])
+    }
+}
+
+private struct PseudoLiveSampleMeta: Codable {
+    let capturedAt: Date
+    let profileSlug: String
+    let profileID: String
+    let sourceKind: String
+    let managementMode: String
+    let port: Int
+    let pid: Int
+    let ownership: String
+    let adoptionKind: String
+    let healthState: String
+    let readyState: String
+    let isRunning: Bool
+    let httpResponding: Bool?
+    let lastReadyAt: Date?
+    let unhealthySince: Date?
+    let lastProbeAt: Date?
+    let lastHealthyProbeAt: Date?
+    let lastUnhealthyReason: String?
+    let lastLifecycleMessage: String?
+    let lastError: String?
+    let sampleFile: String
 }

@@ -99,9 +99,26 @@ struct HomeDashboardView: View {
         HStack(spacing: 8) {
             switch processManager.state {
             case .running, .waitingForHealthCheck, .unresponsive:
-                Button(L10n.k("dashboard.restart", fallback: "重启")) {
+                let isUnresponsive: Bool = {
+                    if case .unresponsive = processManager.state { return true }
+                    return false
+                }()
+                Button(
+                    isUnresponsive
+                        ? L10n.k("dashboard.restart_auto_recovering", fallback: "Supervisor 自动恢复中")
+                        : L10n.k("dashboard.restart", fallback: "重启")
+                ) {
                     processManager.restart()
                 }
+                .disabled(isUnresponsive)
+                .help(
+                    isUnresponsive
+                        ? L10n.k(
+                            "dashboard.restart_auto_recovering_tip",
+                            fallback: "Supervisor 正在自动恢复，请稍候。"
+                        )
+                        : ""
+                )
                 Button(L10n.k("dashboard.stop", fallback: "停止")) {
                     Task {
                         await gateway.disconnect()

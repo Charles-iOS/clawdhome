@@ -570,12 +570,53 @@ extension EZRWorkerSupervisorController {
             return (true, nil)
         }
 
+        for graceAttempt in 0..<Self.gatewayStartupFinalGraceProbeExtraAttempts {
+            try? await Task.sleep(
+                nanoseconds: Self.gatewayStartupFinalGraceProbeIntervalSeconds * 1_000_000_000
+            )
+            let graceProbe = await GatewayHealthProbe.httpProbe(port: record.resolution.resolvedPort)
+            let graceAt = Date()
+            record.lastProbeAt = graceAt
+            if graceProbe.ready {
+                let finalPID = gatewayPIDListening(onPort: record.resolution.resolvedPort)
+                if requireSameListeningPID,
+                   let finalPID,
+                   !listeningGatewayProcessBelongsToRecord(
+                       pid: finalPID,
+                       record: record,
+                       expectedRootPID: pid
+                   ) {
+                    let message = "端口 \(record.resolution.resolvedPort) 已被其他 Gateway 进程占用"
+                    if ownership == .supervised {
+                        _ = await stopRecord(record)
+                    }
+                    record.markFailed(message, now: graceAt)
+                    record.ownership = .none
+                    return (false, message)
+                }
+                logLifecycle(
+                    "waitForGatewayReady startup-grace-recovered profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) attempt=\(graceAttempt + 1)/\(Self.gatewayStartupFinalGraceProbeExtraAttempts)"
+                )
+                record.isPrepared = true
+                record.isRunning = true
+                record.pid = finalPID ?? pid
+                record.portListeningPID = record.pid
+                record.httpResponding = graceProbe.alive
+                record.adoptionKind = adoptionKind(for: record, ownership: ownership)
+                clearRestartHandoffHistory(for: record.profile.id)
+                record.markHealthy(now: graceAt)
+                return (true, nil)
+            }
+        }
+
+        let timeoutSecondsHint = Self.gatewayStartupTimeoutMessageSeconds
+
         if ownership == .supervised, record.process?.isRunning == true {
             let capturedOutput = startupOutput?.output
             _ = await stopRecord(record, markUserStopped: false)
             let message =
                 extractStartupFailureMessage(from: capturedOutput)
-                ?? "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
+                ?? "Gateway 启动超时（\(timeoutSecondsHint)s）"
             logLifecycle(
                 "waitForGatewayReady startup-timeout profile=\(record.profile.slug) port=\(record.resolution.resolvedPort) message=\(message)"
             )
@@ -583,7 +624,7 @@ extension EZRWorkerSupervisorController {
             return (false, message)
         }
 
-        let message = "Gateway 启动超时（\(Self.gatewayStartupProbeAttempts)s）"
+        let message = "Gateway 启动超时（\(timeoutSecondsHint)s）"
         record.markFailed(message, now: finalProbeAt)
         record.ownership = .none
         return (false, message)
